@@ -1,0 +1,89 @@
+use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "market_status")]
+pub enum MarketStatus {
+    ACTIVE,
+    CLOSED,
+    RESOLVED,
+    CANCELLED,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow, sqlx::Type)]
+pub struct Market {
+    pub id: Uuid,
+    pub title: String,
+    pub description: String,
+    pub category: String,
+    pub close_at: DateTime<Utc>,
+    pub status: MarketStatus,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]
+pub struct Outcome {
+    pub id: Uuid,
+    pub market_id: Uuid,
+    pub label: String,
+    pub start_price: Decimal,
+    pub current_price: Decimal,
+    pub total_shares: Decimal,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "order_type")]
+pub enum OrderType {
+    BUY,
+    SELL,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type)]
+#[sqlx(type_name = "order_status")]
+pub enum OrderStatus {
+    PENDING,
+    PARTIAL,
+    FILLED,
+    CANCELLED,
+    EXPIRED,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]
+pub struct Order {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub market_id: Uuid,
+    pub outcome_id: Uuid,
+    pub order_type: OrderType,
+    pub shares: Decimal,
+    pub remaining_shares: Decimal,
+    pub price: Decimal,
+    pub status: OrderStatus,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]
+pub struct Trade {
+    pub id: Uuid,
+    pub market_id: Uuid,
+    pub buy_order_id: Uuid,
+    pub sell_order_id: OrderType,
+    pub shares: Decimal,
+    pub price: Decimal,
+    pub created_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]
+pub struct ResolvedMarket {
+    pub id: Uuid,
+    pub market_id: Uuid,
+    pub winning_outcome_id: Uuid,
+    pub created_at: Option<DateTime<Utc>>,
+}
