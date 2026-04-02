@@ -78,9 +78,14 @@ pub struct UpdateUserDTO {
     )]
     pub email: String,
 
-    #[validate(length(min = 1, message = "Mobile number is required"))]
     #[serde(rename = "mobileNo")]
-    pub mobile_no: String,
+    pub mobile_no: Option<String>,
+}
+
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateUserPictureDTO {
+    #[validate(length(min = 1, message = "Picture is required"))]
+    pub picture: String,
 }
 
 fn validate_positive_decimal(value: &Decimal) -> Result<(), ValidationError> {

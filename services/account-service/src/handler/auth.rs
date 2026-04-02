@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use axum::{
-    Extension, Json, Router,
+    Json, Router,
+    extract::State,
     http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
     routing::post,
@@ -17,14 +18,14 @@ use validator::Validate;
 
 use crate::{AppState, db::AccountExt, util::hash};
 
-pub fn auth_handler() -> Router {
+pub fn auth_handler() -> Router<Arc<AppState>> {
     Router::new()
         .route("/signup", post(signup))
         .route("/signin", post(signin))
 }
 
 pub async fn signup(
-    Extension(app_state): Extension<Arc<AppState>>,
+    State(app_state): State<Arc<AppState>>,
     Json(body): Json<RegisterUserDTO>,
 ) -> Result<impl IntoResponse, HttpError> {
     body.validate()
@@ -53,7 +54,7 @@ pub async fn signup(
 }
 
 pub async fn signin(
-    Extension(app_state): Extension<Arc<AppState>>,
+    State(app_state): State<Arc<AppState>>,
     Json(body): Json<LoginUserDTO>,
 ) -> Result<impl IntoResponse, HttpError> {
     body.validate()

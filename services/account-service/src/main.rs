@@ -13,6 +13,7 @@ use crate::router::create_router;
 
 pub mod db;
 pub mod handler;
+pub mod middleware;
 pub mod router;
 pub mod util;
 

@@ -12,6 +12,18 @@ pub trait AccountExt {
         email: T,
         password: T,
     ) -> Result<User, sqlx::Error>;
+    async fn update_user<T: Into<String> + Send>(
+        &self,
+        user_id: Uuid,
+        name: T,
+        email: T,
+        mobile_no: Option<T>,
+    ) -> Result<User, sqlx::Error>;
+    async fn update_user_picture<T: Into<String> + Send>(
+        &self,
+        user_id: Uuid,
+        picture: T,
+    ) -> Result<User, sqlx::Error>;
 }
 
 #[async_trait]
@@ -55,6 +67,51 @@ impl AccountExt for PGClient {
         )
         .fetch_one(&self.pool)
         .await?;
+
+        Ok(user)
+    }
+
+    async fn update_user<T: Into<String> + Send>(
+        &self,
+        user_id: Uuid,
+        name: T,
+        email: T,
+        mobile_no: Option<T>,
+    ) -> Result<User, sqlx::Error> {
+        let name = name.into();
+        let email = email.into();
+        let mobile_no = mobile_no.map(|m| m.into());
+
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            UPDATE users 
+            SET name = $1, email = $2, mobile_no = COALESCE($3, mobile_no)
+            WHERE id = $4
+            RETURNING id, name, email, password, picture, mobile_no, created_at, updated_at
+            "#,
+            name,
+            email,
+            mobile_no,
+            user_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(user)
+    }
+
+    async fn update_user_picture<T: Into<String> + Send>(
+        &self,
+        user_id: Uuid,
+        picture: T,
+    ) -> Result<User, sqlx::Error> {
+        let user = sqlx::query_as!(
+            User,
+            r#"UPDATE users SET picture = $1 WHERE id = $2 RETURNING id, name, email, password, picture, mobile_no, created_at, updated_at"#,
+            picture.into(),
+            user_id
+        ).fetch_one(&self.pool).await?;
 
         Ok(user)
     }
