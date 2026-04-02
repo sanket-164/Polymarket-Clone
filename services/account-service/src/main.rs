@@ -4,18 +4,21 @@ use axum::http::{
     HeaderValue, Method,
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
-use common::config::db::PGConfig;
+use common::config::{db::PGConfig, jwt::JWTConfig};
 use common::database::client::PGClient;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use tower_http::cors::CorsLayer;
 
 use crate::router::create_router;
 
+pub mod db;
 pub mod handler;
 pub mod router;
+pub mod util;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
+    pub jwt_config: JWTConfig,
     pub pg_client: PGClient,
 }
 
@@ -50,8 +53,10 @@ async fn main() {
     MIGRATOR.run(&pool).await.expect("Failed to run migrations");
 
     let pg_client = PGClient::new(pool);
+    let jwt_config = JWTConfig::init();
 
     let app_state = AppState {
+        jwt_config,
         pg_client: pg_client.clone(),
     };
 
