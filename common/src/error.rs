@@ -26,6 +26,7 @@ pub enum ErrorMessage {
     EmailExist,
     TokenNotGiven,
     HashingError,
+    InsufficientBalance,
 }
 
 impl ErrorMessage {
@@ -36,6 +37,7 @@ impl ErrorMessage {
             ErrorMessage::InvalidToken => "Token is invalid".to_string(),
             ErrorMessage::TokenNotGiven => "Token is not given".to_string(),
             ErrorMessage::HashingError => "Error while hasing the password".to_string(),
+            ErrorMessage::InsufficientBalance => "Insufficient Balance".to_string(),
         }
     }
 }
@@ -71,6 +73,13 @@ impl HttpError {
         HttpError {
             message: message.into(),
             status: StatusCode::CONFLICT,
+        }
+    }
+
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        HttpError {
+            message: message.into(),
+            status: StatusCode::FORBIDDEN,
         }
     }
 

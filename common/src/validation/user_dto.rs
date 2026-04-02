@@ -96,7 +96,7 @@ fn validate_positive_decimal(value: &Decimal) -> Result<(), ValidationError> {
 }
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct DepositBalance {
+pub struct DepositBalanceDTO {
     #[validate(custom(
         function = "validate_positive_decimal",
         message = "Balance must be greater than zero"
@@ -105,7 +105,7 @@ pub struct DepositBalance {
 }
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct WithdrawBalance {
+pub struct WithdrawBalanceDTO {
     #[validate(custom(
         function = "validate_positive_decimal",
         message = "Balance must be greater than zero"

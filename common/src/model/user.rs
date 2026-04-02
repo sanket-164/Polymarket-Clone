@@ -29,7 +29,7 @@ pub struct Wallet {
 #[sqlx(type_name = "transaction_type")]
 pub enum TransactionType {
     DEPOSIT,
-    WITHDRAWL,
+    WITHDRAW,
     TRADE,
     REFUND,
     PAYOUT,

@@ -14,7 +14,7 @@ use common::{
 
 use crate::{AppState, db::AccountExt};
 
-pub async fn auth(
+pub async fn auth_middleware(
     cookie_jar: CookieJar,
     State(app_state): State<Arc<AppState>>,
     mut req: Request,

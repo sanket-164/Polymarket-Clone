@@ -1,5 +1,9 @@
 use async_trait::async_trait;
-use common::{database::client::PGClient, model::user::User};
+use common::{
+    database::client::PGClient,
+    model::user::{User, Wallet},
+};
+use rust_decimal::Decimal;
 use uuid::Uuid;
 
 #[async_trait]
@@ -24,6 +28,11 @@ pub trait AccountExt {
         user_id: Uuid,
         picture: T,
     ) -> Result<User, sqlx::Error>;
+    async fn get_balance(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error>;
+    async fn deposite_balance(&self, user_id: Uuid, amount: Decimal)
+    -> Result<Wallet, sqlx::Error>;
+    async fn withdraw_balance(&self, user_id: Uuid, amount: Decimal)
+    -> Result<Wallet, sqlx::Error>;
 }
 
 #[async_trait]
@@ -68,6 +77,14 @@ impl AccountExt for PGClient {
         .fetch_one(&self.pool)
         .await?;
 
+        sqlx::query!(
+            r#"INSERT INTO wallets (user_id)
+            VALUES ($1)"#,
+            user.id
+        )
+        .execute(&self.pool)
+        .await?;
+
         Ok(user)
     }
 
@@ -108,11 +125,96 @@ impl AccountExt for PGClient {
     ) -> Result<User, sqlx::Error> {
         let user = sqlx::query_as!(
             User,
-            r#"UPDATE users SET picture = $1 WHERE id = $2 RETURNING id, name, email, password, picture, mobile_no, created_at, updated_at"#,
+            r#"
+            UPDATE users SET picture = $1 WHERE id = $2 
+            RETURNING id, name, email, password, picture, mobile_no, created_at, updated_at
+            "#,
             picture.into(),
             user_id
-        ).fetch_one(&self.pool).await?;
+        )
+        .fetch_one(&self.pool)
+        .await?;
 
         Ok(user)
+    }
+
+    async fn get_balance(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error> {
+        let wallet = sqlx::query_as!(
+            Wallet,
+            r#"
+            SELECT id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
+            FROM wallets 
+            WHERE user_id = $1
+            "#,
+            user_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(wallet)
+    }
+
+    async fn deposite_balance(
+        &self,
+        user_id: Uuid,
+        amount: Decimal,
+    ) -> Result<Wallet, sqlx::Error> {
+        let wallet = sqlx::query_as!(
+            Wallet,
+            r#"
+            UPDATE wallets SET balance = balance + $1
+            WHERE user_id = $2 
+            RETURNING id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
+            "#,
+            amount,
+            user_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        sqlx::query!(
+            r#"
+            INSERT INTO transactions (wallet_id, amount, type) 
+            VALUES ($1, $2, 'DEPOSIT')
+            "#,
+            wallet.id,
+            amount
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(wallet)
+    }
+
+    async fn withdraw_balance(
+        &self,
+        user_id: Uuid,
+        amount: Decimal,
+    ) -> Result<Wallet, sqlx::Error> {
+        let wallet = sqlx::query_as!(
+            Wallet,
+            r#"
+            UPDATE wallets SET balance = balance - $1
+            WHERE user_id = $2 
+            RETURNING id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
+            "#,
+            amount,
+            user_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        sqlx::query!(
+            r#"
+            INSERT INTO transactions (wallet_id, amount, type) 
+            VALUES ($1, $2, 'WITHDRAW')
+            "#,
+            wallet.id,
+            amount
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(wallet)
     }
 }
