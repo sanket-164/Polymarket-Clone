@@ -1,0 +1,182 @@
+use async_trait::async_trait;
+use common::{
+    database::client::PGClient,
+    model::{
+        market::{Market, Order, OrderType, Outcome},
+        user::{Holding, User, Wallet},
+    },
+};
+use rust_decimal::Decimal;
+use uuid::Uuid;
+
+#[async_trait]
+pub trait OrderExt {
+    async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, sqlx::Error>;
+    async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error>;
+    async fn get_outcome_by_id(&self, outcome_id: Uuid) -> Result<Option<Outcome>, sqlx::Error>;
+    async fn get_user_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error>;
+    async fn get_user_holding(
+        &self,
+        user_id: Uuid,
+        outcome_id: Uuid,
+    ) -> Result<Option<Holding>, sqlx::Error>;
+    async fn insert_order(
+        &self,
+        user_id: Uuid,
+        market_id: Uuid,
+        outcome_id: Uuid,
+        shares: Decimal,
+        price: Decimal,
+        order_type: OrderType,
+    ) -> Result<Order, sqlx::Error>;
+}
+
+#[async_trait]
+impl OrderExt for PGClient {
+    async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, sqlx::Error> {
+        let user = sqlx::query_as!(
+            User,
+            r#"SELECT id, name, email, password, picture, mobile_no, created_at, updated_at FROM users WHERE id = $1"#,
+            user_id
+        ).fetch_optional(&self.pool).await?;
+
+        Ok(user)
+    }
+
+    async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error> {
+        let query = r#"
+            SELECT id, title, description, category, close_at, status, created_at, updated_at, deleted_at
+            FROM market
+            WHERE id = $1"#;
+
+        let market = sqlx::query_as::<_, Market>(query)
+            .bind(market_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(market)
+    }
+
+    async fn get_outcome_by_id(&self, outcome_id: Uuid) -> Result<Option<Outcome>, sqlx::Error> {
+        let query = r#"
+            SELECT id, market_id, label, start_price, current_price, total_shares, created_at, updated_at
+            FROM outcome
+            WHERE id = $1"#;
+
+        let outcome = sqlx::query_as::<_, Outcome>(query)
+            .bind(outcome_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(outcome)
+    }
+
+    async fn get_user_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error> {
+        let query = r#"
+            SELECT id, user_id, balance, locked_balance, created_at, updated_at
+            FROM wallets
+            WHERE user_id = $1
+            "#;
+
+        let wallet = sqlx::query_as::<_, Wallet>(query)
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(wallet)
+    }
+
+    async fn get_user_holding(
+        &self,
+        user_id: Uuid,
+        outcome_id: Uuid,
+    ) -> Result<Option<Holding>, sqlx::Error> {
+        let query = r#"
+            SELECT id, user_id, market_id, outcome_id, shares, locked_shares, created_at, updated_at
+            FROM holdings
+            WHERE user_id = $1 AND outcome_id = $2"#;
+
+        let holding = sqlx::query_as::<_, Holding>(query)
+            .bind(user_id)
+            .bind(outcome_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(holding)
+    }
+
+    async fn insert_order(
+        &self,
+        user_id: Uuid,
+        market_id: Uuid,
+        outcome_id: Uuid,
+        shares: Decimal,
+        price: Decimal,
+        order_type: OrderType,
+    ) -> Result<Order, sqlx::Error> {
+        match order_type {
+            OrderType::BUY => {
+                let query = r#"
+                    UPDATE wallets
+                    SET balance = balance - $1, locked_balance = locked_balance + $2
+                    WHERE user_id = $3
+                    RETURNING id, user_id, balance, locked_balance, created_at, updated_at
+                    "#;
+
+                let wallet = sqlx::query_as::<_, Wallet>(query)
+                    .bind(price * shares)
+                    .bind(price * shares)
+                    .bind(user_id)
+                    .fetch_one(&self.pool)
+                    .await?;
+
+                sqlx::query!(
+                    r#"
+                    INSERT INTO transactions (wallet_id, amount, type) 
+                    VALUES ($1, $2, 'BUY')
+                    "#,
+                    wallet.id,
+                    price * shares,
+                )
+                .execute(&self.pool)
+                .await?;
+            }
+            OrderType::SELL => {
+                let query = r#"
+                    UPDATE holdings
+                    SET shares = shares - $1, locked_shares = locked_shares + $2
+                    WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
+                    RETURNING id, user_id, market_id, outcome_id, shares, locked_shares, created_at, updated_at
+                    "#;
+
+                let _holding = sqlx::query_as::<_, Holding>(query)
+                    .bind(shares)
+                    .bind(shares)
+                    .bind(user_id)
+                    .bind(market_id)
+                    .bind(outcome_id)
+                    .fetch_one(&self.pool)
+                    .await?;
+            }
+        }
+
+        let query = r#"
+            INSERT INTO orders (user_id, market_id, outcome_id, type, shares, remaining_shares, price) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, user_id, market_id, outcome_id, type, shares, remaining_shares, price, status, created_at, updated_at 
+            "#;
+
+        let order = sqlx::query_as::<_, Order>(query)
+            .bind(user_id)
+            .bind(market_id)
+            .bind(outcome_id)
+            .bind(order_type)
+            .bind(shares)
+            .bind(shares)
+            .bind(price)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(order)
+    }
+}

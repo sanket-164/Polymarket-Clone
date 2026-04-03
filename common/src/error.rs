@@ -27,6 +27,10 @@ pub enum ErrorMessage {
     TokenNotGiven,
     HashingError,
     InsufficientBalance,
+    MarketNotFound,
+    MarketIsNotActive,
+    OutcomeNotFound,
+    InsufficientShares,
 }
 
 impl ErrorMessage {
@@ -38,6 +42,10 @@ impl ErrorMessage {
             ErrorMessage::TokenNotGiven => "Token is not given".to_string(),
             ErrorMessage::HashingError => "Error while hasing the password".to_string(),
             ErrorMessage::InsufficientBalance => "Insufficient Balance".to_string(),
+            ErrorMessage::MarketNotFound => "Market does not exist".to_string(),
+            ErrorMessage::MarketIsNotActive => "Market is not active".to_string(),
+            ErrorMessage::OutcomeNotFound => "Outcome does not exist".to_string(),
+            ErrorMessage::InsufficientShares => "Insufficient Shares".to_string(),
         }
     }
 }
@@ -80,6 +88,13 @@ impl HttpError {
         HttpError {
             message: message.into(),
             status: StatusCode::FORBIDDEN,
+        }
+    }
+
+    pub fn not_found(message: impl Into<String>) -> Self {
+        HttpError {
+            message: message.into(),
+            status: StatusCode::NOT_FOUND,
         }
     }
 

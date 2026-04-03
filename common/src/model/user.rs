@@ -48,12 +48,12 @@ pub struct Transaction {
 
 #[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
 pub struct Holding {
-    id: Uuid,
-    user_id: Uuid,
-    market_id: Uuid,
-    outcome_id: Uuid,
-    shares: Decimal,
-    locked_shares: Decimal,
-    created_at: Option<DateTime<Utc>>,
-    updated_at: Option<DateTime<Utc>>,
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub market_id: Uuid,
+    pub outcome_id: Uuid,
+    pub shares: Decimal,
+    pub locked_shares: Decimal,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }

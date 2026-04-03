@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     mobile_no VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Wallets Table
@@ -47,11 +47,11 @@ CREATE TABLE IF NOT EXISTS market (
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     category VARCHAR(255) NOT NULL,
-    close_at TIMESTAMP NOT NULL,
-    status market_status NOT NULL,
+    close_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    status market_status DEFAULT 'ACTIVE' NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Outcome Table
@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS outcome (
     total_shares DECIMAL(20, 8) DEFAULT 0.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE,
     FOREIGN KEY (market_id) REFERENCES market(id) ON DELETE CASCADE
 );
 
@@ -73,10 +74,11 @@ CREATE TABLE IF NOT EXISTS holdings (
     user_id UUID NOT NULL,
     market_id UUID NOT NULL,
     outcome_id UUID NOT NULL,
-    shares DECIMAL(20, 8) DEFAULT 0.00,
-    locked_shares DECIMAL(20, 8) DEFAULT 0.00,
+    shares DECIMAL(20, 8),
+    locked_shares DECIMAL(20, 8),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (market_id) REFERENCES market(id) ON DELETE CASCADE,
     FOREIGN KEY (outcome_id) REFERENCES outcome(id) ON DELETE CASCADE
@@ -92,7 +94,7 @@ CREATE TABLE IF NOT EXISTS orders (
     shares DECIMAL(20, 8) NOT NULL,
     remaining_shares DECIMAL(20, 8) NOT NULL,
     price DECIMAL(20, 8) NOT NULL,
-    status order_status NOT NULL,
+    status order_status NOT NULL DEFAULT 'PENDING',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

@@ -54,12 +54,13 @@ pub enum OrderStatus {
     EXPIRED,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Order {
     pub id: Uuid,
     pub user_id: Uuid,
     pub market_id: Uuid,
     pub outcome_id: Uuid,
+    #[sqlx(rename = "type")]
     pub order_type: OrderType,
     pub shares: Decimal,
     pub remaining_shares: Decimal,
