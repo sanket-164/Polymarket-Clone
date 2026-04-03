@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow, sqlx::Type)]
+#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
 pub struct User {
     pub id: Uuid,
     pub name: String,
@@ -15,7 +15,7 @@ pub struct User {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow, sqlx::Type)]
+#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
 pub struct Wallet {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -30,21 +30,23 @@ pub struct Wallet {
 pub enum TransactionType {
     DEPOSIT,
     WITHDRAW,
-    TRADE,
+    BUY,
+    SELL,
     REFUND,
     PAYOUT,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow, sqlx::Type)]
+#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
 pub struct Transaction {
     pub id: Uuid,
     pub wallet_id: Uuid,
-    pub amount: Decimal,
+    #[sqlx(rename = "type")]
     pub transaction_type: TransactionType,
+    pub amount: Decimal,
     pub created_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow, sqlx::Type)]
+#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
 pub struct Holding {
     id: Uuid,
     user_id: Uuid,

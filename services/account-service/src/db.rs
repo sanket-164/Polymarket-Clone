@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use common::{
     database::client::PGClient,
-    model::user::{User, Wallet},
+    model::user::{Transaction, TransactionType, User, Wallet},
 };
 use rust_decimal::Decimal;
 use uuid::Uuid;
@@ -33,6 +33,14 @@ pub trait AccountExt {
     -> Result<Wallet, sqlx::Error>;
     async fn withdraw_balance(&self, user_id: Uuid, amount: Decimal)
     -> Result<Wallet, sqlx::Error>;
+    async fn get_transactions(
+        &self,
+        wallet_id: Uuid,
+        transaction_type: Option<TransactionType>,
+        order_by: &str,
+        limit: i64,
+        skip: i64,
+    ) -> Result<Vec<Transaction>, sqlx::Error>;
 }
 
 #[async_trait]
@@ -216,5 +224,40 @@ impl AccountExt for PGClient {
         .await?;
 
         Ok(wallet)
+    }
+
+    async fn get_transactions(
+        &self,
+        user_id: Uuid,
+        transaction_type: Option<TransactionType>,
+        order_by: &str,
+        limit: i64,
+        skip: i64,
+    ) -> Result<Vec<Transaction>, sqlx::Error> {
+        let query = format!(
+            r#"
+            SELECT 
+                id, 
+                wallet_id, 
+                amount, 
+                type,
+                created_at 
+            FROM transactions 
+            WHERE wallet_id = (SELECT id FROM wallets WHERE user_id = $1)
+            AND ($2::transaction_type IS NULL OR type = $2)
+            ORDER BY {order_by}
+            LIMIT $3 OFFSET $4
+            "#
+        );
+
+        let transactions = sqlx::query_as::<_, Transaction>(&query)
+            .bind(user_id)
+            .bind(transaction_type)
+            .bind(limit)
+            .bind(skip)
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(transactions)
     }
 }
