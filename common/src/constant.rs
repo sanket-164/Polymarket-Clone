@@ -25,4 +25,5 @@ pub const WALLET_TRANSACTIONS: &str = "/transactions";
 
 // Order
 pub const ORDER_PREFIX: &str = "/order";
+pub const ORDER_GET: &str = "/";
 pub const ORDER_PLACE: &str = "/";

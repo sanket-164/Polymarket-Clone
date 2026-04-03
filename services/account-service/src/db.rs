@@ -41,7 +41,7 @@ pub trait WalletExt {
         &self,
         wallet_id: Uuid,
         transaction_type: Option<TransactionType>,
-        order_by: &str,
+        order_by: String,
         limit: i64,
         skip: i64,
     ) -> Result<Vec<Transaction>, sqlx::Error>;
@@ -237,7 +237,7 @@ impl WalletExt for PGClient {
         &self,
         user_id: Uuid,
         transaction_type: Option<TransactionType>,
-        order_by: &str,
+        order_by: String,
         limit: i64,
         skip: i64,
     ) -> Result<Vec<Transaction>, sqlx::Error> {

@@ -1,8 +1,9 @@
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
     model::{
-        market::{Market, Order, OrderType, Outcome},
+        market::{Market, Order, OrderStatus, OrderType, Outcome},
         user::{Holding, User, Wallet},
     },
 };
@@ -20,6 +21,18 @@ pub trait OrderExt {
         user_id: Uuid,
         outcome_id: Uuid,
     ) -> Result<Option<Holding>, sqlx::Error>;
+    async fn get_user_orders(
+        &self,
+        user_id: Uuid,
+        market_id: Option<Uuid>,
+        order_type: Option<OrderType>,
+        status: Option<OrderStatus>,
+        before: Option<DateTime<Utc>>,
+        after: Option<DateTime<Utc>>,
+        order_by: String,
+        limit: i64,
+        skip: i64,
+    ) -> Result<Vec<Order>, sqlx::Error>;
     async fn insert_order(
         &self,
         user_id: Uuid,
@@ -103,6 +116,79 @@ impl OrderExt for PGClient {
             .await?;
 
         Ok(holding)
+    }
+
+    async fn get_user_orders(
+        &self,
+        user_id: Uuid,
+        market_id: Option<Uuid>,
+        order_type: Option<OrderType>,
+        status: Option<OrderStatus>,
+        before: Option<DateTime<Utc>>,
+        after: Option<DateTime<Utc>>,
+        order_by: String,
+        limit: i64,
+        skip: i64,
+    ) -> Result<Vec<Order>, sqlx::Error> {
+        let mut query = String::from(
+            "SELECT id, user_id, market_id, outcome_id, type, shares, remaining_shares, price, status, created_at, updated_at
+            FROM orders
+            WHERE user_id = $1"
+        );
+
+        let mut param_index = 2;
+
+        if market_id.is_some() {
+            query.push_str(&format!(" AND market_id = ${}", param_index));
+            param_index += 1;
+        }
+        if order_type.is_some() {
+            query.push_str(&format!(" AND type = ${}", param_index));
+            param_index += 1;
+        }
+        if status.is_some() {
+            query.push_str(&format!(" AND status = ${}", param_index));
+            param_index += 1;
+        }
+        if before.is_some() {
+            query.push_str(&format!(" AND created_at < ${}", param_index));
+            param_index += 1;
+        }
+        if after.is_some() {
+            query.push_str(&format!(" AND created_at > ${}", param_index));
+            param_index += 1;
+        }
+
+        query.push_str(&format!(
+            " ORDER BY {} LIMIT ${} OFFSET ${}",
+            order_by,
+            param_index,
+            param_index + 1
+        ));
+
+        let mut q = sqlx::query_as::<_, Order>(&query).bind(user_id);
+
+        if let Some(mid) = market_id {
+            q = q.bind(mid);
+        }
+        if let Some(ot) = order_type {
+            q = q.bind(ot);
+        }
+        if let Some(s) = status {
+            q = q.bind(s);
+        }
+        if let Some(b) = before {
+            q = q.bind(b);
+        }
+        if let Some(a) = after {
+            q = q.bind(a);
+        }
+
+        q = q.bind(limit).bind(skip);
+
+        let orders = q.fetch_all(&self.pool).await?;
+
+        Ok(orders)
     }
 
     async fn insert_order(

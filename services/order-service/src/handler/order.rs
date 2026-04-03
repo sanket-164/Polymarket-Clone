@@ -1,15 +1,18 @@
 use std::sync::Arc;
 
 use axum::{
-    Extension, Json, Router, extract::State, http::StatusCode, response::IntoResponse,
-    routing::post,
+    Extension, Json, Router,
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
 };
 use chrono::Utc;
 use common::{
-    constant::ORDER_PLACE,
+    constant::{ORDER_GET, ORDER_PLACE},
     error::{ErrorMessage, HttpError},
     model::market::{MarketStatus, OrderType},
-    validation::order_dto::PlaceOrderDTO,
+    validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
 use uuid::Uuid;
 use validator::Validate;
@@ -17,7 +20,55 @@ use validator::Validate;
 use crate::{AppState, db::OrderExt};
 
 pub fn order_handler() -> Router<Arc<AppState>> {
-    Router::new().route(ORDER_PLACE, post(place_order))
+    Router::new()
+        .route(ORDER_GET, get(get_orders))
+        .route(ORDER_PLACE, post(place_order))
+}
+
+async fn get_orders(
+    Query(query_params): Query<OrderQueryDTO>,
+    State(app_state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+) -> Result<impl IntoResponse, HttpError> {
+    query_params
+        .validate()
+        .map_err(|e| HttpError::bad_request(e.to_string()))?;
+
+    let order_by = format!(
+        "{} {}",
+        query_params
+            .order_field
+            .unwrap_or_else(|| "created_at".to_string()),
+        query_params.order_by.unwrap_or_else(|| "ASC".to_string()),
+    );
+
+    let limit = match query_params.limit {
+        Some(l) => l,
+        _ => 10,
+    };
+
+    let skip = match query_params.skip {
+        Some(s) => s,
+        _ => 0,
+    };
+
+    let orders = app_state
+        .pg_client
+        .get_user_orders(
+            user_id,
+            query_params.market_id,
+            query_params.order_type,
+            query_params.status,
+            query_params.before,
+            query_params.after,
+            order_by,
+            limit,
+            skip,
+        )
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok((StatusCode::OK, Json(orders)))
 }
 
 async fn place_order(

@@ -117,7 +117,7 @@ async fn get_user_transactions(
         .get_transactions(
             user_id,
             query_params.transaction_type,
-            order_by.as_str(),
+            order_by,
             limit,
             skip,
         )
