@@ -12,7 +12,7 @@ use common::{
     constant::{AUTH_SIGNIN, AUTH_SIGNUP},
     error::{ErrorMessage, HttpError},
     util::jwt,
-    validation::user_dto::{LoginUserDTO, RegisterUserDTO},
+    validation::user_dto::{LoginUserDTO, RegisterUserDTO, UserResponse},
 };
 use serde_json::json;
 use validator::Validate;
@@ -51,7 +51,7 @@ pub async fn signup(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    Ok((StatusCode::CREATED, Json(new_user)))
+    Ok((StatusCode::CREATED, Json(UserResponse::from(new_user))))
 }
 
 pub async fn signin(

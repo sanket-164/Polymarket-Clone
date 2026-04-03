@@ -200,6 +200,8 @@ impl OrderExt for PGClient {
         price: Decimal,
         order_type: OrderType,
     ) -> Result<Order, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
         match order_type {
             OrderType::BUY => {
                 let query = r#"
@@ -213,7 +215,7 @@ impl OrderExt for PGClient {
                     .bind(price * shares)
                     .bind(price * shares)
                     .bind(user_id)
-                    .fetch_one(&self.pool)
+                    .fetch_one(&mut *tx)
                     .await?;
 
                 sqlx::query!(
@@ -224,7 +226,7 @@ impl OrderExt for PGClient {
                     wallet.id,
                     price * shares,
                 )
-                .execute(&self.pool)
+                .execute(&mut *tx)
                 .await?;
             }
             OrderType::SELL => {
@@ -241,7 +243,7 @@ impl OrderExt for PGClient {
                     .bind(user_id)
                     .bind(market_id)
                     .bind(outcome_id)
-                    .fetch_one(&self.pool)
+                    .fetch_one(&mut *tx)
                     .await?;
             }
         }
@@ -260,8 +262,10 @@ impl OrderExt for PGClient {
             .bind(shares)
             .bind(shares)
             .bind(price)
-            .fetch_one(&self.pool)
+            .fetch_one(&mut *tx)
             .await?;
+
+        tx.commit().await?;
 
         Ok(order)
     }

@@ -77,6 +77,8 @@ impl AccountExt for PGClient {
         email: T,
         password: T,
     ) -> Result<User, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
         let user = sqlx::query_as!(
             User,
             r#"INSERT INTO users (name, email, password)
@@ -86,7 +88,7 @@ impl AccountExt for PGClient {
             email.into(),
             password.into()
         )
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         sqlx::query!(
@@ -94,8 +96,10 @@ impl AccountExt for PGClient {
             VALUES ($1)"#,
             user.id
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+
+        tx.commit().await?;
 
         Ok(user)
     }
@@ -174,6 +178,8 @@ impl WalletExt for PGClient {
         user_id: Uuid,
         amount: Decimal,
     ) -> Result<Wallet, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
         let wallet = sqlx::query_as!(
             Wallet,
             r#"
@@ -184,7 +190,7 @@ impl WalletExt for PGClient {
             amount,
             user_id
         )
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         sqlx::query!(
@@ -195,8 +201,10 @@ impl WalletExt for PGClient {
             wallet.id,
             amount
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+
+        tx.commit().await?;
 
         Ok(wallet)
     }
@@ -206,6 +214,8 @@ impl WalletExt for PGClient {
         user_id: Uuid,
         amount: Decimal,
     ) -> Result<Wallet, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
         let wallet = sqlx::query_as!(
             Wallet,
             r#"
@@ -216,7 +226,7 @@ impl WalletExt for PGClient {
             amount,
             user_id
         )
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         sqlx::query!(
@@ -227,8 +237,10 @@ impl WalletExt for PGClient {
             wallet.id,
             amount
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+
+        tx.commit().await?;
 
         Ok(wallet)
     }

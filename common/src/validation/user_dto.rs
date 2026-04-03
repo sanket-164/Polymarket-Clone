@@ -1,8 +1,10 @@
+use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
-use crate::model::user::TransactionType;
+use crate::model::user::{TransactionType, User};
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterUserDTO {
@@ -147,4 +149,29 @@ pub struct TransactionsQueryDTO {
 
     #[validate(range(min = 0))]
     pub skip: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub email: String,
+    pub picture: Option<String>,
+    pub mobile_no: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+impl From<User> for UserResponse {
+    fn from(user: User) -> Self {
+        UserResponse {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            picture: user.picture,
+            mobile_no: user.mobile_no,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+        }
+    }
 }

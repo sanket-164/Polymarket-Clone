@@ -9,8 +9,8 @@ use axum::{
 };
 use common::{
     constant::{PROFILE_GET_ME, PROFILE_UPDATE, PROFILE_UPDATE_PICTURE},
-    error::HttpError,
-    validation::user_dto::{UpdateUserDTO, UpdateUserPictureDTO},
+    error::{ErrorMessage, HttpError},
+    validation::user_dto::{UpdateUserDTO, UpdateUserPictureDTO, UserResponse},
 };
 use uuid::Uuid;
 use validator::Validate;
@@ -32,9 +32,10 @@ async fn get_me(
         .pg_client
         .get_user_by_id(user_id)
         .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
+        .map_err(|e| HttpError::server_error(e.to_string()))?
+        .ok_or(HttpError::not_found(ErrorMessage::UserNotFound.to_string()))?;
 
-    Ok((StatusCode::OK, Json(user)))
+    Ok((StatusCode::OK, Json(UserResponse::from(user))))
 }
 
 async fn update_user_profile(
@@ -51,7 +52,7 @@ async fn update_user_profile(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    Ok((StatusCode::OK, Json(updated_user)))
+    Ok((StatusCode::OK, Json(UserResponse::from(updated_user))))
 }
 
 async fn update_user_picture(
@@ -68,5 +69,5 @@ async fn update_user_picture(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    Ok((StatusCode::OK, Json(updated_user)))
+    Ok((StatusCode::OK, Json(UserResponse::from(updated_user))))
 }
