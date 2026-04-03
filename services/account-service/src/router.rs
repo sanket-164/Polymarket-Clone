@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::{Router, middleware, routing::get};
+use common::constant::{API_PREFIX, AUTH_PREFIX, HEALTH_CHECK, PROFILE_PREFIX, WALLET_PREFIX};
 
 use crate::{
     AppState,
@@ -10,17 +11,17 @@ use crate::{
 
 pub fn create_router(app_state: Arc<AppState>) -> Router {
     let api_route = Router::new()
-        .route("/", get(health_check))
-        .nest("/auth", auth_handler())
+        .route(HEALTH_CHECK, get(health_check))
+        .nest(AUTH_PREFIX, auth_handler())
         .nest(
-            "/profile",
+            PROFILE_PREFIX,
             profile_handler().layer(middleware::from_fn_with_state(
                 app_state.clone(),
                 auth_middleware,
             )),
         )
         .nest(
-            "/wallet",
+            WALLET_PREFIX,
             wallet_handler().layer(middleware::from_fn_with_state(
                 app_state.clone(),
                 auth_middleware,
@@ -28,5 +29,5 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         )
         .with_state(app_state);
 
-    Router::new().nest("/api", api_route)
+    Router::new().nest(API_PREFIX, api_route)
 }

@@ -8,6 +8,7 @@ use axum::{
     routing::{get, post},
 };
 use common::{
+    constant::{WALLET_BALANCE, WALLET_DEPOSIT, WALLET_TRANSACTIONS, WALLET_WITHDRAW},
     error::{ErrorMessage, HttpError},
     validation::user_dto::{DepositBalanceDTO, TransactionsQueryDTO},
 };
@@ -15,14 +16,14 @@ use rust_decimal::{Decimal, prelude::Zero};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::{AppState, db::AccountExt};
+use crate::{AppState, db::WalletExt};
 
 pub fn wallet_handler() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/balance", get(get_balance))
-        .route("/deposit", post(deposite_balance))
-        .route("/withdraw", post(withdraw_balance))
-        .route("/transactions", get(get_user_transactions))
+        .route(WALLET_BALANCE, get(get_balance))
+        .route(WALLET_DEPOSIT, post(deposite_balance))
+        .route(WALLET_WITHDRAW, post(withdraw_balance))
+        .route(WALLET_TRANSACTIONS, get(get_user_transactions))
 }
 
 async fn get_balance(

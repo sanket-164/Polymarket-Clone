@@ -6,6 +6,7 @@ use axum::{
 };
 use chrono::Utc;
 use common::{
+    constant::ORDER_PLACE,
     error::{ErrorMessage, HttpError},
     model::market::{MarketStatus, OrderType},
     validation::order_dto::PlaceOrderDTO,
@@ -16,7 +17,7 @@ use validator::Validate;
 use crate::{AppState, db::OrderExt};
 
 pub fn order_handler() -> Router<Arc<AppState>> {
-    Router::new().route("/", post(place_order))
+    Router::new().route(ORDER_PLACE, post(place_order))
 }
 
 async fn place_order(

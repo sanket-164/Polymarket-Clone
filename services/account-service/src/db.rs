@@ -28,6 +28,10 @@ pub trait AccountExt {
         user_id: Uuid,
         picture: T,
     ) -> Result<User, sqlx::Error>;
+}
+
+#[async_trait]
+pub trait WalletExt {
     async fn get_balance(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error>;
     async fn deposite_balance(&self, user_id: Uuid, amount: Decimal)
     -> Result<Wallet, sqlx::Error>;
@@ -145,7 +149,10 @@ impl AccountExt for PGClient {
 
         Ok(user)
     }
+}
 
+#[async_trait]
+impl WalletExt for PGClient {
     async fn get_balance(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error> {
         let wallet = sqlx::query_as!(
             Wallet,
