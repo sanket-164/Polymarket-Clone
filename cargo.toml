@@ -2,6 +2,7 @@
 members = [
     "services/account-service",
     "services/order-service",
+    "services/matching-engine",
     "common"
 ]
 
@@ -26,3 +27,5 @@ validator = { version = "0.16.1", features = ["derive"] }
 tower-http = { version = "0.5.2", features = ["cors", "trace"] }
 tracing-subscriber = { version = "0.3.18" }
 time = "0.3.20"
+async-nats = "0.35"
+futures = "0.3"
