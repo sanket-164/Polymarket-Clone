@@ -1,6 +1,10 @@
 use std::time::Duration;
 
 use async_nats::{ConnectOptions, jetstream};
+use common::{
+    constant::{MAX_RECONNECTS, STREAM_NAME},
+    model::market::Order,
+};
 
 #[derive(Debug, Clone)]
 pub struct Publisher {
@@ -10,7 +14,7 @@ pub struct Publisher {
 impl Publisher {
     pub async fn new(url: &str) -> Result<Self, async_nats::Error> {
         let client = ConnectOptions::new()
-            .max_reconnects(5)
+            .max_reconnects(Some(MAX_RECONNECTS as usize))
             .reconnect_delay_callback(|attempts| {
                 Duration::from_millis(100 * 2_u64.pow(attempts as u32))
             })
@@ -31,23 +35,26 @@ impl Publisher {
         })
     }
 
-    pub async fn publish(&self, stream_name: &str, message: &str) -> Result<(), async_nats::Error> {
+    pub async fn publish(&self, message: Order) -> Result<(), async_nats::Error> {
         let _stream = self
             .jetstream
             .get_or_create_stream(jetstream::stream::Config {
-                name: stream_name.into(),
-                subjects: vec!["tasks.>".into()],
+                name: STREAM_NAME.into(),
+                subjects: vec!["orders.>".into()],
                 ..Default::default()
             })
             .await?;
 
-        let ack = self
-            .jetstream
-            .publish("tasks.order", message.to_string().into())
-            .await?
-            .await?; // Second .await confirms server ack
+        let payload = serde_json::to_vec(&message).map_err(|e| {
+            async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+        })?;
 
-        println!("Published, seq: {}", ack.sequence);
+        self.jetstream
+            .publish("orders.order", payload.into())
+            .await?
+            .await?;
+
+        println!("Published order: {}", message.id);
 
         Ok(())
     }

@@ -163,5 +163,11 @@ async fn place_order(
         }
     }
 
+    app_state
+        .publisher
+        .publish(order.clone())
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
     Ok((StatusCode::CREATED, Json(order)))
 }

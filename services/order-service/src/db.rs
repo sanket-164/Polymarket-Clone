@@ -200,70 +200,78 @@ impl OrderExt for PGClient {
         price: Decimal,
         order_type: OrderType,
     ) -> Result<Order, sqlx::Error> {
+        let cost = price * shares;
         let mut tx = self.pool.begin().await?;
 
         match order_type {
             OrderType::BUY => {
-                let query = r#"
-                    UPDATE wallets
-                    SET balance = balance - $1, locked_balance = locked_balance + $2
-                    WHERE user_id = $3
-                    RETURNING id, user_id, balance, locked_balance, created_at, updated_at
-                    "#;
-
-                let wallet = sqlx::query_as::<_, Wallet>(query)
-                    .bind(price * shares)
-                    .bind(price * shares)
-                    .bind(user_id)
-                    .fetch_one(&mut *tx)
-                    .await?;
-
-                sqlx::query!(
-                    r#"
-                    INSERT INTO transactions (wallet_id, amount, type) 
-                    VALUES ($1, $2, 'BUY')
-                    "#,
-                    wallet.id,
-                    price * shares,
+                // Deduct from balance and lock the funds
+                sqlx::query(
+                    r#"UPDATE wallets
+                       SET balance = balance - $1, locked_balance = locked_balance + $1
+                       WHERE user_id = $2"#,
                 )
+                .bind(cost)
+                .bind(user_id)
                 .execute(&mut *tx)
                 .await?;
-            }
-            OrderType::SELL => {
-                let query = r#"
-                    UPDATE holdings
-                    SET shares = shares - $1, locked_shares = locked_shares + $2
-                    WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
-                    RETURNING id, user_id, market_id, outcome_id, shares, locked_shares, created_at, updated_at
-                    "#;
 
-                let _holding = sqlx::query_as::<_, Holding>(query)
-                    .bind(shares)
-                    .bind(shares)
+                let holding: Option<Holding> = sqlx::query_as(
+                    r#"SELECT * FROM holdings
+                       WHERE user_id = $1 AND market_id = $2 AND outcome_id = $3"#,
+                )
+                .bind(user_id)
+                .bind(market_id)
+                .bind(outcome_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+
+                if holding.is_none() {
+                    sqlx::query(
+                        r#"INSERT INTO holdings (user_id, market_id, outcome_id, shares, locked_shares)
+                           VALUES ($1, $2, $3, $4, $5)"#,
+                    )
                     .bind(user_id)
                     .bind(market_id)
                     .bind(outcome_id)
-                    .fetch_one(&mut *tx)
+                    .bind(Decimal::ZERO)
+                    .bind(Decimal::ZERO)
+                    .execute(&mut *tx)
                     .await?;
+                }
+            }
+
+            OrderType::SELL => {
+                // Move shares from available to locked
+                sqlx::query_as::<_, Holding>(
+                    r#"UPDATE holdings
+                       SET shares = shares - $1, locked_shares = locked_shares + $1
+                       WHERE user_id = $2 AND market_id = $3 AND outcome_id = $4
+                       RETURNING id, user_id, market_id, outcome_id, shares, locked_shares, created_at, updated_at"#,
+                )
+                .bind(shares)
+                .bind(user_id)
+                .bind(market_id)
+                .bind(outcome_id)
+                .fetch_one(&mut *tx)
+                .await?;
             }
         }
 
-        let query = r#"
-            INSERT INTO orders (user_id, market_id, outcome_id, type, shares, remaining_shares, price) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id, user_id, market_id, outcome_id, type, shares, remaining_shares, price, status, created_at, updated_at 
-            "#;
-
-        let order = sqlx::query_as::<_, Order>(query)
-            .bind(user_id)
-            .bind(market_id)
-            .bind(outcome_id)
-            .bind(order_type)
-            .bind(shares)
-            .bind(shares)
-            .bind(price)
-            .fetch_one(&mut *tx)
-            .await?;
+        let order = sqlx::query_as::<_, Order>(
+            r#"INSERT INTO orders (user_id, market_id, outcome_id, type, shares, remaining_shares, price)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)
+               RETURNING id, user_id, market_id, outcome_id, type, shares, remaining_shares, price, status, created_at, updated_at"#,
+        )
+        .bind(user_id)
+        .bind(market_id)
+        .bind(outcome_id)
+        .bind(order_type)
+        .bind(shares)
+        .bind(shares)
+        .bind(price)
+        .fetch_one(&mut *tx)
+        .await?;
 
         tx.commit().await?;
 

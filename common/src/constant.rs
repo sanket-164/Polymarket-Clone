@@ -27,3 +27,7 @@ pub const WALLET_TRANSACTIONS: &str = "/transactions";
 pub const ORDER_PREFIX: &str = "/order";
 pub const ORDER_GET: &str = "/";
 pub const ORDER_PLACE: &str = "/";
+
+// NATS Config
+pub const STREAM_NAME: &str = "ORDERS";
+pub const MAX_RECONNECTS: u8 = 5;

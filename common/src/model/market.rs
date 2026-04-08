@@ -37,14 +37,14 @@ pub struct Outcome {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type, Eq)]
 #[sqlx(type_name = "order_type")]
 pub enum OrderType {
     BUY,
     SELL,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type, Eq)]
 #[sqlx(type_name = "order_status")]
 pub enum OrderStatus {
     PENDING,
@@ -54,7 +54,7 @@ pub enum OrderStatus {
     EXPIRED,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, Eq, PartialEq)]
 pub struct Order {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -75,7 +75,7 @@ pub struct Trade {
     pub id: Uuid,
     pub market_id: Uuid,
     pub buy_order_id: Uuid,
-    pub sell_order_id: OrderType,
+    pub sell_order_id: Uuid,
     pub shares: Decimal,
     pub price: Decimal,
     pub created_at: Option<DateTime<Utc>>,

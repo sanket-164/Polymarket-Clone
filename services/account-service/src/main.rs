@@ -4,7 +4,7 @@ use axum::http::{
     HeaderValue, Method,
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
-use common::config::{db::PGConfig, jwt::JWTConfig};
+use common::config::{JWTConfig, PGConfig};
 use common::database::client::PGClient;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use tower_http::cors::CorsLayer;
@@ -31,19 +31,19 @@ async fn main() {
         .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST, Method::PUT]);
 
-    let config = PGConfig::init();
+    let pg_config = PGConfig::init();
 
     let pool = match PgPoolOptions::new()
-        .max_connections(1)
-        .connect(&config.database_url)
+        .max_connections(pg_config.pool_size_each_service)
+        .connect(&pg_config.database_url)
         .await
     {
         Ok(pool) => {
             println!("Connected to database");
             pool
         }
-        Err(_err) => {
-            println!("Failed to connect to database");
+        Err(e) => {
+            println!("Failed to connect to database: {e}");
             // Fail fast: Application cannot run without DB
             std::process::exit(1);
         }

@@ -32,6 +32,7 @@ pub enum ErrorMessage {
     MarketIsNotActive,
     OutcomeNotFound,
     InsufficientShares,
+    CannotPublishOrder,
 }
 
 impl ErrorMessage {
@@ -48,6 +49,7 @@ impl ErrorMessage {
             ErrorMessage::MarketIsNotActive => "Market is not active".to_string(),
             ErrorMessage::OutcomeNotFound => "Outcome does not exist".to_string(),
             ErrorMessage::InsufficientShares => "Insufficient Shares".to_string(),
+            ErrorMessage::CannotPublishOrder => "Failed to publish order".to_string(),
         }
     }
 }
