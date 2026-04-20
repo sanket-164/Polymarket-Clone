@@ -3,7 +3,7 @@ mod engine;
 mod nats_consumer;
 
 use common::{
-    config::PGConfig, constant::STREAM_NAME, database::client::PGClient, model::market::Order,
+    config::PGConfig, constant::ORDER_STREAM, database::client::PGClient, model::market::Order,
 };
 use futures::StreamExt;
 use nats_consumer::Consumer;
@@ -60,7 +60,7 @@ async fn main() {
 
     let stream = consumer
         .jetstream
-        .get_stream(STREAM_NAME)
+        .get_stream(ORDER_STREAM)
         .await
         .expect("Failed to get stream");
 

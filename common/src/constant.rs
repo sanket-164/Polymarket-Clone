@@ -29,5 +29,6 @@ pub const ORDER_GET: &str = "/";
 pub const ORDER_PLACE: &str = "/";
 
 // NATS Config
-pub const STREAM_NAME: &str = "ORDERS";
+pub const ORDER_STREAM: &str = "ORDER";
+pub const MARKET_STREAM: &str = "MARKET";
 pub const MAX_RECONNECTS: u8 = 5;

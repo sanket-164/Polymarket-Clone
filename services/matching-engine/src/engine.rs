@@ -141,14 +141,16 @@ impl Engine {
                                 break;
                             }
 
-                            println!("Trade {} -> {}", remaining.id, sell.id);
+                            println!("Trade {} -> {}\n", remaining.id, sell.id);
 
-                            match remaining.shares.cmp(&sell.shares) {
+                            match remaining.remaining_shares.cmp(&sell.remaining_shares) {
                                 Ordering::Greater => {
-                                    remaining.shares = remaining.shares - sell.shares;
+                                    remaining.remaining_shares =
+                                        remaining.remaining_shares - sell.remaining_shares;
                                 }
                                 Ordering::Less => {
-                                    sell.shares = sell.shares - remaining.shares;
+                                    sell.remaining_shares =
+                                        sell.remaining_shares - remaining.remaining_shares;
                                     book.push_sell(sell);
                                     break;
                                 }
@@ -159,7 +161,7 @@ impl Engine {
                         }
                         // no match found, rest of buy sits on book
                         _ => {
-                            println!("{:?}", remaining);
+                            println!("{:?\n}", remaining);
                             book.push_buy(remaining);
                             break;
                         }
@@ -182,14 +184,16 @@ impl Engine {
                                 break;
                             }
 
-                            println!("Trade {} -> {}", buy.id, remaining.id);
+                            println!("Trade {} -> {}\n", buy.id, remaining.id);
 
-                            match remaining.shares.cmp(&buy.shares) {
+                            match remaining.remaining_shares.cmp(&buy.remaining_shares) {
                                 Ordering::Greater => {
-                                    remaining.shares = remaining.shares - buy.shares;
+                                    remaining.remaining_shares =
+                                        remaining.remaining_shares - buy.remaining_shares;
                                 }
                                 Ordering::Less => {
-                                    buy.shares = buy.shares - remaining.shares;
+                                    buy.remaining_shares =
+                                        buy.remaining_shares - remaining.remaining_shares;
                                     book.push_buy(buy);
                                     break;
                                 }
@@ -200,7 +204,7 @@ impl Engine {
                         }
                         // no match found, rest of sell sits on book
                         _ => {
-                            println!("{:?}", remaining);
+                            println!("{:?}\n", remaining);
                             book.push_sell(remaining);
                             break;
                         }

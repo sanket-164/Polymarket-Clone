@@ -125,6 +125,12 @@ impl TradeExt for PGClient {
             .execute(&mut *tx)
             .await?;
 
+        sqlx::query(r#"UPDATE outcome SET current_price = $1 WHERE id = $2"#)
+            .bind(sell_order.price)
+            .bind(sell_order.outcome_id)
+            .execute(&mut *tx)
+            .await?;
+
         tx.commit().await?;
 
         Ok(trade)

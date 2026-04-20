@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use async_nats::{ConnectOptions, jetstream};
 use common::{
-    constant::{MAX_RECONNECTS, STREAM_NAME},
+    constant::{MAX_RECONNECTS, ORDER_STREAM},
     model::market::Order,
 };
 
@@ -39,8 +39,8 @@ impl Publisher {
         let _stream = self
             .jetstream
             .get_or_create_stream(jetstream::stream::Config {
-                name: STREAM_NAME.into(),
-                subjects: vec!["orders.>".into()],
+                name: ORDER_STREAM.into(),
+                subjects: vec!["order.>".into()],
                 ..Default::default()
             })
             .await?;
@@ -50,7 +50,7 @@ impl Publisher {
         })?;
 
         self.jetstream
-            .publish("orders.order", payload.into())
+            .publish("order.insert", payload.into())
             .await?
             .await?;
 
