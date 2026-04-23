@@ -208,10 +208,11 @@ impl OrderExt for PGClient {
                 // Deduct from balance and lock the funds
                 sqlx::query(
                     r#"UPDATE wallets
-                       SET balance = balance - $1, locked_balance = locked_balance + $1
-                       WHERE user_id = $2"#,
+                       SET balance = balance - $1, locked_balance = locked_balance + $1, updated_at = $2
+                       WHERE user_id = $3"#,
                 )
                 .bind(cost)
+                .bind(Utc::now())
                 .bind(user_id)
                 .execute(&mut *tx)
                 .await?;
@@ -245,11 +246,12 @@ impl OrderExt for PGClient {
                 // Move shares from available to locked
                 sqlx::query_as::<_, Holding>(
                     r#"UPDATE holdings
-                       SET shares = shares - $1, locked_shares = locked_shares + $1
-                       WHERE user_id = $2 AND market_id = $3 AND outcome_id = $4
+                       SET shares = shares - $1, locked_shares = locked_shares + $1, updated_at = $2
+                       WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
                        RETURNING id, user_id, market_id, outcome_id, shares, locked_shares, created_at, updated_at"#,
                 )
                 .bind(shares)
+                .bind(Utc::now())
                 .bind(user_id)
                 .bind(market_id)
                 .bind(outcome_id)

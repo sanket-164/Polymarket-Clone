@@ -1,6 +1,7 @@
 use std::cmp::min;
 
 use async_trait::async_trait;
+use chrono::Utc;
 use common::{
     database::client::PGClient,
     model::{
@@ -47,13 +48,15 @@ impl TradeExt for PGClient {
                     status = CASE
                         WHEN remaining_shares - $1 = 0 THEN $2
                         ELSE $3
-                    END
-                WHERE id = $4
+                    END,
+                    updated_at = $4
+                WHERE id = $5
                 "#,
             )
             .bind(trade_shares)
             .bind(OrderStatus::FILLED)
             .bind(OrderStatus::PARTIAL)
+            .bind(Utc::now())
             .bind(order_id)
             .execute(&mut *tx)
             .await?;
@@ -71,11 +74,12 @@ impl TradeExt for PGClient {
         sqlx::query(
             r#"
             UPDATE holdings
-            SET shares = shares + $1
-            WHERE user_id = $2 AND market_id = $3 AND outcome_id = $4
+            SET shares = shares + $1, updated_at = $2
+            WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
             "#,
         )
         .bind(trade_shares)
+        .bind(Utc::now())
         .bind(buy_order.user_id)
         .bind(buy_order.market_id)
         .bind(buy_order.outcome_id)
@@ -96,11 +100,12 @@ impl TradeExt for PGClient {
         sqlx::query(
             r#"
             UPDATE holdings
-            SET locked_shares = locked_shares - $1
-            WHERE user_id = $2 AND market_id = $3 AND outcome_id = $4
+            SET locked_shares = locked_shares - $1, updated_at = $2
+            WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
             "#,
         )
         .bind(trade_shares)
+        .bind(Utc::now())
         .bind(sell_order.user_id)
         .bind(sell_order.market_id)
         .bind(sell_order.outcome_id)
@@ -109,11 +114,12 @@ impl TradeExt for PGClient {
 
         sqlx::query(
             r#"UPDATE wallets
-               SET balance = balance + $1
-               WHERE user_id = $2
+               SET balance = balance + $1, updated_at = $2
+               WHERE user_id = $3
             "#,
         )
         .bind(total_cost)
+        .bind(Utc::now())
         .bind(sell_order.user_id)
         .execute(&mut *tx)
         .await?;

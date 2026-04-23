@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use chrono::Utc;
 use common::{
     database::client::PGClient,
     model::user::{Transaction, TransactionType, User, Wallet},
@@ -119,13 +120,14 @@ impl AccountExt for PGClient {
             User,
             r#"
             UPDATE users 
-            SET name = $1, email = $2, mobile_no = COALESCE($3, mobile_no)
-            WHERE id = $4
+            SET name = $1, email = $2, mobile_no = COALESCE($3, mobile_no), updated_at = $4
+            WHERE id = $5
             RETURNING id, name, email, password, picture, mobile_no, created_at, updated_at
             "#,
             name,
             email,
             mobile_no,
+            Utc::now(),
             user_id
         )
         .fetch_one(&self.pool)
@@ -142,10 +144,12 @@ impl AccountExt for PGClient {
         let user = sqlx::query_as!(
             User,
             r#"
-            UPDATE users SET picture = $1 WHERE id = $2 
+            UPDATE users SET picture = $1, updated_at = $2
+            WHERE id = $3 
             RETURNING id, name, email, password, picture, mobile_no, created_at, updated_at
             "#,
             picture.into(),
+            Utc::now(),
             user_id
         )
         .fetch_one(&self.pool)
@@ -183,11 +187,12 @@ impl WalletExt for PGClient {
         let wallet = sqlx::query_as!(
             Wallet,
             r#"
-            UPDATE wallets SET balance = balance + $1
-            WHERE user_id = $2 
+            UPDATE wallets SET balance = balance + $1, updated_at = $2
+            WHERE user_id = $3
             RETURNING id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
             "#,
             amount,
+            Utc::now(),
             user_id
         )
         .fetch_one(&mut *tx)
@@ -219,11 +224,12 @@ impl WalletExt for PGClient {
         let wallet = sqlx::query_as!(
             Wallet,
             r#"
-            UPDATE wallets SET balance = balance - $1
-            WHERE user_id = $2 
+            UPDATE wallets SET balance = balance - $1, updated_at = $2
+            WHERE user_id = $3
             RETURNING id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
             "#,
             amount,
+            Utc::now(),
             user_id
         )
         .fetch_one(&mut *tx)

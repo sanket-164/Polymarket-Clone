@@ -177,20 +177,3 @@ CREATE INDEX idx_trades_created_at ON trades(created_at DESC);
 
 -- Resolved Markets
 CREATE INDEX idx_resolved_markets_market_id ON resolved_markets(market_id);
-
--- Create a trigger function to update updated_at on row change
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Attach the trigger to all tables that have an updated_at column
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_wallets_updated_at BEFORE UPDATE ON wallets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_market_updated_at BEFORE UPDATE ON market FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_outcome_updated_at BEFORE UPDATE ON outcome FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_holdings_updated_at BEFORE UPDATE ON holdings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
