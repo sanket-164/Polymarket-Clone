@@ -58,7 +58,7 @@ impl OrderExt for PGClient {
 
     async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error> {
         let query = r#"
-            SELECT id, title, description, category, close_at, status, created_at, updated_at, deleted_at
+            SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
             FROM market
             WHERE id = $1"#;
 

@@ -88,7 +88,10 @@ async fn place_order(
             ErrorMessage::MarketNotFound.to_string(),
         ))?;
 
-    if market.status != MarketStatus::ACTIVE || market.close_at < Utc::now() {
+    if market.start_at > Utc::now()
+        || (market.status != MarketStatus::ACTIVE && market.status != MarketStatus::PENDING)
+        || market.close_at < Utc::now()
+    {
         return Err(HttpError::bad_request(
             ErrorMessage::MarketIsNotActive.to_string(),
         ));

@@ -6,6 +6,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type)]
 #[sqlx(type_name = "market_status")]
 pub enum MarketStatus {
+    PENDING,
     ACTIVE,
     CLOSED,
     RESOLVED,
@@ -18,6 +19,7 @@ pub struct Market {
     pub title: String,
     pub description: String,
     pub category: String,
+    pub start_at: DateTime<Utc>,
     pub close_at: DateTime<Utc>,
     pub status: MarketStatus,
     pub created_at: Option<DateTime<Utc>>,
