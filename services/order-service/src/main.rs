@@ -2,25 +2,27 @@ use axum::http::{
     HeaderValue, Method,
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
-use common::config::{JWTConfig, PGConfig};
 use common::database::client::PGClient;
+use common::{
+    config::{JWTConfig, PGConfig},
+    nats_handler::NatsHandler,
+};
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
-use crate::{nats_publisher::Publisher, router::create_router};
+use crate::router::create_router;
 
 pub mod db;
 pub mod handler;
 pub mod middleware;
-pub mod nats_publisher;
 pub mod router;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub jwt_config: JWTConfig,
     pub pg_client: PGClient,
-    pub publisher: Publisher,
+    pub publisher: NatsHandler,
 }
 
 #[tokio::main]
@@ -56,7 +58,7 @@ async fn main() {
     let pg_client = PGClient::new(pool);
     let jwt_config = JWTConfig::init();
 
-    let publisher = match Publisher::new("nats://localhost:4222").await {
+    let publisher = match NatsHandler::new("nats://localhost:4222").await {
         Ok(p) => p,
         Err(e) => {
             println!("Failed to connect publisher: {e}");

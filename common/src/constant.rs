@@ -29,6 +29,9 @@ pub const ORDER_GET: &str = "/";
 pub const ORDER_PLACE: &str = "/";
 
 // NATS Config
-pub const ORDER_STREAM: &str = "ORDER";
-pub const MARKET_STREAM: &str = "MARKET";
+pub const NATS_STREAM: &str = "nats";
+pub const SUBJECT_INSERT_ORDER: &str = "nats.insert.order";
+pub const SUBJECT_CENCEL_ORDER: &str = "nats.cancel.order";
+pub const SUBJECT_INSERT_MARKET: &str = "nats.insert.market";
+pub const SUBJECT_REMOVE_MARKET: &str = "nats.remove.market";
 pub const MAX_RECONNECTS: u8 = 5;

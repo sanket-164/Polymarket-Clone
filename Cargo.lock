@@ -550,10 +550,12 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "argon2",
+ "async-nats",
  "async-trait",
  "axum",
  "chrono",
  "dotenv",
+ "futures",
  "jsonwebtoken",
  "rust_decimal",
  "rust_decimal_macros",

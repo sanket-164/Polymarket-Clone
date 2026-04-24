@@ -161,7 +161,6 @@ impl Engine {
                         }
                         // no match found, rest of buy sits on book
                         _ => {
-                            println!("{:?\n}", remaining);
                             book.push_buy(remaining);
                             break;
                         }
@@ -204,7 +203,6 @@ impl Engine {
                         }
                         // no match found, rest of sell sits on book
                         _ => {
-                            println!("{:?}\n", remaining);
                             book.push_sell(remaining);
                             break;
                         }

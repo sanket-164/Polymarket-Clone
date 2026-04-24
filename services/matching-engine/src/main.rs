@@ -1,19 +1,22 @@
 mod db;
 mod engine;
-mod nats_consumer;
 
 use common::{
-    config::PGConfig, constant::ORDER_STREAM, database::client::PGClient, model::market::Order,
+    config::PGConfig,
+    constant::{
+        SUBJECT_CENCEL_ORDER, SUBJECT_INSERT_MARKET, SUBJECT_INSERT_ORDER, SUBJECT_REMOVE_MARKET,
+    },
+    database::client::PGClient,
+    model::market::NatsMessage,
+    nats_handler::NatsHandler,
 };
 use futures::StreamExt;
-use nats_consumer::Consumer;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 
 use crate::engine::Engine;
 
 pub struct AppState {
     pub pg_client: PGClient,
-    pub consumer: Consumer,
 }
 
 #[tokio::main]
@@ -42,14 +45,6 @@ async fn main() {
 
     let pg_client = PGClient::new(pool);
 
-    let consumer = match Consumer::new("nats://localhost:4222").await {
-        Ok(c) => c,
-        Err(e) => {
-            println!("Failed to connect consumer: {e}");
-            std::process::exit(1);
-        }
-    };
-
     let mut engine = Engine::new();
 
     let m_id = uuid::Uuid::parse_str("a1b2c3d4-e5f6-7890-abcd-ef1234567890").expect("lol");
@@ -58,29 +53,20 @@ async fn main() {
 
     engine.add_market(m_id, fo_id, so_id);
 
-    let stream = consumer
-        .jetstream
-        .get_stream(ORDER_STREAM)
-        .await
-        .expect("Failed to get stream");
+    let nats_consumer = match NatsHandler::new("nats://localhost:4222").await {
+        Ok(c) => c,
+        Err(e) => {
+            println!("Failed to connect consumer: {e}");
+            std::process::exit(1);
+        }
+    };
 
-    let consumer_handle = stream
-        .get_or_create_consumer(
-            "matching-engine",
-            async_nats::jetstream::consumer::pull::Config {
-                durable_name: Some("matching-engine".to_string()),
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("Failed to create consumer");
-
-    let mut messages = consumer_handle
-        .messages()
+    let mut message_stream = nats_consumer
+        .get_message_stream()
         .await
         .expect("Failed to get messages");
 
-    while let Some(msg) = messages.next().await {
+    while let Some(msg) = message_stream.next().await {
         let msg = match msg {
             Ok(m) => m,
             Err(e) => {
@@ -89,7 +75,7 @@ async fn main() {
             }
         };
 
-        let order: Order = match serde_json::from_slice(&msg.payload) {
+        let message: NatsMessage = match serde_json::from_slice(&msg.payload) {
             Ok(o) => o,
             Err(e) => {
                 eprintln!("Deserialize error: {e}");
@@ -98,8 +84,31 @@ async fn main() {
             }
         };
 
-        {
-            engine.match_order(order, &pg_client).await;
+        match msg.subject.as_str() {
+            SUBJECT_INSERT_ORDER => {
+                engine.match_order(message.order.unwrap(), &pg_client).await;
+            }
+            SUBJECT_INSERT_MARKET => {
+                let market = message.market.expect("Market does not exist in message");
+                let outcomes = message
+                    .outcomes
+                    .expect("Outcomes does not exist in message");
+                engine.add_market(
+                    market.id,
+                    outcomes.first_outcome.id,
+                    outcomes.second_outcome.id,
+                );
+            }
+            SUBJECT_REMOVE_MARKET => {
+                let market = message.market.expect("Market does not exist in message");
+                engine.remove_market(market.id);
+            }
+            SUBJECT_CENCEL_ORDER => {
+                // handle cancel order
+            }
+            unknown => {
+                eprintln!("Unknown subject: {unknown}");
+            }
         }
 
         if let Err(e) = msg.ack().await {

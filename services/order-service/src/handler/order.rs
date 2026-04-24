@@ -11,7 +11,7 @@ use chrono::Utc;
 use common::{
     constant::{ORDER_GET, ORDER_PLACE},
     error::{ErrorMessage, HttpError},
-    model::market::{MarketStatus, OrderType},
+    model::market::{MarketStatus, NatsMessage, OrderType},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
 use uuid::Uuid;
@@ -166,9 +166,18 @@ async fn place_order(
         }
     }
 
+    let order_message = NatsMessage {
+        order: Some(order.clone()),
+        market: None,
+        outcomes: None,
+    };
+
     app_state
         .publisher
-        .publish(order.clone())
+        .publish_message(
+            order_message,
+            common::nats_handler::PublishMessage::InsertOrder,
+        )
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

@@ -90,3 +90,16 @@ pub struct ResolvedMarket {
     pub winning_outcome_id: Uuid,
     pub created_at: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarketOutcomes {
+    pub first_outcome: Outcome,
+    pub second_outcome: Outcome,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NatsMessage {
+    pub order: Option<Order>,
+    pub market: Option<Market>,
+    pub outcomes: Option<MarketOutcomes>,
+}

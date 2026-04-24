@@ -5,3 +5,4 @@ pub mod error;
 pub mod model;
 pub mod util;
 pub mod validation;
+pub mod nats_handler;
