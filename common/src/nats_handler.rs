@@ -3,7 +3,7 @@ use crate::{
         MAX_RECONNECTS, NATS_STREAM, SUBJECT_CENCEL_ORDER, SUBJECT_INSERT_MARKET,
         SUBJECT_INSERT_ORDER, SUBJECT_REMOVE_MARKET,
     },
-    model::market::NatsMessage,
+    model::NatsMessage,
 };
 use async_nats::{
     ConnectOptions,

@@ -11,7 +11,7 @@ use chrono::Utc;
 use common::{
     constant::{ORDER_GET, ORDER_PLACE},
     error::{ErrorMessage, HttpError},
-    model::market::{MarketStatus, NatsMessage, OrderType},
+    model::{MarketStatus, NatsMessage, OrderType},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
 use uuid::Uuid;

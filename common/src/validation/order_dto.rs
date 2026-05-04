@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
-use crate::model::market::{OrderStatus, OrderType};
+use crate::model::{OrderStatus, OrderType};
 
 fn validate_positive_decimal(value: &Decimal) -> Result<(), ValidationError> {
     if *value <= Decimal::ZERO {

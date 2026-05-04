@@ -2,10 +2,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
-    model::{
-        Admin,
-        market::{Market, Outcome},
-    },
+    model::{Admin, Market, Outcome},
 };
 use uuid::Uuid;
 
@@ -19,6 +16,31 @@ pub trait AccountExt {
         name: T,
         email: T,
     ) -> Result<Admin, sqlx::Error>;
+}
+
+#[async_trait]
+pub trait MarketExt {
+    async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error>;
+    async fn create_market(
+        &self,
+        title: &str,
+        description: &str,
+        category: &str,
+        start_at: DateTime<Utc>,
+        close_at: DateTime<Utc>,
+        outcome1: Outcome,
+        outcome2: Outcome,
+    ) -> Result<Market, sqlx::Error>;
+    async fn update_market(
+        &self,
+        market_id: Uuid,
+        title: &str,
+        description: &str,
+        category: &str,
+        start_at: DateTime<Utc>,
+        close_at: DateTime<Utc>,
+    ) -> Result<Market, sqlx::Error>;
+    async fn delete_market(&self, market_id: Uuid) -> Result<Market, sqlx::Error>;
 }
 
 #[async_trait]

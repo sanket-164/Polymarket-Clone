@@ -2,10 +2,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
-    model::{
-        market::{Market, Order, OrderStatus, OrderType, Outcome},
-        user::{Holding, User, Wallet},
-    },
+    model::{Holding, Market, Order, OrderStatus, OrderType, Outcome, User, Wallet},
 };
 use rust_decimal::Decimal;
 use uuid::Uuid;

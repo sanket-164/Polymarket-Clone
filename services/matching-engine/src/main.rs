@@ -7,7 +7,7 @@ use common::{
         SUBJECT_CENCEL_ORDER, SUBJECT_INSERT_MARKET, SUBJECT_INSERT_ORDER, SUBJECT_REMOVE_MARKET,
     },
     database::client::PGClient,
-    model::market::NatsMessage,
+    model::NatsMessage,
     nats_handler::NatsHandler,
 };
 use futures::StreamExt;

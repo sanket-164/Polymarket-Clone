@@ -4,10 +4,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use common::{
     database::client::PGClient,
-    model::{
-        market::{Order, OrderStatus, Trade},
-        user::TransactionType,
-    },
+    model::{Order, OrderStatus, Trade, TransactionType},
 };
 
 #[async_trait]

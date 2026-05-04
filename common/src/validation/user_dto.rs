@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
-use crate::model::user::{TransactionType, User};
+use crate::model::{TransactionType, User};
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterUserDTO {

@@ -11,13 +11,13 @@ use axum_extra::extract::cookie::Cookie;
 use common::{
     constant::{AUTH_SIGNIN, AUTH_SIGNUP},
     error::{ErrorMessage, HttpError},
-    util::jwt,
+    util::{hash, jwt},
     validation::user_dto::{LoginUserDTO, RegisterUserDTO, UserResponse},
 };
 use serde_json::json;
 use validator::Validate;
 
-use crate::{AppState, db::AccountExt, util::hash};
+use crate::{AppState, db::AccountExt};
 
 pub fn auth_handler() -> Router<Arc<AppState>> {
     Router::new()

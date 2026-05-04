@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use common::{
     database::client::PGClient,
-    model::user::{Transaction, TransactionType, User, Wallet},
+    model::{Transaction, TransactionType, User, Wallet},
 };
 use rust_decimal::Decimal;
 use uuid::Uuid;

@@ -1,8 +1,8 @@
+use crate::error::ErrorMessage;
 use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{SaltString, rand_core::OsRng},
 };
-use common::error::ErrorMessage;
 
 pub fn generate(password: impl Into<String>) -> Result<String, ErrorMessage> {
     let password = password.into();

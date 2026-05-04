@@ -16,13 +16,12 @@ pub mod db;
 pub mod handler;
 pub mod middleware;
 pub mod router;
-pub mod util;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub jwt_config: JWTConfig,
     pub pg_client: PGClient,
-    pub publisher: NatsHandler
+    pub publisher: NatsHandler,
 }
 
 #[tokio::main]

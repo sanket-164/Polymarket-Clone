@@ -1,6 +1,6 @@
 use crate::db::TradeExt;
 use common::database::client::PGClient;
-use common::model::market::{Order, OrderType};
+use common::model::{Order, OrderType};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use uuid::Uuid;
