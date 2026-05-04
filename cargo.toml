@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "services/account-service",
+    "services/admin-service",
+    "services/user-service",
     "services/order-service",
     "services/matching-engine",
     "common"

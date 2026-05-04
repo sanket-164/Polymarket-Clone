@@ -128,6 +128,15 @@ CREATE TABLE IF NOT EXISTS resolved_markets (
     FOREIGN KEY (winning_outcome_id) REFERENCES outcome(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS admins (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 ALTER TABLE wallets ADD CONSTRAINT check_balance_non_negative CHECK (balance >= 0 AND locked_balance >= 0);
 ALTER TABLE holdings ADD CONSTRAINT unique_user_market_outcome UNIQUE (user_id, market_id, outcome_id);
 ALTER TABLE holdings ADD CONSTRAINT check_shares_non_negative CHECK (shares >= 0 AND locked_shares >= 0);

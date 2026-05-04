@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "account-service"
+name = "admin-service"
 version = "0.1.0"
 dependencies = [
  "argon2",
@@ -3396,6 +3396,31 @@ dependencies = [
  "idna 1.1.0",
  "percent-encoding",
  "serde",
+]
+
+[[package]]
+name = "user-service"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "async-trait",
+ "axum",
+ "axum-extra",
+ "chrono",
+ "common",
+ "dotenv",
+ "jsonwebtoken",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "time",
+ "tokio",
+ "tower-http",
+ "tracing-subscriber",
+ "uuid",
+ "validator",
 ]
 
 [[package]]
