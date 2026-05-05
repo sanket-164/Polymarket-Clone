@@ -173,18 +173,16 @@ impl MarketExt for PGClient {
         let insert_holdings_query = "
             INSERT INTO holdings (user_id, market_id, outcome_id, shares, locked_shares)
             VALUES
-            ('11111111-1111-1111-1111-111111111111', $1, $2, $3, $4),
-            ('11111111-1111-1111-1111-111111111111', $5, $6, $7, $8)
+            ('11111111-1111-1111-1111-111111111111', $1, $2, 0.00, $3),
+            ('11111111-1111-1111-1111-111111111111', $4, $5, 0.00, $6)
         ";
 
         sqlx::query(insert_holdings_query)
             .bind(market.id)
             .bind(first_outcome.id)
             .bind(first_outcome.total_shares)
-            .bind(first_outcome.total_shares)
             .bind(market.id)
             .bind(second_outcome.id)
-            .bind(second_outcome.total_shares)
             .bind(second_outcome.total_shares)
             .execute(&mut *tx)
             .await?;
