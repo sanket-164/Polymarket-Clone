@@ -8,17 +8,18 @@ use uuid::Uuid;
 #[derive(Debug, Eq, PartialEq)]
 struct BuyOrder(pub Order);
 
-// Newtype wrapper that reverses Ord so BinaryHeap acts as a min-heap
 #[derive(Debug, Eq, PartialEq)]
 struct SellOrder(pub Order);
 
+// Buy orders: min-heap, lowest price first
 impl Ord for SellOrder {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Reverse price comparison: lowest price = highest priority
-        self.0
+        // Reverse price comparison
+        other
+            .0
             .price
-            .cmp(&other.0.price)
-            .then_with(|| other.0.remaining_shares.cmp(&self.0.remaining_shares))
+            .cmp(&self.0.price)
+            .then_with(|| other.0.created_at.cmp(&self.0.created_at))
     }
 }
 
@@ -28,13 +29,13 @@ impl PartialOrd for SellOrder {
     }
 }
 
-// Buy orders: highest price wins → natural max-heap
+// Buy orders: max-heap, highest price first
 impl Ord for BuyOrder {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0
             .price
             .cmp(&other.0.price)
-            .then_with(|| other.0.remaining_shares.cmp(&self.0.remaining_shares))
+            .then_with(|| other.0.created_at.cmp(&self.0.created_at))
     }
 }
 
@@ -46,8 +47,8 @@ impl PartialOrd for BuyOrder {
 
 #[derive(Debug)]
 struct OrderBook {
-    buy: BinaryHeap<BuyOrder>,   // max-heap: highest price first
-    sell: BinaryHeap<SellOrder>, // min-heap: lowest price first
+    buy: BinaryHeap<BuyOrder>,
+    sell: BinaryHeap<SellOrder>,
 }
 
 impl OrderBook {
