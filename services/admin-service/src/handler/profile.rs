@@ -8,7 +8,7 @@ use axum::{
     routing::{get, put},
 };
 use common::{
-    constant::{PROFILE_GET_ME, PROFILE_UPDATE},
+    constant::ROOT,
     error::{ErrorMessage, HttpError},
     validation::admin_dto::{AdminResponse, UpdateAdminDTO},
 };
@@ -19,8 +19,8 @@ use crate::{AppState, db::AccountExt};
 
 pub fn profile_handler() -> Router<Arc<AppState>> {
     Router::new()
-        .route(PROFILE_GET_ME, get(get_me))
-        .route(PROFILE_UPDATE, put(update_admin_profile))
+        .route(ROOT, get(get_me))
+        .route(ROOT, put(update_admin_profile))
 }
 
 async fn get_me(

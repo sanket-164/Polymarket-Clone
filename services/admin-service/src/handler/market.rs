@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::post};
 use common::{
-    constant::CREATE_MARKET,
+    constant::ROOT,
     error::HttpError,
     model::{MarketOutcomes, NatsMessage},
     nats_handler::PublishMessage,
@@ -13,7 +13,7 @@ use validator::Validate;
 use crate::{AppState, db::MarketExt};
 
 pub fn market_handler() -> Router<Arc<AppState>> {
-    Router::new().route(CREATE_MARKET, post(create_market))
+    Router::new().route(ROOT, post(create_market))
 }
 
 async fn create_market(

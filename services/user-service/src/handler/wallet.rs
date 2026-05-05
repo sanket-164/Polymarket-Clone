@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
 };
 use common::{
-    constant::{WALLET_BALANCE, WALLET_DEPOSIT, WALLET_TRANSACTIONS, WALLET_WITHDRAW},
+    constant::{BALANCE, DEPOSIT, TRANSACTIONS, WITHDRAW},
     error::{ErrorMessage, HttpError},
     validation::user_dto::{DepositBalanceDTO, TransactionsQueryDTO},
 };
@@ -20,10 +20,10 @@ use crate::{AppState, db::WalletExt};
 
 pub fn wallet_handler() -> Router<Arc<AppState>> {
     Router::new()
-        .route(WALLET_BALANCE, get(get_balance))
-        .route(WALLET_DEPOSIT, post(deposite_balance))
-        .route(WALLET_WITHDRAW, post(withdraw_balance))
-        .route(WALLET_TRANSACTIONS, get(get_user_transactions))
+        .route(BALANCE, get(get_balance))
+        .route(DEPOSIT, post(deposite_balance))
+        .route(WITHDRAW, post(withdraw_balance))
+        .route(TRANSACTIONS, get(get_user_transactions))
 }
 
 async fn get_balance(

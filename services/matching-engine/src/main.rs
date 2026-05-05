@@ -4,7 +4,7 @@ mod engine;
 use common::{
     config::PGConfig,
     constant::{
-        SUBJECT_CENCEL_ORDER, SUBJECT_INSERT_MARKET, SUBJECT_INSERT_ORDER, SUBJECT_REMOVE_MARKET,
+        SUBJECT_CENCEL_ORDER, SUBJECT_CREATE_MARKET, SUBJECT_PLACE_ORDER, SUBJECT_REMOVE_MARKET,
     },
     database::client::PGClient,
     model::NatsMessage,
@@ -85,10 +85,10 @@ async fn main() {
         };
 
         match msg.subject.as_str() {
-            SUBJECT_INSERT_ORDER => {
+            SUBJECT_PLACE_ORDER => {
                 engine.match_order(message.order.unwrap(), &pg_client).await;
             }
-            SUBJECT_INSERT_MARKET => {
+            SUBJECT_CREATE_MARKET => {
                 let market = message.market.expect("Market does not exist in message");
                 let outcomes = message
                     .outcomes

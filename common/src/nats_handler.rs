@@ -1,7 +1,7 @@
 use crate::{
     constant::{
-        MAX_RECONNECTS, NATS_STREAM, SUBJECT_CENCEL_ORDER, SUBJECT_INSERT_MARKET,
-        SUBJECT_INSERT_ORDER, SUBJECT_REMOVE_MARKET,
+        MAX_RECONNECTS, NATS_STREAM, SUBJECT_CENCEL_ORDER, SUBJECT_CREATE_MARKET,
+        SUBJECT_PLACE_ORDER, SUBJECT_REMOVE_MARKET,
     },
     model::NatsMessage,
 };
@@ -85,13 +85,13 @@ impl NatsHandler {
 
         match message_type {
             PublishMessage::PlaceOrder => {
-                message_subject = SUBJECT_INSERT_ORDER;
+                message_subject = SUBJECT_PLACE_ORDER;
             }
             PublishMessage::CancelOrder => {
                 message_subject = SUBJECT_CENCEL_ORDER;
             }
             PublishMessage::CreateMarket => {
-                message_subject = SUBJECT_INSERT_MARKET;
+                message_subject = SUBJECT_CREATE_MARKET;
             }
             PublishMessage::RemoveMarket => {
                 message_subject = SUBJECT_REMOVE_MARKET;

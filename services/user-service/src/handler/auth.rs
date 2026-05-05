@@ -9,7 +9,7 @@ use axum::{
 };
 use axum_extra::extract::cookie::Cookie;
 use common::{
-    constant::{AUTH_SIGNIN, AUTH_SIGNUP},
+    constant::{SIGNIN, SIGNUP},
     error::{ErrorMessage, HttpError},
     util::{hash, jwt},
     validation::user_dto::{LoginUserDTO, RegisterUserDTO, UserResponse},
@@ -21,8 +21,8 @@ use crate::{AppState, db::AccountExt};
 
 pub fn auth_handler() -> Router<Arc<AppState>> {
     Router::new()
-        .route(AUTH_SIGNUP, post(signup))
-        .route(AUTH_SIGNIN, post(signin))
+        .route(SIGNUP, post(signup))
+        .route(SIGNIN, post(signin))
 }
 
 pub async fn signup(

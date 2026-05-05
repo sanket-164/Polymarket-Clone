@@ -8,7 +8,7 @@ use axum::{
     routing::{get, put},
 };
 use common::{
-    constant::{PROFILE_GET_ME, PROFILE_UPDATE, PROFILE_UPDATE_PICTURE},
+    constant::{PICTURE, ROOT},
     error::{ErrorMessage, HttpError},
     validation::user_dto::{UpdateUserDTO, UpdateUserPictureDTO, UserResponse},
 };
@@ -19,9 +19,9 @@ use crate::{AppState, db::AccountExt};
 
 pub fn profile_handler() -> Router<Arc<AppState>> {
     Router::new()
-        .route(PROFILE_GET_ME, get(get_me))
-        .route(PROFILE_UPDATE, put(update_user_profile))
-        .route(PROFILE_UPDATE_PICTURE, put(update_user_picture))
+        .route(ROOT, get(get_me))
+        .route(ROOT, put(update_user_profile))
+        .route(PICTURE, put(update_user_picture))
 }
 
 async fn get_me(

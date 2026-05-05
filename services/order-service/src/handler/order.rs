@@ -9,7 +9,7 @@ use axum::{
 };
 use chrono::Utc;
 use common::{
-    constant::{ORDER_GET, ORDER_PLACE},
+    constant::ROOT,
     error::{ErrorMessage, HttpError},
     model::{MarketStatus, NatsMessage, OrderType},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
@@ -21,8 +21,8 @@ use crate::{AppState, db::OrderExt};
 
 pub fn order_handler() -> Router<Arc<AppState>> {
     Router::new()
-        .route(ORDER_GET, get(get_orders))
-        .route(ORDER_PLACE, post(place_order))
+        .route(ROOT, get(get_orders))
+        .route(ROOT, post(place_order))
 }
 
 async fn get_orders(

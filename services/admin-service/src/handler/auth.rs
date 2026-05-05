@@ -9,7 +9,7 @@ use axum::{
 };
 use axum_extra::extract::cookie::Cookie;
 use common::{
-    constant::AUTH_SIGNIN,
+    constant::SIGNIN,
     error::{ErrorMessage, HttpError},
     util::{hash, jwt},
     validation::admin_dto::LoginAdminDTO,
@@ -20,7 +20,7 @@ use validator::Validate;
 use crate::{AppState, db::AccountExt};
 
 pub fn auth_handler() -> Router<Arc<AppState>> {
-    Router::new().route(AUTH_SIGNIN, post(signin))
+    Router::new().route(SIGNIN, post(signin))
 }
 
 pub async fn signin(
