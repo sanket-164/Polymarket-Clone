@@ -28,6 +28,10 @@ pub const ORDER_PREFIX: &str = "/order";
 pub const ORDER_GET: &str = "/";
 pub const ORDER_PLACE: &str = "/";
 
+// Market
+pub const MARKET_PREFIX: &str = "/market";
+pub const CREATE_MARKET: &str = "/";
+
 // NATS Config
 pub const NATS_STREAM: &str = "nats";
 pub const SUBJECT_INSERT_ORDER: &str = "nats.insert.order";

@@ -60,9 +60,9 @@ CREATE TABLE IF NOT EXISTS outcome (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     market_id UUID NOT NULL,
     label VARCHAR(255) NOT NULL,
-    start_price DECIMAL(20, 8) DEFAULT 0.00,
-    current_price DECIMAL(20, 8) DEFAULT 0.00,
-    total_shares DECIMAL(20, 8) DEFAULT 0.00,
+    start_price DECIMAL(20, 8) NOT NULL,
+    current_price DECIMAL(20, 8) NOT NULL,
+    total_shares DECIMAL(20, 8) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (market_id) REFERENCES market(id) ON DELETE CASCADE
@@ -74,8 +74,8 @@ CREATE TABLE IF NOT EXISTS holdings (
     user_id UUID NOT NULL,
     market_id UUID NOT NULL,
     outcome_id UUID NOT NULL,
-    shares DECIMAL(20, 8),
-    locked_shares DECIMAL(20, 8),
+    shares DECIMAL(20, 8) NOT NULL,
+    locked_shares DECIMAL(20, 8) DEFAULT 0.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP WITH TIME ZONE,
@@ -186,3 +186,8 @@ CREATE INDEX idx_trades_created_at ON trades(created_at DESC);
 
 -- Resolved Markets
 CREATE INDEX idx_resolved_markets_market_id ON resolved_markets(market_id);
+
+-- Password: 12345678 (hashed using Argon2id)
+INSERT INTO admins (id, name, email, password) VALUES ('00000000-0000-0000-0000-000000000000', 'Admin', 'admin@polymarketclone.com', '$argon2id$v=19$m=19456,t=2,p=1$AaHZRuAc1RJtu7JC9k9Jag$CkH8UBnDyZaPZd1Y2IzEP83F5W03oVdwzQQzESbDzWM');
+INSERT INTO users (id, name, email, password) VALUES ('11111111-1111-1111-1111-111111111111', 'User', 'user@polymarketclone.com', '$argon2id$v=19$m=19456,t=2,p=1$AaHZRuAc1RJtu7JC9k9Jag$CkH8UBnDyZaPZd1Y2IzEP83F5W03oVdwzQQzESbDzWM');
+INSERT INTO wallets (id, user_id, balance, locked_balance) VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 0.00, 0.00);

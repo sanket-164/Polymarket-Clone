@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod market;
 pub mod profile;
 
 use axum::response::IntoResponse;

@@ -17,9 +17,9 @@ pub struct NatsHandler {
 }
 
 pub enum PublishMessage {
-    InsertOrder,
+    PlaceOrder,
     CancelOrder,
-    InsertMarket,
+    CreateMarket,
     RemoveMarket,
 }
 
@@ -84,13 +84,13 @@ impl NatsHandler {
         let message_subject;
 
         match message_type {
-            PublishMessage::InsertOrder => {
+            PublishMessage::PlaceOrder => {
                 message_subject = SUBJECT_INSERT_ORDER;
             }
             PublishMessage::CancelOrder => {
                 message_subject = SUBJECT_CENCEL_ORDER;
             }
-            PublishMessage::InsertMarket => {
+            PublishMessage::CreateMarket => {
                 message_subject = SUBJECT_INSERT_MARKET;
             }
             PublishMessage::RemoveMarket => {

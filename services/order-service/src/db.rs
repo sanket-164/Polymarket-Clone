@@ -11,7 +11,11 @@ use uuid::Uuid;
 pub trait OrderExt {
     async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, sqlx::Error>;
     async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error>;
-    async fn get_outcome_by_id(&self, outcome_id: Uuid) -> Result<Option<Outcome>, sqlx::Error>;
+    async fn get_market_outcome(
+        &self,
+        outcome_id: Uuid,
+        market_id: Uuid,
+    ) -> Result<Option<Outcome>, sqlx::Error>;
     async fn get_user_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error>;
     async fn get_user_holding(
         &self,
@@ -67,14 +71,19 @@ impl OrderExt for PGClient {
         Ok(market)
     }
 
-    async fn get_outcome_by_id(&self, outcome_id: Uuid) -> Result<Option<Outcome>, sqlx::Error> {
+    async fn get_market_outcome(
+        &self,
+        outcome_id: Uuid,
+        market_id: Uuid,
+    ) -> Result<Option<Outcome>, sqlx::Error> {
         let query = r#"
             SELECT id, market_id, label, start_price, current_price, total_shares, created_at, updated_at
             FROM outcome
-            WHERE id = $1"#;
+            WHERE id = $1 AND market_id = $2"#;
 
         let outcome = sqlx::query_as::<_, Outcome>(query)
             .bind(outcome_id)
+            .bind(market_id)
             .fetch_optional(&self.pool)
             .await?;
 

@@ -99,7 +99,7 @@ async fn place_order(
 
     app_state
         .pg_client
-        .get_outcome_by_id(body.outcome_id)
+        .get_market_outcome(body.outcome_id, body.market_id)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?
         .ok_or(HttpError::not_found(
@@ -176,7 +176,7 @@ async fn place_order(
         .publisher
         .publish_message(
             order_message,
-            common::nats_handler::PublishMessage::InsertOrder,
+            common::nats_handler::PublishMessage::PlaceOrder,
         )
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;

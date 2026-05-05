@@ -48,6 +48,15 @@ pub struct Outcome {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarketWithOutcomes {
+    // when serialized to JSON, market fields appear at the top level
+    #[serde(flatten)]
+    pub market: Market,
+    pub first_outcome: Outcome,
+    pub second_outcome: Outcome,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type, Eq)]
 #[sqlx(type_name = "order_type")]
 pub enum OrderType {

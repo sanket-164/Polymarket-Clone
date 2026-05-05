@@ -17,10 +17,7 @@ pub struct RegisterUserDTO {
     )]
     pub email: String,
 
-    #[validate(
-        length(min = 1, message = "Password is required"),
-        length(min = 8, message = "Password must be at least 8 characters")
-    )]
+    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
     pub password: String,
 
     #[validate(
@@ -39,26 +36,17 @@ pub struct LoginUserDTO {
     )]
     pub email: String,
 
-    #[validate(
-        length(min = 1, message = "Password is required"),
-        length(min = 8, message = "Password must be at least 8 charaters")
-    )]
+    #[validate(length(min = 8, message = "Password must be at least 8 charaters"))]
     pub password: String,
 }
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct ResetPassword {
-    #[validate(
-        length(min = 1, message = "Old Password is required"),
-        length(min = 8, message = "Password must be at least 8 characters")
-    )]
+    #[validate(length(min = 8, message = "Old Password must be at least 8 characters"))]
     #[serde(rename = "oldPassword")]
     pub old_password: String,
 
-    #[validate(
-        length(min = 1, message = "New Password is required"),
-        length(min = 8, message = "Password must be at least 8 characters")
-    )]
+    #[validate(length(min = 8, message = "New Password must be at least 8 characters"))]
     #[serde(rename = "newPassword")]
     pub new_password: String,
 
