@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
-use crate::model::{TransactionType, User};
+use crate::model::{MarketStatus, TransactionType, User};
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterUserDTO {
@@ -113,6 +113,15 @@ fn validate_order_field(value: &str) -> Result<(), ValidationError> {
     }
 }
 
+fn validate_market_order_field(value: &str) -> Result<(), ValidationError> {
+    match value {
+        "start_at" | "close_at" => Ok(()),
+        _ => Err(ValidationError::new(
+            "Invalid order field. Must be 'start_at' or 'close_at'",
+        )),
+    }
+}
+
 fn validate_order_by(value: &str) -> Result<(), ValidationError> {
     match value {
         "ASC" | "DESC" => Ok(()),
@@ -131,6 +140,28 @@ pub struct TransactionsQueryDTO {
     pub order_by: Option<String>,
 
     pub transaction_type: Option<TransactionType>,
+
+    #[validate(range(min = 1))]
+    pub limit: Option<i64>,
+
+    #[validate(range(min = 0))]
+    pub skip: Option<i64>,
+}
+
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
+pub struct MarketQueryDTO {
+    #[validate(custom(function = "validate_market_order_field"))]
+    pub order_field: Option<String>,
+
+    #[validate(custom(function = "validate_order_by"))]
+    pub order_by: Option<String>,
+
+    pub status: Option<MarketStatus>,
+    pub category: Option<String>,
+    pub start_after: Option<DateTime<Utc>>,
+    pub start_before: Option<DateTime<Utc>>,
+    pub close_after: Option<DateTime<Utc>>,
+    pub close_before: Option<DateTime<Utc>>,
 
     #[validate(range(min = 1))]
     pub limit: Option<i64>,

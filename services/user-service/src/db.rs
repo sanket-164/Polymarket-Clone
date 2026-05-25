@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
-    model::{Transaction, TransactionType, User, Wallet},
+    model::{Market, MarketStatus, Transaction, TransactionType, User, Wallet},
 };
 use rust_decimal::Decimal;
 use uuid::Uuid;
@@ -46,6 +46,22 @@ pub trait WalletExt {
         limit: i64,
         skip: i64,
     ) -> Result<Vec<Transaction>, sqlx::Error>;
+}
+
+#[async_trait]
+pub trait MarketExt {
+    async fn get_markets(
+        &self,
+        status: MarketStatus,
+        category: Option<String>,
+        start_after: Option<DateTime<Utc>>,
+        start_before: Option<DateTime<Utc>>,
+        close_after: Option<DateTime<Utc>>,
+        close_before: Option<DateTime<Utc>>,
+        order_by: String,
+        limit: i64,
+        skip: i64,
+    ) -> Result<Vec<Market>, sqlx::Error>;
 }
 
 #[async_trait]
@@ -284,5 +300,81 @@ impl WalletExt for PGClient {
             .await?;
 
         Ok(transactions)
+    }
+}
+
+#[async_trait]
+impl MarketExt for PGClient {
+    async fn get_markets(
+        &self,
+        status: MarketStatus,
+        category: Option<String>,
+        start_after: Option<DateTime<Utc>>,
+        start_before: Option<DateTime<Utc>>,
+        close_after: Option<DateTime<Utc>>,
+        close_before: Option<DateTime<Utc>>,
+        order_by: String,
+        limit: i64,
+        skip: i64,
+    ) -> Result<Vec<Market>, sqlx::Error> {
+        let mut query = String::from(
+        "SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
+        FROM market
+        WHERE deleted_at IS NULL AND status = $1",
+    );
+
+        let mut param_index = 2;
+
+        if category.is_some() {
+            query.push_str(&format!(" AND category = ${}", param_index));
+            param_index += 1;
+        }
+        if start_after.is_some() {
+            query.push_str(&format!(" AND start_at >= ${}", param_index));
+            param_index += 1;
+        }
+        if start_before.is_some() {
+            query.push_str(&format!(" AND start_at <= ${}", param_index));
+            param_index += 1;
+        }
+        if close_after.is_some() {
+            query.push_str(&format!(" AND close_at >= ${}", param_index));
+            param_index += 1;
+        }
+        if close_before.is_some() {
+            query.push_str(&format!(" AND close_at <= ${}", param_index));
+            param_index += 1;
+        }
+
+        query.push_str(&format!(
+            " ORDER BY {} LIMIT ${} OFFSET ${}",
+            order_by,
+            param_index,
+            param_index + 1
+        ));
+
+        let mut q = sqlx::query_as::<_, Market>(&query).bind(status);
+
+        if let Some(c) = category {
+            q = q.bind(c);
+        }
+        if let Some(sa) = start_after {
+            q = q.bind(sa);
+        }
+        if let Some(sb) = start_before {
+            q = q.bind(sb);
+        }
+        if let Some(ca) = close_after {
+            q = q.bind(ca);
+        }
+        if let Some(cb) = close_before {
+            q = q.bind(cb);
+        }
+
+        q = q.bind(limit).bind(skip);
+
+        let markets = q.fetch_all(&self.pool).await?;
+
+        Ok(markets)
     }
 }
