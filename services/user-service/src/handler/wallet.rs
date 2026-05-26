@@ -99,7 +99,7 @@ async fn get_user_transactions(
         query_params
             .order_field
             .unwrap_or_else(|| "created_at".to_string()),
-        query_params.order_by.unwrap_or_else(|| "ASC".to_string()),
+        query_params.order_by.unwrap_or_else(|| "DESC".to_string()),
     );
 
     let limit = match query_params.limit {

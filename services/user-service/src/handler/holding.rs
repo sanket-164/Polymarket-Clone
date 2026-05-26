@@ -8,30 +8,27 @@ use axum::{
     routing::get,
 };
 use common::{
-    constant::ROOT, error::HttpError, model::MarketStatus, validation::user_dto::MarketQueryDTO,
+    constant::ROOT,
+    error::HttpError,
+    validation::user_dto::{HoldingQueryDTO, HoldingsResponse},
 };
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::{AppState, db::MarketExt};
+use crate::{AppState, db::HoldingExt};
 
-pub fn market_handler() -> Router<Arc<AppState>> {
-    Router::new().route(ROOT, get(get_markets))
+pub fn holding_handler() -> Router<Arc<AppState>> {
+    Router::new().route(ROOT, get(get_user_holdings))
 }
 
-async fn get_markets(
-    Query(query_params): Query<MarketQueryDTO>,
+async fn get_user_holdings(
+    Query(query_params): Query<HoldingQueryDTO>,
     State(app_state): State<Arc<AppState>>,
-    Extension(_user_id): Extension<Uuid>,
+    Extension(user_id): Extension<Uuid>,
 ) -> Result<impl IntoResponse, HttpError> {
     query_params
         .validate()
         .map_err(|e| HttpError::bad_request(e.to_string()))?;
-
-    let status = match query_params.status {
-        Some(s) => s,
-        _ => MarketStatus::ACTIVE,
-    };
 
     let limit = match query_params.limit {
         Some(l) => l,
@@ -51,21 +48,11 @@ async fn get_markets(
         query_params.order_by.unwrap_or_else(|| "DESC".to_string()),
     );
 
-    let markets = app_state
+    let holdings = app_state
         .pg_client
-        .get_markets(
-            status,
-            query_params.category,
-            query_params.start_after,
-            query_params.start_before,
-            query_params.close_after,
-            query_params.close_before,
-            order_by,
-            limit,
-            skip,
-        )
+        .get_user_holdings(user_id, order_by, limit, skip)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    Ok((StatusCode::OK, Json(markets)))
+    Ok((StatusCode::OK, Json(HoldingsResponse::from(holdings))))
 }

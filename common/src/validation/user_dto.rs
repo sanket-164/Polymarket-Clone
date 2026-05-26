@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
-use crate::model::{MarketStatus, TransactionType, User};
+use crate::model::{Holding, Market, MarketStatus, Outcome, TransactionType, User};
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterUserDTO {
@@ -115,9 +115,18 @@ fn validate_order_field(value: &str) -> Result<(), ValidationError> {
 
 fn validate_market_order_field(value: &str) -> Result<(), ValidationError> {
     match value {
-        "start_at" | "close_at" => Ok(()),
+        "start_at" | "close_at" | "created_at" => Ok(()),
         _ => Err(ValidationError::new(
-            "Invalid order field. Must be 'start_at' or 'close_at'",
+            "Invalid order field. Must be 'start_at', 'close_at' or 'created_at'",
+        )),
+    }
+}
+
+fn validate_holding_order_field(value: &str) -> Result<(), ValidationError> {
+    match value {
+        "shares" | "close_at" | "created_at" => Ok(()),
+        _ => Err(ValidationError::new(
+            "Invalid order field. Must be 'shares' or 'created_at'",
         )),
     }
 }
@@ -170,6 +179,21 @@ pub struct MarketQueryDTO {
     pub skip: Option<i64>,
 }
 
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
+pub struct HoldingQueryDTO {
+    #[validate(custom(function = "validate_holding_order_field"))]
+    pub order_field: Option<String>,
+
+    #[validate(custom(function = "validate_order_by"))]
+    pub order_by: Option<String>,
+
+    #[validate(range(min = 1))]
+    pub limit: Option<i64>,
+
+    #[validate(range(min = 0))]
+    pub skip: Option<i64>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct UserResponse {
     pub id: Uuid,
@@ -192,5 +216,40 @@ impl From<User> for UserResponse {
             created_at: user.created_at,
             updated_at: user.updated_at,
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct HoldingDetails {
+    pub holding: Holding,
+    pub market: Market,
+    pub outcome: Outcome,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct HoldingsResponse {
+    pub id: Uuid,
+    pub shares: Decimal,
+    pub locked_shares: Decimal,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+    pub market: Market,
+    pub outcome: Outcome,
+}
+
+impl HoldingsResponse {
+    pub fn from(details: Vec<HoldingDetails>) -> Vec<HoldingsResponse> {
+        details
+            .into_iter()
+            .map(|d| HoldingsResponse {
+                id: d.holding.id,
+                shares: d.holding.shares,
+                locked_shares: d.holding.locked_shares,
+                created_at: d.holding.created_at,
+                updated_at: d.holding.updated_at,
+                market: d.market,
+                outcome: d.outcome,
+            })
+            .collect()
     }
 }

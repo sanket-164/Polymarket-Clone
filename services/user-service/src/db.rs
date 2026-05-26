@@ -2,9 +2,11 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
-    model::{Market, MarketStatus, Transaction, TransactionType, User, Wallet},
+    model::{Holding, Market, MarketStatus, Outcome, Transaction, TransactionType, User, Wallet},
+    validation::user_dto::HoldingDetails,
 };
 use rust_decimal::Decimal;
+use sqlx::Row;
 use uuid::Uuid;
 
 #[async_trait]
@@ -62,6 +64,17 @@ pub trait MarketExt {
         limit: i64,
         skip: i64,
     ) -> Result<Vec<Market>, sqlx::Error>;
+}
+
+#[async_trait]
+pub trait HoldingExt {
+    async fn get_user_holdings(
+        &self,
+        user_id: Uuid,
+        order_by: String,
+        limit: i64,
+        skip: i64,
+    ) -> Result<Vec<HoldingDetails>, sqlx::Error>;
 }
 
 #[async_trait]
@@ -376,5 +389,89 @@ impl MarketExt for PGClient {
         let markets = q.fetch_all(&self.pool).await?;
 
         Ok(markets)
+    }
+}
+
+#[async_trait]
+impl HoldingExt for PGClient {
+    async fn get_user_holdings(
+        &self,
+        user_id: Uuid,
+        order_by: String,
+        limit: i64,
+        skip: i64,
+    ) -> Result<Vec<HoldingDetails>, sqlx::Error> {
+        let query = format!(
+            "SELECT
+            h.id, h.user_id, h.market_id, h.outcome_id, h.shares, h.locked_shares,
+            h.created_at, h.updated_at,
+            m.id as market_id, m.title, m.description, m.category,
+            m.start_at, m.close_at, m.status, m.created_at as market_created_at,
+            m.updated_at as market_updated_at, m.deleted_at,
+            o.id as outcome_id, o.market_id as outcome_market_id, o.label,
+            o.start_price, o.current_price, o.total_shares,
+            o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
+        FROM holdings h
+        JOIN market m ON h.market_id = m.id
+        JOIN outcome o ON h.outcome_id = o.id
+        WHERE h.user_id = $1
+        ORDER BY {} LIMIT $2 OFFSET $3",
+            order_by
+        );
+
+        let rows = sqlx::query(&query)
+            .bind(user_id)
+            .bind(limit)
+            .bind(skip)
+            .fetch_all(&self.pool)
+            .await?;
+
+        let holdings = rows
+            .iter()
+            .map(|row| {
+                let holding = Holding {
+                    id: row.get("id"),
+                    user_id: row.get("user_id"),
+                    market_id: row.get("market_id"),
+                    outcome_id: row.get("outcome_id"),
+                    shares: row.get("shares"),
+                    locked_shares: row.get("locked_shares"),
+                    created_at: row.get("created_at"),
+                    updated_at: row.get("updated_at"),
+                };
+
+                let market = Market {
+                    id: row.get("market_id"),
+                    title: row.get("title"),
+                    description: row.get("description"),
+                    category: row.get("category"),
+                    start_at: row.get("start_at"),
+                    close_at: row.get("close_at"),
+                    status: row.get("status"),
+                    created_at: row.get("market_created_at"),
+                    updated_at: row.get("market_updated_at"),
+                    deleted_at: row.get("deleted_at"),
+                };
+
+                let outcome = Outcome {
+                    id: row.get("outcome_id"),
+                    market_id: row.get("outcome_market_id"),
+                    label: row.get("label"),
+                    start_price: row.get("start_price"),
+                    current_price: row.get("current_price"),
+                    total_shares: row.get("total_shares"),
+                    created_at: row.get("outcome_created_at"),
+                    updated_at: row.get("outcome_updated_at"),
+                };
+
+                HoldingDetails {
+                    holding,
+                    market,
+                    outcome,
+                }
+            })
+            .collect();
+
+        Ok(holdings)
     }
 }

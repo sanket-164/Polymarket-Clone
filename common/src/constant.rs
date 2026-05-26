@@ -24,6 +24,9 @@ pub const ORDER: &str = "/order";
 // Market
 pub const MARKET: &str = "/market";
 
+// Holding
+pub const HOLDING: &str = "/holding";
+
 // NATS Config
 pub const NATS_STREAM: &str = "nats";
 pub const SUBJECT_PLACE_ORDER: &str = "nats.place.order";
