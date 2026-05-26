@@ -1,6 +1,7 @@
 // API CONSTANTS
 pub const API: &str = "/api";
 pub const ROOT: &str = "/";
+pub const ID: &str = "/:id";
 
 // Auth
 pub const AUTH: &str = "/auth";

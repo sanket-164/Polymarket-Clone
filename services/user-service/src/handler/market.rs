@@ -2,13 +2,16 @@ use std::sync::Arc;
 
 use axum::{
     Extension, Json, Router,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::get,
 };
 use common::{
-    constant::ROOT, error::HttpError, model::MarketStatus, validation::user_dto::MarketQueryDTO,
+    constant::{ID, ROOT},
+    error::HttpError,
+    model::MarketStatus,
+    validation::user_dto::MarketQueryDTO,
 };
 use uuid::Uuid;
 use validator::Validate;
@@ -16,7 +19,9 @@ use validator::Validate;
 use crate::{AppState, db::MarketExt};
 
 pub fn market_handler() -> Router<Arc<AppState>> {
-    Router::new().route(ROOT, get(get_markets))
+    Router::new()
+        .route(ROOT, get(get_markets))
+        .route(ID, get(get_market_details))
 }
 
 async fn get_markets(
@@ -68,4 +73,18 @@ async fn get_markets(
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     Ok((StatusCode::OK, Json(markets)))
+}
+
+async fn get_market_details(
+    Path(id): Path<Uuid>,
+    State(app_state): State<Arc<AppState>>,
+    Extension(_user_id): Extension<Uuid>,
+) -> Result<impl IntoResponse, HttpError> {
+    let market = app_state
+        .pg_client
+        .get_market_details(id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok((StatusCode::OK, Json(market)))
 }

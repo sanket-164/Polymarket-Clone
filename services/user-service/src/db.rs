@@ -2,11 +2,14 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
-    model::{Holding, Market, MarketStatus, Outcome, Transaction, TransactionType, User, Wallet},
+    model::{
+        Holding, Market, MarketStatus, MarketWithOutcomes, Outcome, Transaction, TransactionType,
+        User, Wallet,
+    },
     validation::user_dto::HoldingDetails,
 };
 use rust_decimal::Decimal;
-use sqlx::Row;
+use sqlx::{Row, postgres::PgRow};
 use uuid::Uuid;
 
 #[async_trait]
@@ -64,6 +67,7 @@ pub trait MarketExt {
         limit: i64,
         skip: i64,
     ) -> Result<Vec<Market>, sqlx::Error>;
+    async fn get_market_details(&self, market_id: Uuid) -> Result<MarketWithOutcomes, sqlx::Error>;
 }
 
 #[async_trait]
@@ -389,6 +393,61 @@ impl MarketExt for PGClient {
         let markets = q.fetch_all(&self.pool).await?;
 
         Ok(markets)
+    }
+
+    async fn get_market_details(&self, market_id: Uuid) -> Result<MarketWithOutcomes, sqlx::Error> {
+        let query = "
+        SELECT
+            m.id, m.title, m.description, m.category,
+            m.start_at, m.close_at, m.status,
+            m.created_at, m.updated_at, m.deleted_at,
+            o.id as outcome_id, o.market_id as outcome_market_id, o.label,
+            o.start_price, o.current_price, o.total_shares,
+            o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
+        FROM market m
+        JOIN outcome o ON o.market_id = m.id
+        WHERE m.id = $1
+        ORDER BY o.created_at ASC
+    ";
+
+        let rows = sqlx::query(query)
+            .bind(market_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+        if rows.len() < 2 {
+            return Err(sqlx::Error::RowNotFound);
+        }
+
+        let market = Market {
+            id: rows[0].get("id"),
+            title: rows[0].get("title"),
+            description: rows[0].get("description"),
+            category: rows[0].get("category"),
+            start_at: rows[0].get("start_at"),
+            close_at: rows[0].get("close_at"),
+            status: rows[0].get("status"),
+            created_at: rows[0].get("created_at"),
+            updated_at: rows[0].get("updated_at"),
+            deleted_at: rows[0].get("deleted_at"),
+        };
+
+        let parse_outcome = |row: &PgRow| Outcome {
+            id: row.get("outcome_id"),
+            market_id: row.get("outcome_market_id"),
+            label: row.get("label"),
+            start_price: row.get("start_price"),
+            current_price: row.get("current_price"),
+            total_shares: row.get("total_shares"),
+            created_at: row.get("outcome_created_at"),
+            updated_at: row.get("outcome_updated_at"),
+        };
+
+        Ok(MarketWithOutcomes {
+            market,
+            first_outcome: parse_outcome(&rows[0]),
+            second_outcome: parse_outcome(&rows[1]),
+        })
     }
 }
 
