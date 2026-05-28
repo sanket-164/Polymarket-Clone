@@ -174,10 +174,7 @@ async fn place_order(
 
     app_state
         .publisher
-        .publish_message(
-            order_message,
-            common::nats_handler::PublishMessage::PlaceOrder,
-        )
+        .place_order(order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

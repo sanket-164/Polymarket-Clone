@@ -16,13 +16,6 @@ pub struct NatsHandler {
     pub jetstream: jetstream::Context,
 }
 
-pub enum PublishMessage {
-    PlaceOrder,
-    CancelOrder,
-    CreateMarket,
-    RemoveMarket,
-}
-
 impl NatsHandler {
     pub async fn new(url: &str) -> Result<Self, async_nats::Error> {
         let client = ConnectOptions::new()
@@ -67,42 +60,39 @@ impl NatsHandler {
             )
             .await?;
 
-        let message_stream = consumer.messages().await?;
-
-        Ok(message_stream)
+        Ok(consumer.messages().await?)
     }
 
-    pub async fn publish_message(
+    async fn publish(
         &self,
-        message: NatsMessage,
-        message_type: PublishMessage,
+        subject: &'static str,
+        message: &NatsMessage,
     ) -> Result<(), async_nats::Error> {
-        let payload = serde_json::to_vec(&message).map_err(|e| {
+        let payload = serde_json::to_vec(message).map_err(|e| {
             async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
         })?;
 
-        let message_subject;
-
-        match message_type {
-            PublishMessage::PlaceOrder => {
-                message_subject = SUBJECT_PLACE_ORDER;
-            }
-            PublishMessage::CancelOrder => {
-                message_subject = SUBJECT_CENCEL_ORDER;
-            }
-            PublishMessage::CreateMarket => {
-                message_subject = SUBJECT_CREATE_MARKET;
-            }
-            PublishMessage::RemoveMarket => {
-                message_subject = SUBJECT_REMOVE_MARKET;
-            }
-        }
-
         self.jetstream
-            .publish(message_subject, payload.into())
+            .publish(subject, payload.into())
             .await?
             .await?;
 
         Ok(())
+    }
+
+    pub async fn place_order(&self, message: NatsMessage) -> Result<(), async_nats::Error> {
+        self.publish(SUBJECT_PLACE_ORDER, &message).await
+    }
+
+    pub async fn cancel_order(&self, message: NatsMessage) -> Result<(), async_nats::Error> {
+        self.publish(SUBJECT_CENCEL_ORDER, &message).await
+    }
+
+    pub async fn create_market(&self, message: NatsMessage) -> Result<(), async_nats::Error> {
+        self.publish(SUBJECT_CREATE_MARKET, &message).await
+    }
+
+    pub async fn remove_market(&self, message: NatsMessage) -> Result<(), async_nats::Error> {
+        self.publish(SUBJECT_REMOVE_MARKET, &message).await
     }
 }

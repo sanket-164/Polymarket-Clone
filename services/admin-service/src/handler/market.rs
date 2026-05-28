@@ -5,7 +5,6 @@ use common::{
     constant::ROOT,
     error::HttpError,
     model::{MarketOutcomes, NatsMessage},
-    nats_handler::PublishMessage,
     validation::admin_dto::CreateMarketDTO,
 };
 use validator::Validate;
@@ -43,7 +42,7 @@ async fn create_market(
 
     app_state
         .publisher
-        .publish_message(market_message, PublishMessage::CreateMarket)
+        .create_market(market_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
@@ -61,7 +60,7 @@ async fn create_market(
 
     app_state
         .publisher
-        .publish_message(first_order_message, PublishMessage::PlaceOrder)
+        .place_order(first_order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
@@ -79,7 +78,7 @@ async fn create_market(
 
     app_state
         .publisher
-        .publish_message(second_order_message, PublishMessage::PlaceOrder)
+        .place_order(second_order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
