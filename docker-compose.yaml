@@ -84,6 +84,27 @@ services:
     volumes:
       - nats_data:/data
 
+  redis:
+    image: redis:7-alpine
+    command:
+      - redis-server
+      - --save 60 1 # persist if ≥1 key changes in 60s
+      - --loglevel warning
+      - --requirepass redispassword
+      - --maxmemory 256mb
+      - --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "redispassword", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   nats_data:
+    driver: local
+  redis_data:
     driver: local

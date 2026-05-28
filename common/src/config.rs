@@ -49,3 +49,18 @@ impl JWTConfig {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct RedisConfig {
+    pub redis_url: String,
+}
+
+impl RedisConfig {
+    pub fn init() -> Self {
+        dotenv().ok();
+
+        let redis_url = std::env::var("REDIS_URL").expect("REDIS_URL is not set in .env file.");
+
+        RedisConfig { redis_url }
+    }
+}

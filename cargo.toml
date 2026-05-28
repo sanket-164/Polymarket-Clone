@@ -30,3 +30,5 @@ tracing-subscriber = { version = "0.3.18" }
 time = "0.3.20"
 async-nats = "0.35"
 futures = "0.3"
+redis = { version = "0.32", features = ["tokio-comp"] }
+deadpool-redis = "0.22"

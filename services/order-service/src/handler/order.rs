@@ -14,6 +14,8 @@ use common::{
     model::{MarketStatus, NatsMessage, OrderType},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
+use redis::AsyncCommands;
+use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -107,8 +109,9 @@ async fn place_order(
         ))?;
 
     let order;
+    let order_type = body.order_type.clone();
 
-    match body.order_type {
+    match order_type {
         OrderType::BUY => {
             let wallet = app_state
                 .pg_client
@@ -130,7 +133,7 @@ async fn place_order(
                     body.outcome_id,
                     body.shares,
                     body.price,
-                    body.order_type,
+                    order_type,
                 )
                 .await
                 .map_err(|e| HttpError::server_error(e.to_string()))?;
@@ -159,7 +162,7 @@ async fn place_order(
                     body.outcome_id,
                     body.shares,
                     body.price,
-                    body.order_type,
+                    order_type,
                 )
                 .await
                 .map_err(|e| HttpError::server_error(e.to_string()))?;
@@ -175,6 +178,39 @@ async fn place_order(
     app_state
         .publisher
         .place_order(order_message)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let mut redis = app_state
+        .redis_pool
+        .get()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let orderbook_key = format!(
+        "orderbook:{}:{}:{}",
+        body.market_id,
+        body.outcome_id,
+        match body.order_type {
+            OrderType::BUY => "buy",
+            OrderType::SELL => "sell",
+        }
+    );
+
+    redis
+        .hincr::<_, _, _, ()>(
+            format!("{}:qty", orderbook_key),
+            body.price.to_string(),
+            body.shares.to_f64(),
+        )
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    redis::cmd("ZADD")
+        .arg(orderbook_key)
+        .arg(body.price.to_f64())
+        .arg(body.price.to_string())
+        .query_async::<()>(&mut redis)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
