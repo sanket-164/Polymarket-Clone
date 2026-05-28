@@ -109,9 +109,8 @@ async fn place_order(
         ))?;
 
     let order;
-    let order_type = body.order_type.clone();
 
-    match order_type {
+    match body.order_type {
         OrderType::BUY => {
             let wallet = app_state
                 .pg_client
@@ -127,13 +126,12 @@ async fn place_order(
 
             order = app_state
                 .pg_client
-                .insert_order(
+                .buy_order(
                     user_id,
                     body.market_id,
                     body.outcome_id,
                     body.shares,
                     body.price,
-                    order_type,
                 )
                 .await
                 .map_err(|e| HttpError::server_error(e.to_string()))?;
@@ -156,13 +154,12 @@ async fn place_order(
 
             order = app_state
                 .pg_client
-                .insert_order(
+                .sell_order(
                     user_id,
                     body.market_id,
                     body.outcome_id,
                     body.shares,
                     body.price,
-                    order_type,
                 )
                 .await
                 .map_err(|e| HttpError::server_error(e.to_string()))?;

@@ -34,14 +34,21 @@ pub trait OrderExt {
         limit: i64,
         skip: i64,
     ) -> Result<Vec<Order>, sqlx::Error>;
-    async fn insert_order(
+    async fn buy_order(
         &self,
         user_id: Uuid,
         market_id: Uuid,
         outcome_id: Uuid,
         shares: Decimal,
         price: Decimal,
-        order_type: OrderType,
+    ) -> Result<Order, sqlx::Error>;
+    async fn sell_order(
+        &self,
+        user_id: Uuid,
+        market_id: Uuid,
+        outcome_id: Uuid,
+        shares: Decimal,
+        price: Decimal,
     ) -> Result<Order, sqlx::Error>;
 }
 
@@ -197,92 +204,88 @@ impl OrderExt for PGClient {
         Ok(orders)
     }
 
-    async fn insert_order(
+    async fn buy_order(
         &self,
         user_id: Uuid,
         market_id: Uuid,
         outcome_id: Uuid,
         shares: Decimal,
         price: Decimal,
-        order_type: OrderType,
     ) -> Result<Order, sqlx::Error> {
         let cost = price * shares;
         let mut tx = self.pool.begin().await?;
 
-        match order_type {
-            OrderType::BUY => {
-                // Deduct from balance and lock the funds
-                sqlx::query(
-                    r#"UPDATE wallets
-                       SET balance = balance - $1, locked_balance = locked_balance + $1, updated_at = $2
-                       WHERE user_id = $3"#,
-                )
-                .bind(cost)
-                .bind(Utc::now())
-                .bind(user_id)
-                .execute(&mut *tx)
-                .await?;
-
-                let holding: Option<Holding> = sqlx::query_as(
-                    r#"SELECT * FROM holdings
-                       WHERE user_id = $1 AND market_id = $2 AND outcome_id = $3"#,
-                )
-                .bind(user_id)
-                .bind(market_id)
-                .bind(outcome_id)
-                .fetch_optional(&mut *tx)
-                .await?;
-
-                if holding.is_none() {
-                    sqlx::query(
-                        r#"INSERT INTO holdings (user_id, market_id, outcome_id, shares, locked_shares)
-                           VALUES ($1, $2, $3, $4, $5)"#,
-                    )
-                    .bind(user_id)
-                    .bind(market_id)
-                    .bind(outcome_id)
-                    .bind(Decimal::ZERO)
-                    .bind(Decimal::ZERO)
-                    .execute(&mut *tx)
-                    .await?;
-                }
-            }
-
-            OrderType::SELL => {
-                // Move shares from available to locked
-                sqlx::query_as::<_, Holding>(
-                    r#"UPDATE holdings
-                       SET shares = shares - $1, locked_shares = locked_shares + $1, updated_at = $2
-                       WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
-                       RETURNING id, user_id, market_id, outcome_id, shares, locked_shares, created_at, updated_at"#,
-                )
-                .bind(shares)
-                .bind(Utc::now())
-                .bind(user_id)
-                .bind(market_id)
-                .bind(outcome_id)
-                .fetch_one(&mut *tx)
-                .await?;
-            }
-        }
-
         let order = sqlx::query_as::<_, Order>(
-            r#"INSERT INTO orders (user_id, market_id, outcome_id, type, shares, remaining_shares, price)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
-               RETURNING id, user_id, market_id, outcome_id, type, shares, remaining_shares, price, status, created_at, updated_at"#,
+            r#"WITH deduct_wallet AS (
+               UPDATE wallets
+               SET    balance         = balance         - $1,
+                      locked_balance  = locked_balance  + $1,
+                      updated_at      = NOW()
+               WHERE  user_id = $2
+           ),
+           upsert_holding AS (
+               INSERT INTO holdings (user_id, market_id, outcome_id, shares, locked_shares)
+               VALUES ($2, $3, $4, 0, 0)
+               ON CONFLICT (user_id, market_id, outcome_id) DO NOTHING
+           )
+           INSERT INTO orders
+               (user_id, market_id, outcome_id, type, shares, remaining_shares, price)
+           VALUES ($2, $3, $4, $5, $6, $6, $7)
+           RETURNING
+               id, user_id, market_id, outcome_id, type,
+               shares, remaining_shares, price, status,
+               created_at, updated_at"#,
         )
+        .bind(cost)
         .bind(user_id)
         .bind(market_id)
         .bind(outcome_id)
-        .bind(order_type)
-        .bind(shares)
-        .bind(shares)
+        .bind(OrderType::BUY)
+        .bind(shares) // (shares & remaining_shares)
         .bind(price)
         .fetch_one(&mut *tx)
         .await?;
 
         tx.commit().await?;
+        Ok(order)
+    }
 
+    async fn sell_order(
+        &self,
+        user_id: Uuid,
+        market_id: Uuid,
+        outcome_id: Uuid,
+        shares: Decimal,
+        price: Decimal,
+    ) -> Result<Order, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        let order = sqlx::query_as::<_, Order>(
+            r#"WITH lock_shares AS (
+               UPDATE holdings
+               SET    shares        = shares        - $1,
+                      locked_shares = locked_shares + $1,
+                      updated_at    = NOW()
+               WHERE  user_id = $2 AND market_id = $3 AND outcome_id = $4
+           )
+           INSERT INTO orders
+               (user_id, market_id, outcome_id, type, shares, remaining_shares, price)
+           VALUES ($2, $3, $4, $5, $1, $1, $6)
+           RETURNING
+               id, user_id, market_id, outcome_id, type,
+               shares, remaining_shares, price, status,
+               created_at, updated_at"#,
+        )
+        .bind(shares) // (shares & remaining_shares)
+        .bind(user_id)
+        .bind(market_id)
+        .bind(outcome_id)
+        .bind(OrderType::SELL)
+        .bind(price)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
         Ok(order)
     }
 }
