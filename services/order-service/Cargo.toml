@@ -24,5 +24,5 @@ tracing-subscriber.workspace = true
 tokio.workspace = true
 time.workspace = true
 async-nats.workspace = true
-redis = { version = "0.32", features = ["tokio-comp"] }
-deadpool-redis = "0.22"
+redis.workspace = true
+deadpool-redis.workspace = true

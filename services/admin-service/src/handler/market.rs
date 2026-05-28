@@ -7,6 +7,7 @@ use common::{
     model::{MarketOutcomes, NatsMessage},
     validation::admin_dto::CreateMarketDTO,
 };
+use rust_decimal::prelude::ToPrimitive;
 use validator::Validate;
 
 use crate::{AppState, db::MarketExt};
@@ -52,8 +53,47 @@ async fn create_market(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
+    let second_outcome_order = app_state
+        .pg_client
+        .insert_sell_order(second_outcome)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    // Push both initial sell orders into the aggregated Redis orderbook.
+    let mut redis = app_state
+        .redis_pool
+        .get()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    for order in [&first_outcome_order, &second_outcome_order] {
+        let base_key = format!("orderbook:{}:{}:sell", order.market_id, order.outcome_id);
+        let qty_key = format!("{}:qty", base_key);
+        let price_str = order.price.normalize().to_string();
+        let shares_f64 = order.shares.to_f64();
+
+        redis::pipe()
+            .cmd("HINCRBYFLOAT")
+            .arg(&qty_key)
+            .arg(&price_str)
+            .arg(shares_f64)
+            .cmd("ZADD")
+            .arg(&base_key)
+            .arg(order.price.to_f64())
+            .arg(&price_str)
+            .query_async::<()>(&mut *redis)
+            .await
+            .map_err(|e| HttpError::server_error(e.to_string()))?;
+    }
+
     let first_order_message = NatsMessage {
         order: Some(first_outcome_order),
+        market: None,
+        outcomes: None,
+    };
+
+    let second_order_message = NatsMessage {
+        order: Some(second_outcome_order),
         market: None,
         outcomes: None,
     };
@@ -63,18 +103,6 @@ async fn create_market(
         .place_order(first_order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let second_outcome_order = app_state
-        .pg_client
-        .insert_sell_order(second_outcome)
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let second_order_message = NatsMessage {
-        order: Some(second_outcome_order),
-        market: None,
-        outcomes: None,
-    };
 
     app_state
         .publisher

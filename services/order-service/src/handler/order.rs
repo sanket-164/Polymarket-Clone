@@ -14,7 +14,6 @@ use common::{
     model::{MarketStatus, NatsMessage, OrderType},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
-use redis::AsyncCommands;
 use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
 use validator::Validate;
@@ -193,21 +192,20 @@ async fn place_order(
             OrderType::SELL => "sell",
         }
     );
+    let price_str = body.price.normalize().to_string();
+    let shares_f64 = body.shares.to_f64();
+    let price_f64 = body.price.to_f64();
 
-    redis
-        .hincr::<_, _, _, ()>(
-            format!("{}:qty", orderbook_key),
-            body.price.to_string(),
-            body.shares.to_f64(),
-        )
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    redis::cmd("ZADD")
-        .arg(orderbook_key)
-        .arg(body.price.to_f64())
-        .arg(body.price.to_string())
-        .query_async::<()>(&mut redis)
+    redis::pipe()
+        .cmd("HINCRBYFLOAT")
+        .arg(format!("{}:qty", orderbook_key))
+        .arg(&price_str)
+        .arg(shares_f64)
+        .cmd("ZADD")
+        .arg(&orderbook_key)
+        .arg(price_f64)
+        .arg(&price_str)
+        .query_async::<()>(&mut *redis)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

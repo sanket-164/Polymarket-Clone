@@ -2,7 +2,7 @@ mod db;
 mod engine;
 
 use common::{
-    config::PGConfig,
+    config::{PGConfig, RedisConfig},
     constant::{
         SUBJECT_CENCEL_ORDER, SUBJECT_CREATE_MARKET, SUBJECT_PLACE_ORDER, SUBJECT_REMOVE_MARKET,
     },
@@ -10,13 +10,16 @@ use common::{
     model::NatsMessage,
     nats_handler::NatsHandler,
 };
+use deadpool_redis::{Config, Runtime};
 use futures::StreamExt;
+use redis::aio::MultiplexedConnection;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 
 use crate::engine::Engine;
 
 pub struct AppState {
     pub pg_client: PGClient,
+    pub redis_pool: MultiplexedConnection,
 }
 
 #[tokio::main]
@@ -45,13 +48,14 @@ async fn main() {
 
     let pg_client = PGClient::new(pool);
 
+    let mut redis_connection = Config::from_url(RedisConfig::init().redis_url)
+        .create_pool(Some(Runtime::Tokio1))
+        .unwrap()
+        .get()
+        .await
+        .unwrap();
+
     let mut engine = Engine::new();
-
-    let m_id = uuid::Uuid::parse_str("a1b2c3d4-e5f6-7890-abcd-ef1234567890").expect("lol");
-    let fo_id = uuid::Uuid::parse_str("b2c3d4e5-f6a7-8901-bcde-f12345678901").expect("lol");
-    let so_id = uuid::Uuid::parse_str("c3d4e5f6-a7b8-9012-cdef-123456789012").expect("lol");
-
-    engine.add_market(m_id, fo_id, so_id);
 
     let nats_consumer = match NatsHandler::new("nats://localhost:4222").await {
         Ok(c) => c,
@@ -86,7 +90,9 @@ async fn main() {
 
         match msg.subject.as_str() {
             SUBJECT_PLACE_ORDER => {
-                engine.match_order(message.order.unwrap(), &pg_client).await;
+                engine
+                    .match_order(message.order.unwrap(), &pg_client, &mut redis_connection)
+                    .await;
             }
             SUBJECT_CREATE_MARKET => {
                 let market = message.market.expect("Market does not exist in message");

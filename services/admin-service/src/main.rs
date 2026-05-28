@@ -4,9 +4,10 @@ use axum::http::{
     HeaderValue, Method,
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
-use common::config::{JWTConfig, PGConfig};
+use common::config::{JWTConfig, PGConfig, RedisConfig};
 use common::database::client::PGClient;
 use common::nats_handler::NatsHandler;
+use deadpool_redis::{Config, Pool, Runtime};
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use tower_http::cors::CorsLayer;
 
@@ -22,6 +23,7 @@ pub struct AppState {
     pub jwt_config: JWTConfig,
     pub pg_client: PGClient,
     pub publisher: NatsHandler,
+    pub redis_pool: Pool,
 }
 
 #[tokio::main]
@@ -65,10 +67,15 @@ async fn main() {
         }
     };
 
+    let redis_pool = Config::from_url(RedisConfig::init().redis_url)
+        .create_pool(Some(Runtime::Tokio1))
+        .unwrap();
+
     let app_state = AppState {
         jwt_config,
         pg_client: pg_client.clone(),
         publisher: publisher,
+        redis_pool,
     };
 
     let app = create_router(Arc::new(app_state.clone())).layer(cors.clone());

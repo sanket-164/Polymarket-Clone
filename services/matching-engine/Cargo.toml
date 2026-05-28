@@ -16,3 +16,5 @@ sqlx.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 async-trait.workspace = true
+redis.workspace = true
+deadpool-redis.workspace = true

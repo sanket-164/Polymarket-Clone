@@ -1,6 +1,9 @@
 use crate::db::TradeExt;
 use common::database::client::PGClient;
 use common::model::{Order, OrderType};
+use deadpool_redis::Connection;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use uuid::Uuid;
@@ -121,7 +124,56 @@ impl Engine {
         self.order_books.get_mut(market_id)?.get_mut(outcome_id)
     }
 
-    pub async fn match_order(&mut self, order: Order, pg_client: &PGClient) {
+    async fn uprem_price(
+        redis: &mut Connection,
+        market_id: &Uuid,
+        outcome_id: &Uuid,
+        order_type: &str,
+        price: &Decimal,
+        filled_shares: Decimal,
+    ) {
+        let base_key = format!("orderbook:{}:{}:{}", market_id, outcome_id, order_type);
+        let qty_key = format!("{}:qty", base_key);
+        let price_str = price.normalize().to_string();
+
+        // Update the shares in HashMap
+        let new_qty: f64 = match redis::cmd("HINCRBYFLOAT")
+            .arg(&qty_key)
+            .arg(&price_str)
+            .arg(-filled_shares.to_f64().unwrap_or(0.0))
+            .query_async(redis)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("Redis HINCRBYFLOAT failed: {:?}", e);
+                return;
+            }
+        };
+
+        // Remove price & shares from HashMap & SortedSet if share's quantity is 0
+        if new_qty <= 0.0 {
+            if let Err(e) = redis::pipe()
+                .cmd("HDEL")
+                .arg(&qty_key)
+                .arg(&price_str)
+                .cmd("ZREM")
+                .arg(&base_key)
+                .arg(&price_str)
+                .query_async::<()>(redis)
+                .await
+            {
+                eprintln!("Redis cleanup failed: {:?}", e);
+            }
+        }
+    }
+
+    pub async fn match_order(
+        &mut self,
+        order: Order,
+        pg_client: &PGClient,
+        redis: &mut Connection,
+    ) {
         let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
             return;
         };
@@ -134,6 +186,7 @@ impl Engine {
                     match book.peek_sell() {
                         Some(best_sell) if remaining.price >= best_sell.price => {
                             let mut sell = book.pop_sell().unwrap();
+                            let filled = remaining.remaining_shares.min(sell.remaining_shares);
 
                             if let Err(e) = pg_client.trade(remaining.clone(), sell.clone()).await {
                                 eprintln!("Trade failed: {:?}", e);
@@ -142,25 +195,46 @@ impl Engine {
                                 break;
                             }
 
-                            println!("Trade {} -> {}\n", remaining.id, sell.id);
+                            println!("Trade {} -> {}", remaining.id, sell.id);
+
+                            // Update Redis for both sides of the trade.
+                            Engine::uprem_price(
+                                redis,
+                                &remaining.market_id,
+                                &remaining.outcome_id,
+                                "buy",
+                                &remaining.price,
+                                filled,
+                            )
+                            .await;
+                            Engine::uprem_price(
+                                redis,
+                                &sell.market_id,
+                                &sell.outcome_id,
+                                "sell",
+                                &sell.price,
+                                filled,
+                            )
+                            .await;
 
                             match remaining.remaining_shares.cmp(&sell.remaining_shares) {
                                 Ordering::Greater => {
-                                    remaining.remaining_shares =
-                                        remaining.remaining_shares - sell.remaining_shares;
+                                    // sell fully consumed, buy continues.
+                                    remaining.remaining_shares -= sell.remaining_shares;
                                 }
                                 Ordering::Less => {
-                                    sell.remaining_shares =
-                                        sell.remaining_shares - remaining.remaining_shares;
+                                    // buy fully consumed, sell goes back partially filled.
+                                    sell.remaining_shares -= remaining.remaining_shares;
                                     book.push_sell(sell);
                                     break;
                                 }
                                 Ordering::Equal => {
+                                    // Both fully consumed.
                                     break;
                                 }
                             }
                         }
-                        // no match found, rest of buy sits on book
+                        // No match — unmatched remainder stays on book (already in Redis from place_order).
                         _ => {
                             book.push_buy(remaining);
                             break;
@@ -176,6 +250,7 @@ impl Engine {
                     match book.peek_buy() {
                         Some(best_buy) if remaining.price <= best_buy.price => {
                             let mut buy = book.pop_buy().unwrap();
+                            let filled = remaining.remaining_shares.min(buy.remaining_shares);
 
                             if let Err(e) = pg_client.trade(buy.clone(), remaining.clone()).await {
                                 eprintln!("Trade failed: {:?}", e);
@@ -184,16 +259,36 @@ impl Engine {
                                 break;
                             }
 
-                            println!("Trade {} -> {}\n", buy.id, remaining.id);
+                            println!("Trade {} -> {}", buy.id, remaining.id);
+
+                            // Update Redis for both sides of the trade.
+                            Engine::uprem_price(
+                                redis,
+                                &remaining.market_id,
+                                &remaining.outcome_id,
+                                "sell",
+                                &remaining.price,
+                                filled,
+                            )
+                            .await;
+                            Engine::uprem_price(
+                                redis,
+                                &buy.market_id,
+                                &buy.outcome_id,
+                                "buy",
+                                &buy.price,
+                                filled,
+                            )
+                            .await;
 
                             match remaining.remaining_shares.cmp(&buy.remaining_shares) {
                                 Ordering::Greater => {
-                                    remaining.remaining_shares =
-                                        remaining.remaining_shares - buy.remaining_shares;
+                                    // buy fully consumed, sell continues.
+                                    remaining.remaining_shares -= buy.remaining_shares;
                                 }
                                 Ordering::Less => {
-                                    buy.remaining_shares =
-                                        buy.remaining_shares - remaining.remaining_shares;
+                                    // sell fully consumed, buy goes back partially filled.
+                                    buy.remaining_shares -= remaining.remaining_shares;
                                     book.push_buy(buy);
                                     break;
                                 }
@@ -202,7 +297,6 @@ impl Engine {
                                 }
                             }
                         }
-                        // no match found, rest of sell sits on book
                         _ => {
                             book.push_sell(remaining);
                             break;
