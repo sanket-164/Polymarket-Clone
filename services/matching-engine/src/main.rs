@@ -4,23 +4,18 @@ mod engine;
 use common::{
     config::{PGConfig, RedisConfig},
     constant::{
-        SUBJECT_CENCEL_ORDER, SUBJECT_CREATE_MARKET, SUBJECT_PLACE_ORDER, SUBJECT_REMOVE_MARKET,
+        MATCHER_CANCEL_ORDER, MATCHER_CREATE_MARKET, MATCHER_PLACE_ORDER, MATCHER_REMOVE_MARKET,
+        MATCHER_STREAM,
     },
     database::client::PGClient,
-    model::NatsMessage,
+    model::MatcherMessage,
     nats_handler::NatsHandler,
 };
 use deadpool_redis::{Config, Runtime};
 use futures::StreamExt;
-use redis::aio::MultiplexedConnection;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 
 use crate::engine::Engine;
-
-pub struct AppState {
-    pub pg_client: PGClient,
-    pub redis_pool: MultiplexedConnection,
-}
 
 #[tokio::main]
 async fn main() {
@@ -57,16 +52,16 @@ async fn main() {
 
     let mut engine = Engine::new();
 
-    let nats_consumer = match NatsHandler::new("nats://localhost:4222").await {
+    let nats_handler = match NatsHandler::new("nats://localhost:4222").await {
         Ok(c) => c,
         Err(e) => {
-            println!("Failed to connect consumer: {e}");
+            println!("Failed to connect nats handler: {e}");
             std::process::exit(1);
         }
     };
 
-    let mut message_stream = nats_consumer
-        .get_message_stream()
+    let mut message_stream = nats_handler
+        .get_message_stream(MATCHER_STREAM)
         .await
         .expect("Failed to get messages");
 
@@ -79,7 +74,7 @@ async fn main() {
             }
         };
 
-        let message: NatsMessage = match serde_json::from_slice(&msg.payload) {
+        let message: MatcherMessage = match serde_json::from_slice(&msg.payload) {
             Ok(o) => o,
             Err(e) => {
                 eprintln!("Deserialize error: {e}");
@@ -89,12 +84,17 @@ async fn main() {
         };
 
         match msg.subject.as_str() {
-            SUBJECT_PLACE_ORDER => {
+            MATCHER_PLACE_ORDER => {
                 engine
-                    .match_order(message.order.unwrap(), &pg_client, &mut redis_connection)
+                    .match_order(
+                        message.order.unwrap(),
+                        &pg_client,
+                        &mut redis_connection,
+                        &nats_handler,
+                    )
                     .await;
             }
-            SUBJECT_CREATE_MARKET => {
+            MATCHER_CREATE_MARKET => {
                 let market = message.market.expect("Market does not exist in message");
                 let outcomes = message
                     .outcomes
@@ -105,11 +105,11 @@ async fn main() {
                     outcomes.second_outcome.id,
                 );
             }
-            SUBJECT_REMOVE_MARKET => {
+            MATCHER_REMOVE_MARKET => {
                 let market = message.market.expect("Market does not exist in message");
                 engine.remove_market(market.id);
             }
-            SUBJECT_CENCEL_ORDER => {
+            MATCHER_CANCEL_ORDER => {
                 // handle cancel order
             }
             unknown => {

@@ -11,7 +11,7 @@ use chrono::Utc;
 use common::{
     constant::{ID, ROOT, SNAPSHOT},
     error::{ErrorMessage, HttpError},
-    model::{MarketStatus, NatsMessage, OrderType},
+    model::{MarketStatus, MatcherMessage, OrderType},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
 use rust_decimal::prelude::ToPrimitive;
@@ -167,7 +167,7 @@ async fn place_order(
         }
     }
 
-    let order_message = NatsMessage {
+    let order_message = MatcherMessage {
         order: Some(order.clone()),
         market: None,
         outcomes: None,

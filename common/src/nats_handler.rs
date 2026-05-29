@@ -1,9 +1,9 @@
 use crate::{
     constant::{
-        MAX_RECONNECTS, NATS_STREAM, SUBJECT_CENCEL_ORDER, SUBJECT_CREATE_MARKET,
-        SUBJECT_PLACE_ORDER, SUBJECT_REMOVE_MARKET,
+        MATCHER_CANCEL_ORDER, MATCHER_CREATE_MARKET, MATCHER_PLACE_ORDER, MATCHER_REMOVE_MARKET,
+        MAX_NATS_RECONNECTS,
     },
-    model::NatsMessage,
+    model::MatcherMessage,
 };
 use async_nats::{
     ConnectOptions,
@@ -19,7 +19,7 @@ pub struct NatsHandler {
 impl NatsHandler {
     pub async fn new(url: &str) -> Result<Self, async_nats::Error> {
         let client = ConnectOptions::new()
-            .max_reconnects(Some(MAX_RECONNECTS as usize))
+            .max_reconnects(Some(MAX_NATS_RECONNECTS as usize))
             .reconnect_delay_callback(|attempts| {
                 Duration::from_millis(100 * 2_u64.pow(attempts as u32))
             })
@@ -40,12 +40,12 @@ impl NatsHandler {
         })
     }
 
-    pub async fn get_message_stream(&self) -> Result<Stream, async_nats::Error> {
+    pub async fn get_message_stream(&self, stream_name: &str) -> Result<Stream, async_nats::Error> {
         let stream = self
             .jetstream
             .get_or_create_stream(jetstream::stream::Config {
-                name: NATS_STREAM.into(),
-                subjects: vec![format!("{}.>", NATS_STREAM.to_string()).into()],
+                name: stream_name.into(),
+                subjects: vec![format!("{}.>", stream_name.to_string()).into()],
                 ..Default::default()
             })
             .await?;
@@ -66,7 +66,7 @@ impl NatsHandler {
     async fn publish(
         &self,
         subject: &'static str,
-        message: &NatsMessage,
+        message: &MatcherMessage,
     ) -> Result<(), async_nats::Error> {
         let payload = serde_json::to_vec(message).map_err(|e| {
             async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
@@ -80,19 +80,19 @@ impl NatsHandler {
         Ok(())
     }
 
-    pub async fn place_order(&self, message: NatsMessage) -> Result<(), async_nats::Error> {
-        self.publish(SUBJECT_PLACE_ORDER, &message).await
+    pub async fn place_order(&self, message: MatcherMessage) -> Result<(), async_nats::Error> {
+        self.publish(MATCHER_PLACE_ORDER, &message).await
     }
 
-    pub async fn cancel_order(&self, message: NatsMessage) -> Result<(), async_nats::Error> {
-        self.publish(SUBJECT_CENCEL_ORDER, &message).await
+    pub async fn cancel_order(&self, message: MatcherMessage) -> Result<(), async_nats::Error> {
+        self.publish(MATCHER_CANCEL_ORDER, &message).await
     }
 
-    pub async fn create_market(&self, message: NatsMessage) -> Result<(), async_nats::Error> {
-        self.publish(SUBJECT_CREATE_MARKET, &message).await
+    pub async fn create_market(&self, message: MatcherMessage) -> Result<(), async_nats::Error> {
+        self.publish(MATCHER_CREATE_MARKET, &message).await
     }
 
-    pub async fn remove_market(&self, message: NatsMessage) -> Result<(), async_nats::Error> {
-        self.publish(SUBJECT_REMOVE_MARKET, &message).await
+    pub async fn remove_market(&self, message: MatcherMessage) -> Result<(), async_nats::Error> {
+        self.publish(MATCHER_REMOVE_MARKET, &message).await
     }
 }

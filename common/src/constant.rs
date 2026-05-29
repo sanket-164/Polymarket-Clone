@@ -30,9 +30,11 @@ pub const MARKET: &str = "/market";
 pub const HOLDING: &str = "/holding";
 
 // NATS Config
-pub const NATS_STREAM: &str = "nats";
-pub const SUBJECT_PLACE_ORDER: &str = "nats.place.order";
-pub const SUBJECT_CENCEL_ORDER: &str = "nats.cancel.order";
-pub const SUBJECT_CREATE_MARKET: &str = "nats.create.market";
-pub const SUBJECT_REMOVE_MARKET: &str = "nats.remove.market";
-pub const MAX_RECONNECTS: u8 = 5;
+pub const MATCHER_STREAM: &str = "matcher";
+pub const MATCHER_PLACE_ORDER: &str = "matcher.place.order";
+pub const MATCHER_CANCEL_ORDER: &str = "matcher.cancel.order";
+pub const MATCHER_CREATE_MARKET: &str = "matcher.create.market";
+pub const MATCHER_REMOVE_MARKET: &str = "matcher.remove.market";
+pub const FEED_STREAM: &str = "feed";
+pub const FEED_MARKET_ORDER: &str = "feed.market.order";
+pub const MAX_NATS_RECONNECTS: u8 = 5;

@@ -116,7 +116,7 @@ pub struct MarketOutcomes {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NatsMessage {
+pub struct MatcherMessage {
     pub order: Option<Order>,
     pub market: Option<Market>,
     pub outcomes: Option<MarketOutcomes>,

@@ -1,6 +1,7 @@
 use crate::db::TradeExt;
 use common::database::client::PGClient;
 use common::model::{Order, OrderType};
+use common::nats_handler::NatsHandler;
 use deadpool_redis::Connection;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -173,6 +174,7 @@ impl Engine {
         order: Order,
         pg_client: &PGClient,
         redis: &mut Connection,
+        nats_handler: &NatsHandler,
     ) {
         let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
             return;

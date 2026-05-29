@@ -4,7 +4,7 @@ use axum::{Json, Router, extract::State, http::StatusCode, response::IntoRespons
 use common::{
     constant::ROOT,
     error::HttpError,
-    model::{MarketOutcomes, NatsMessage},
+    model::{MarketOutcomes, MatcherMessage},
     validation::admin_dto::CreateMarketDTO,
 };
 use rust_decimal::prelude::ToPrimitive;
@@ -32,7 +32,7 @@ async fn create_market(
     let first_outcome = market.first_outcome.clone();
     let second_outcome = market.second_outcome.clone();
 
-    let market_message = NatsMessage {
+    let market_message = MatcherMessage {
         order: None,
         market: Some(market.market.clone()),
         outcomes: Some(MarketOutcomes {
@@ -86,13 +86,13 @@ async fn create_market(
             .map_err(|e| HttpError::server_error(e.to_string()))?;
     }
 
-    let first_order_message = NatsMessage {
+    let first_order_message = MatcherMessage {
         order: Some(first_outcome_order),
         market: None,
         outcomes: None,
     };
 
-    let second_order_message = NatsMessage {
+    let second_order_message = MatcherMessage {
         order: Some(second_outcome_order),
         market: None,
         outcomes: None,
