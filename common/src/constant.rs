@@ -21,6 +21,7 @@ pub const TRANSACTIONS: &str = "/transactions";
 
 // Order
 pub const ORDER: &str = "/order";
+pub const SNAPSHOT: &str = "/snapshot";
 
 // Market
 pub const MARKET: &str = "/market";

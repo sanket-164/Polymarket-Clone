@@ -16,6 +16,7 @@ pub trait OrderExt {
         outcome_id: Uuid,
         market_id: Uuid,
     ) -> Result<Option<Outcome>, sqlx::Error>;
+    async fn get_market_outcomes(&self, market_id: Uuid) -> Result<Vec<Outcome>, sqlx::Error>;
     async fn get_user_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error>;
     async fn get_user_holding(
         &self,
@@ -95,6 +96,15 @@ impl OrderExt for PGClient {
             .await?;
 
         Ok(outcome)
+    }
+
+    async fn get_market_outcomes(&self, market_id: Uuid) -> Result<Vec<Outcome>, sqlx::Error> {
+        let outcomes = sqlx::query_as::<_, Outcome>(r#"SELECT id, market_id, label, start_price, current_price, total_shares, created_at, updated_at FROM outcome WHERE market_id = $1"#)
+            .bind(market_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(outcomes)
     }
 
     async fn get_user_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error> {
