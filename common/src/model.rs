@@ -192,6 +192,7 @@ pub enum MatcherMessage {
 pub struct OrderFeed {
     pub market_id: Uuid,
     pub outcome_id: Uuid,
+    pub side: OrderType,
     pub quantity: Decimal,
     pub price: Decimal,
 }

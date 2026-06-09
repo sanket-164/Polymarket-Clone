@@ -173,6 +173,7 @@ impl Engine {
         nats_handler: &NatsHandler,
         market_id: Uuid,
         outcome_id: Uuid,
+        side: OrderType,
         price: Decimal,
         // Negative value = shares were consumed (reduction)
         delta: Decimal,
@@ -181,6 +182,7 @@ impl Engine {
             feed: OrderFeed {
                 market_id,
                 outcome_id,
+                side,
                 quantity: -delta, // negative to signal reduction to feed subscribers
                 price,
             },
@@ -245,6 +247,7 @@ impl Engine {
                                 nats_handler,
                                 remaining.market_id,
                                 remaining.outcome_id,
+                                OrderType::BUY,
                                 remaining.price,
                                 filled,
                             )
@@ -253,6 +256,7 @@ impl Engine {
                                 nats_handler,
                                 sell.market_id,
                                 sell.outcome_id,
+                                OrderType::SELL,
                                 sell.price,
                                 filled,
                             )
@@ -322,6 +326,7 @@ impl Engine {
                                 nats_handler,
                                 remaining.market_id,
                                 remaining.outcome_id,
+                                OrderType::SELL,
                                 remaining.price,
                                 filled,
                             )
@@ -330,6 +335,7 @@ impl Engine {
                                 nats_handler,
                                 buy.market_id,
                                 buy.outcome_id,
+                                OrderType::BUY,
                                 buy.price,
                                 filled,
                             )

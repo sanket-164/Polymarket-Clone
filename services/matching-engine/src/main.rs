@@ -96,7 +96,7 @@ async fn main() {
             MatcherMessage::RemoveMarket { market } => {
                 engine.remove_market(market.id);
             }
-            MatcherMessage::CancelOrder { order } => {
+            MatcherMessage::CancelOrder { order: _order } => {
                 // handle cancel order
             }
         }

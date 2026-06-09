@@ -224,6 +224,7 @@ async fn place_order(
         feed: OrderFeed {
             market_id: market_outcome.market_id,
             outcome_id: market_outcome.id,
+            side: body.order_type,
             quantity: aggregated_quantity,
             price: body.price,
         },
