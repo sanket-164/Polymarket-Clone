@@ -19,7 +19,7 @@ impl PGConfig {
             .expect("POOL_SIZE_EACH_SERVICE must be a valid integer");
 
         PGConfig {
-            database_url: database_url,
+            database_url,
             pool_size_each_service,
         }
     }
@@ -62,5 +62,20 @@ impl RedisConfig {
         let redis_url = std::env::var("REDIS_URL").expect("REDIS_URL is not set in .env file.");
 
         RedisConfig { redis_url }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NatsConfig {
+    pub nats_url: String,
+}
+
+impl NatsConfig {
+    pub fn init() -> Self {
+        dotenv().ok();
+
+        let nats_url = std::env::var("NATS_URL").expect("NATS_URL is not set in .env file.");
+
+        NatsConfig { nats_url }
     }
 }

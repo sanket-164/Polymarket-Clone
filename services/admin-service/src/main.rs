@@ -4,7 +4,7 @@ use axum::http::{
     HeaderValue, Method,
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
-use common::config::{JWTConfig, PGConfig, RedisConfig};
+use common::config::{JWTConfig, NatsConfig, PGConfig, RedisConfig};
 use common::database::client::PGClient;
 use common::nats_handler::NatsHandler;
 use deadpool_redis::{Config, Pool, Runtime};
@@ -59,7 +59,7 @@ async fn main() {
     let pg_client = PGClient::new(pool);
     let jwt_config = JWTConfig::init();
 
-    let publisher = match NatsHandler::new("nats://localhost:4222").await {
+    let publisher = match NatsHandler::new(&NatsConfig::init().nats_url).await {
         Ok(p) => p,
         Err(e) => {
             println!("Failed to connect publisher: {e}");
@@ -73,8 +73,8 @@ async fn main() {
 
     let app_state = AppState {
         jwt_config,
-        pg_client: pg_client.clone(),
-        publisher: publisher,
+        pg_client,
+        publisher,
         redis_pool,
     };
 

@@ -3,13 +3,13 @@ mod consumer;
 mod handler;
 mod manager;
 
-use common::nats_handler::NatsHandler;
+use common::{config::NatsConfig, nats_handler::NatsHandler};
 use manager::ChannelManager;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
-    let nats_handler = match NatsHandler::new("nats://localhost:4222").await {
+    let nats_handler = match NatsHandler::new(&NatsConfig::init().nats_url).await {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Failed to connect to NATS: {}", e);

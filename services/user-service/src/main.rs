@@ -57,7 +57,7 @@ async fn main() {
 
     let app_state = AppState {
         jwt_config,
-        pg_client: pg_client.clone(),
+        pg_client,
     };
 
     let app = create_router(Arc::new(app_state.clone())).layer(cors.clone());

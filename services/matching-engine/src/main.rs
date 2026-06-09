@@ -2,7 +2,7 @@ mod db;
 mod engine;
 
 use common::{
-    config::{PGConfig, RedisConfig},
+    config::{NatsConfig, PGConfig, RedisConfig},
     constant::MATCHER_STREAM,
     database::client::PGClient,
     model::MatcherMessage,
@@ -49,7 +49,7 @@ async fn main() {
 
     let mut engine = Engine::new();
 
-    let nats_handler = match NatsHandler::new("nats://localhost:4222").await {
+    let nats_handler = match NatsHandler::new(&NatsConfig::init().nats_url).await {
         Ok(c) => c,
         Err(e) => {
             println!("Failed to connect nats handler: {e}");
