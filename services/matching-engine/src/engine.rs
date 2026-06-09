@@ -1,6 +1,6 @@
 use crate::db::TradeExt;
 use common::database::client::PGClient;
-use common::model::{Order, OrderType};
+use common::model::{FeedMessage, Order, OrderFeed, OrderType};
 use common::nats_handler::NatsHandler;
 use deadpool_redis::Connection;
 use rust_decimal::Decimal;
@@ -169,6 +169,29 @@ impl Engine {
         }
     }
 
+    async fn publish_feed(
+        nats_handler: &NatsHandler,
+        market_id: Uuid,
+        outcome_id: Uuid,
+        price: Decimal,
+        // Negative value = shares were consumed (reduction)
+        delta: Decimal,
+    ) {
+        let feed_message = FeedMessage {
+            order: Some(OrderFeed {
+                market_id,
+                outcome_id,
+                quantity: -delta, // negative to signal reduction to feed subscribers
+                price,
+            }),
+            market_id: None,
+        };
+
+        if let Err(e) = nats_handler.feed_market_order(feed_message).await {
+            eprintln!("Failed to publish feed message: {:?}", e);
+        }
+    }
+
     pub async fn match_order(
         &mut self,
         order: Order,
@@ -199,7 +222,6 @@ impl Engine {
 
                             println!("Trade {} -> {}", remaining.id, sell.id);
 
-                            // Update Redis for both sides of the trade.
                             Engine::uprem_price(
                                 redis,
                                 &remaining.market_id,
@@ -219,21 +241,34 @@ impl Engine {
                             )
                             .await;
 
+                            // Publish feed for both sides
+                            Engine::publish_feed(
+                                nats_handler,
+                                remaining.market_id,
+                                remaining.outcome_id,
+                                remaining.price,
+                                filled,
+                            )
+                            .await;
+                            Engine::publish_feed(
+                                nats_handler,
+                                sell.market_id,
+                                sell.outcome_id,
+                                sell.price,
+                                filled,
+                            )
+                            .await;
+
                             match remaining.remaining_shares.cmp(&sell.remaining_shares) {
                                 Ordering::Greater => {
-                                    // sell fully consumed, buy continues.
                                     remaining.remaining_shares -= sell.remaining_shares;
                                 }
                                 Ordering::Less => {
-                                    // buy fully consumed, sell goes back partially filled.
                                     sell.remaining_shares -= remaining.remaining_shares;
                                     book.push_sell(sell);
                                     break;
                                 }
-                                Ordering::Equal => {
-                                    // Both fully consumed.
-                                    break;
-                                }
+                                Ordering::Equal => break,
                             }
                         }
                         // No match — unmatched remainder stays on book (already in Redis from place_order).
@@ -283,22 +318,37 @@ impl Engine {
                             )
                             .await;
 
+                            // Publish feed for both sides
+                            Engine::publish_feed(
+                                nats_handler,
+                                remaining.market_id,
+                                remaining.outcome_id,
+                                remaining.price,
+                                filled,
+                            )
+                            .await;
+                            Engine::publish_feed(
+                                nats_handler,
+                                buy.market_id,
+                                buy.outcome_id,
+                                buy.price,
+                                filled,
+                            )
+                            .await;
+
                             match remaining.remaining_shares.cmp(&buy.remaining_shares) {
                                 Ordering::Greater => {
-                                    // buy fully consumed, sell continues.
                                     remaining.remaining_shares -= buy.remaining_shares;
                                 }
                                 Ordering::Less => {
-                                    // sell fully consumed, buy goes back partially filled.
                                     buy.remaining_shares -= remaining.remaining_shares;
                                     book.push_buy(buy);
                                     break;
                                 }
-                                Ordering::Equal => {
-                                    break;
-                                }
+                                Ordering::Equal => break,
                             }
                         }
+                        // No match — unmatched remainder stays on book (already in Redis from place_order).
                         _ => {
                             book.push_sell(remaining);
                             break;

@@ -1,4 +1,5 @@
 use crate::manager::ChannelManager;
+use common::model::{ClientMessage, ServerMessage};
 use futures::{SinkExt, stream::StreamExt};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpStream, sync::mpsc};
@@ -35,7 +36,119 @@ pub async fn handle_connection(
 
     while let Some(message) = read.next().await {
         match message {
-            Ok(Message::Text(text)) => {}
+            Ok(Message::Text(text)) => {
+                let msg = serde_json::from_str(&text);
+
+                if msg.is_err() {
+                    let error_message = ServerMessage::Error {
+                        message: msg.err().unwrap().to_string(),
+                    };
+
+                    if let Ok(text) = serde_json::to_string(&error_message) {
+                        if let Err(e) = tx.send(Message::Text(text.into())) {
+                            eprintln!("Failed to send message: {}", e);
+                        }
+                    }
+                    continue;
+                }
+
+                let client_message: ClientMessage = msg.unwrap();
+
+                match client_message {
+                    ClientMessage::JoinMarket { market_id } => {
+                        if !current_channel.is_nil() {
+                            channel_manager
+                                .leave_market_channel(current_channel, &tx.clone())
+                                .await;
+                        }
+
+                        let market_channel = channel_manager.get_market_channel(market_id).await;
+
+                        if market_channel.is_none() {
+                            let error_message = ServerMessage::Error {
+                                message: format!(
+                                    "Channel for the market_id: {} does not exist",
+                                    market_id
+                                ),
+                            };
+
+                            if let Ok(text) = serde_json::to_string(&error_message) {
+                                if let Err(e) = tx.send(Message::Text(text.into())) {
+                                    eprintln!("Failed to send message: {}", e);
+                                }
+                            }
+
+                            continue;
+                        }
+
+                        channel_manager
+                            .join_market_channel(market_id, tx.clone())
+                            .await;
+
+                        current_channel = market_id;
+
+                        let joined_message = ServerMessage::JoinedMarket { market_id };
+
+                        if let Ok(text) = serde_json::to_string(&joined_message) {
+                            if let Err(e) = tx.send(Message::Text(text.into())) {
+                                eprintln!("Failed to send message: {}", e);
+                            }
+                        }
+                    }
+
+                    ClientMessage::LeaveMarket { market_id } => {
+                        if !current_channel.eq(&market_id) || current_channel.is_nil() {
+                            let error_message = ServerMessage::Error {
+                                message: format!(
+                                    "You are not in channel of market_id: {}",
+                                    market_id
+                                ),
+                            };
+
+                            if let Ok(text) = serde_json::to_string(&error_message) {
+                                if let Err(e) = tx.send(Message::Text(text.into())) {
+                                    eprintln!("Failed to send message: {}", e);
+                                }
+                            }
+
+                            continue;
+                        }
+
+                        let market_channel = channel_manager.get_market_channel(market_id).await;
+
+                        if market_channel.is_none() {
+                            let error_message = ServerMessage::Error {
+                                message: format!(
+                                    "Channel for the market_id: {} does not exist",
+                                    market_id
+                                ),
+                            };
+
+                            if let Ok(text) = serde_json::to_string(&error_message) {
+                                if let Err(e) = tx.send(Message::Text(text.into())) {
+                                    eprintln!("Failed to send message: {}", e);
+                                }
+                            }
+
+                            continue;
+                        }
+
+                        channel_manager
+                            .leave_market_channel(market_id, &tx.clone())
+                            .await;
+
+                        current_channel = Uuid::nil();
+
+                        let left_message = ServerMessage::LeftMarket { market_id };
+
+                        if let Ok(text) = serde_json::to_string(&left_message) {
+                            if let Err(e) = tx.send(Message::Text(text.into())) {
+                                eprintln!("Failed to send message: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
             Err(e) => {
                 eprintln!("Error processing message: {}", e);
                 break;
@@ -45,7 +158,9 @@ pub async fn handle_connection(
     }
 
     if !current_channel.is_nil() {
-        channel_manager.leave_channel(current_channel, &tx).await;
+        channel_manager
+            .leave_market_channel(current_channel, &tx)
+            .await;
 
         println!(
             "User {} disconnected and removed from room {}",

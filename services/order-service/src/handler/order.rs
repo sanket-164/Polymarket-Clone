@@ -11,10 +11,10 @@ use chrono::Utc;
 use common::{
     constant::{ID, ROOT, SNAPSHOT},
     error::{ErrorMessage, HttpError},
-    model::{MarketStatus, MatcherMessage, OrderType},
+    model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderType},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
-use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::{Decimal, prelude::ToPrimitive};
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
@@ -100,7 +100,7 @@ async fn place_order(
         ));
     }
 
-    app_state
+    let market_outcome = app_state
         .pg_client
         .get_market_outcome(body.outcome_id, body.market_id)
         .await
@@ -175,7 +175,7 @@ async fn place_order(
 
     app_state
         .publisher
-        .place_order(order_message)
+        .matcher_place_order(order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
@@ -208,6 +208,33 @@ async fn place_order(
         .arg(price_f64)
         .arg(&price_str)
         .query_async::<()>(&mut *redis)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let aggregated_qty: Option<String> = redis::cmd("HGET")
+        .arg(format!("{}:qty", orderbook_key))
+        .arg(&price_str)
+        .query_async(&mut *redis)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let aggregated_quantity = aggregated_qty
+        .and_then(|v| Decimal::from_str_exact(&v).ok())
+        .unwrap_or(body.shares);
+
+    let feed_order_message = FeedMessage {
+        order: Some(OrderFeed {
+            market_id: market_outcome.market_id,
+            outcome_id: market_outcome.id,
+            quantity: aggregated_quantity,
+            price: body.price,
+        }),
+        market_id: None,
+    };
+
+    app_state
+        .publisher
+        .feed_market_order(feed_order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

@@ -4,7 +4,7 @@ use axum::{Json, Router, extract::State, http::StatusCode, response::IntoRespons
 use common::{
     constant::ROOT,
     error::HttpError,
-    model::{MarketOutcomes, MatcherMessage},
+    model::{FeedMessage, MarketOutcomes, MatcherMessage},
     validation::admin_dto::CreateMarketDTO,
 };
 use rust_decimal::prelude::ToPrimitive;
@@ -43,7 +43,18 @@ async fn create_market(
 
     app_state
         .publisher
-        .create_market(market_message)
+        .matcher_create_market(market_message)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let feed_market_message = FeedMessage {
+        order: None,
+        market_id: Some(market.market.id),
+    };
+
+    app_state
+        .publisher
+        .feed_create_market(feed_market_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
@@ -100,13 +111,13 @@ async fn create_market(
 
     app_state
         .publisher
-        .place_order(first_order_message)
+        .matcher_place_order(first_order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     app_state
         .publisher
-        .place_order(second_order_message)
+        .matcher_place_order(second_order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

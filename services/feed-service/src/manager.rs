@@ -17,17 +17,17 @@ impl ChannelManager {
         }
     }
 
-    pub async fn create_channel(&self, market_id: Uuid) {
+    pub async fn create_market_channel(&self, market_id: Uuid) {
         let mut channels = self.channels.lock().await;
         channels.entry(market_id).or_insert_with(Vec::new);
     }
 
-    pub async fn get_channel(&self, market_id: Uuid) -> Option<Vec<Sender>> {
+    pub async fn get_market_channel(&self, market_id: Uuid) -> Option<Vec<Sender>> {
         let channels = self.channels.lock().await;
         channels.get(&market_id).cloned()
     }
 
-    pub async fn join_channel(&self, market_id: Uuid, sender: Sender) {
+    pub async fn join_market_channel(&self, market_id: Uuid, sender: Sender) {
         let mut channels = self.channels.lock().await;
 
         if let Some(senders) = channels.get_mut(&market_id) {
@@ -35,7 +35,7 @@ impl ChannelManager {
         }
     }
 
-    pub async fn leave_channel(&self, market_id: Uuid, sender: &Sender) {
+    pub async fn leave_market_channel(&self, market_id: Uuid, sender: &Sender) {
         let mut channels = self.channels.lock().await;
 
         if let Some(senders) = channels.get_mut(&market_id) {
@@ -43,13 +43,13 @@ impl ChannelManager {
         }
     }
 
-    pub async fn remove_channel(&self, market_id: Uuid) {
+    pub async fn remove_market_channel(&self, market_id: Uuid) {
         let mut channels = self.channels.lock().await;
 
         channels.remove(&market_id);
     }
 
-    pub async fn broadcast(&self, market_id: Uuid, message: Message) {
+    pub async fn broadcast_to_market(&self, market_id: Uuid, message: Message) {
         let mut channels = self.channels.lock().await;
 
         if let Some(senders) = channels.get_mut(&market_id) {

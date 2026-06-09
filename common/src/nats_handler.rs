@@ -1,9 +1,9 @@
 use crate::{
     constant::{
-        MATCHER_CANCEL_ORDER, MATCHER_CREATE_MARKET, MATCHER_PLACE_ORDER, MATCHER_REMOVE_MARKET,
-        MAX_NATS_RECONNECTS,
+        FEED_CREATE_MARKET, FEED_MARKET_ORDER, FEED_REMOVE_MARKET, MATCHER_CANCEL_ORDER,
+        MATCHER_CREATE_MARKET, MATCHER_PLACE_ORDER, MATCHER_REMOVE_MARKET, MAX_NATS_RECONNECTS,
     },
-    model::MatcherMessage,
+    model::{FeedMessage, MatcherMessage},
 };
 use async_nats::{
     ConnectOptions,
@@ -45,7 +45,7 @@ impl NatsHandler {
             .jetstream
             .get_or_create_stream(jetstream::stream::Config {
                 name: stream_name.into(),
-                subjects: vec![format!("{}.>", stream_name.to_string()).into()],
+                subjects: vec![format!("{}.>", stream_name).into()],
                 ..Default::default()
             })
             .await?;
@@ -63,7 +63,7 @@ impl NatsHandler {
         Ok(consumer.messages().await?)
     }
 
-    async fn publish(
+    async fn publish_matcher(
         &self,
         subject: &'static str,
         message: &MatcherMessage,
@@ -76,23 +76,62 @@ impl NatsHandler {
             .publish(subject, payload.into())
             .await?
             .await?;
-
         Ok(())
     }
 
-    pub async fn place_order(&self, message: MatcherMessage) -> Result<(), async_nats::Error> {
-        self.publish(MATCHER_PLACE_ORDER, &message).await
+    pub async fn matcher_place_order(
+        &self,
+        message: MatcherMessage,
+    ) -> Result<(), async_nats::Error> {
+        self.publish_matcher(MATCHER_PLACE_ORDER, &message).await
     }
 
-    pub async fn cancel_order(&self, message: MatcherMessage) -> Result<(), async_nats::Error> {
-        self.publish(MATCHER_CANCEL_ORDER, &message).await
+    pub async fn matcher_cancel_order(
+        &self,
+        message: MatcherMessage,
+    ) -> Result<(), async_nats::Error> {
+        self.publish_matcher(MATCHER_CANCEL_ORDER, &message).await
     }
 
-    pub async fn create_market(&self, message: MatcherMessage) -> Result<(), async_nats::Error> {
-        self.publish(MATCHER_CREATE_MARKET, &message).await
+    pub async fn matcher_create_market(
+        &self,
+        message: MatcherMessage,
+    ) -> Result<(), async_nats::Error> {
+        self.publish_matcher(MATCHER_CREATE_MARKET, &message).await
     }
 
-    pub async fn remove_market(&self, message: MatcherMessage) -> Result<(), async_nats::Error> {
-        self.publish(MATCHER_REMOVE_MARKET, &message).await
+    pub async fn matcher_remove_market(
+        &self,
+        message: MatcherMessage,
+    ) -> Result<(), async_nats::Error> {
+        self.publish_matcher(MATCHER_REMOVE_MARKET, &message).await
+    }
+
+    async fn publish_feed(
+        &self,
+        subject: &'static str,
+        message: &FeedMessage,
+    ) -> Result<(), async_nats::Error> {
+        let payload = serde_json::to_vec(message).map_err(|e| {
+            async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+        })?;
+
+        self.jetstream
+            .publish(subject, payload.into())
+            .await?
+            .await?;
+        Ok(())
+    }
+
+    pub async fn feed_market_order(&self, message: FeedMessage) -> Result<(), async_nats::Error> {
+        self.publish_feed(FEED_MARKET_ORDER, &message).await
+    }
+
+    pub async fn feed_create_market(&self, message: FeedMessage) -> Result<(), async_nats::Error> {
+        self.publish_feed(FEED_CREATE_MARKET, &message).await
+    }
+
+    pub async fn feed_remove_market(&self, message: FeedMessage) -> Result<(), async_nats::Error> {
+        self.publish_feed(FEED_REMOVE_MARKET, &message).await
     }
 }

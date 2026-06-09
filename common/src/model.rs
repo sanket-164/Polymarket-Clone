@@ -176,3 +176,44 @@ pub struct Holding {
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OrderFeed {
+    pub market_id: Uuid,
+    pub outcome_id: Uuid,
+    pub quantity: Decimal,
+    pub price: Decimal,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum ClientMessage {
+    JoinMarket { market_id: Uuid },
+    LeaveMarket { market_id: Uuid },
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+pub enum ServerMessage {
+    JoinedMarket {
+        market_id: Uuid,
+    },
+    LeftMarket {
+        market_id: Uuid,
+    },
+    OrderFeed {
+        market_id: Uuid,
+        outcome_id: Uuid,
+        quantity: Decimal,
+        price: Decimal,
+    },
+    Error {
+        message: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeedMessage {
+    pub order: Option<OrderFeed>,
+    pub market_id: Option<Uuid>,
+}
