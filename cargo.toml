@@ -4,6 +4,7 @@ members = [
     "services/user-service",
     "services/order-service",
     "services/matching-engine",
+    "services/feed-service",
     "common"
 ]
 

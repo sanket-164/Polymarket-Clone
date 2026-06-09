@@ -37,4 +37,6 @@ pub const MATCHER_CREATE_MARKET: &str = "matcher.create.market";
 pub const MATCHER_REMOVE_MARKET: &str = "matcher.remove.market";
 pub const FEED_STREAM: &str = "feed";
 pub const FEED_MARKET_ORDER: &str = "feed.market.order";
+pub const FEED_REMOVE_MARKET: &str = "feed.remove.market";
+pub const FEED_CREATE_MARKET: &str = "feed.create.market";
 pub const MAX_NATS_RECONNECTS: u8 = 5;

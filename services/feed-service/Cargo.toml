@@ -1,0 +1,15 @@
+[package]
+name = "feed-service"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+common = { path = "../../common" }
+futures = "0.3.31"
+futures-util = "0.3.31"
+tokio.workspace = true
+tokio-tungstenite = "0.28.0"
+tungstenite = "0.28.0"
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
