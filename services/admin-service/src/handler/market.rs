@@ -32,24 +32,22 @@ async fn create_market(
     let first_outcome = market.first_outcome.clone();
     let second_outcome = market.second_outcome.clone();
 
-    let market_message = MatcherMessage {
-        order: None,
-        market: Some(market.market.clone()),
-        outcomes: Some(MarketOutcomes {
+    let matcher_market_message = MatcherMessage::CreateMarket {
+        market: market.market.clone(),
+        outcomes: MarketOutcomes {
             first_outcome: first_outcome.clone(),
             second_outcome: second_outcome.clone(),
-        }),
+        },
     };
 
     app_state
         .publisher
-        .matcher_create_market(market_message)
+        .matcher_create_market(matcher_market_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    let feed_market_message = FeedMessage {
-        order: None,
-        market_id: Some(market.market.id),
+    let feed_market_message = FeedMessage::CreateMarket {
+        market_id: market.market.id,
     };
 
     app_state
@@ -97,16 +95,12 @@ async fn create_market(
             .map_err(|e| HttpError::server_error(e.to_string()))?;
     }
 
-    let first_order_message = MatcherMessage {
-        order: Some(first_outcome_order),
-        market: None,
-        outcomes: None,
+    let first_order_message = MatcherMessage::PlaceOrder {
+        order: first_outcome_order,
     };
 
-    let second_order_message = MatcherMessage {
-        order: Some(second_outcome_order),
-        market: None,
-        outcomes: None,
+    let second_order_message = MatcherMessage::PlaceOrder {
+        order: second_outcome_order,
     };
 
     app_state

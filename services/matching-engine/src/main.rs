@@ -3,10 +3,7 @@ mod engine;
 
 use common::{
     config::{PGConfig, RedisConfig},
-    constant::{
-        MATCHER_CANCEL_ORDER, MATCHER_CREATE_MARKET, MATCHER_PLACE_ORDER, MATCHER_REMOVE_MARKET,
-        MATCHER_STREAM,
-    },
+    constant::MATCHER_STREAM,
     database::client::PGClient,
     model::MatcherMessage,
     nats_handler::NatsHandler,
@@ -83,37 +80,24 @@ async fn main() {
             }
         };
 
-        match msg.subject.as_str() {
-            MATCHER_PLACE_ORDER => {
+        match message {
+            MatcherMessage::PlaceOrder { order } => {
                 engine
-                    .match_order(
-                        message.order.unwrap(),
-                        &pg_client,
-                        &mut redis_connection,
-                        &nats_handler,
-                    )
+                    .match_order(order, &pg_client, &mut redis_connection, &nats_handler)
                     .await;
             }
-            MATCHER_CREATE_MARKET => {
-                let market = message.market.expect("Market does not exist in message");
-                let outcomes = message
-                    .outcomes
-                    .expect("Outcomes does not exist in message");
+            MatcherMessage::CreateMarket { market, outcomes } => {
                 engine.add_market(
                     market.id,
                     outcomes.first_outcome.id,
                     outcomes.second_outcome.id,
                 );
             }
-            MATCHER_REMOVE_MARKET => {
-                let market = message.market.expect("Market does not exist in message");
+            MatcherMessage::RemoveMarket { market } => {
                 engine.remove_market(market.id);
             }
-            MATCHER_CANCEL_ORDER => {
+            MatcherMessage::CancelOrder { order } => {
                 // handle cancel order
-            }
-            unknown => {
-                eprintln!("Unknown subject: {unknown}");
             }
         }
 

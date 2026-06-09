@@ -109,19 +109,6 @@ pub struct ResolvedMarket {
     pub created_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MarketOutcomes {
-    pub first_outcome: Outcome,
-    pub second_outcome: Outcome,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MatcherMessage {
-    pub order: Option<Order>,
-    pub market: Option<Market>,
-    pub outcomes: Option<MarketOutcomes>,
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
 pub struct User {
     pub id: Uuid,
@@ -177,6 +164,30 @@ pub struct Holding {
     pub updated_at: Option<DateTime<Utc>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarketOutcomes {
+    pub first_outcome: Outcome,
+    pub second_outcome: Outcome,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum MatcherMessage {
+    PlaceOrder {
+        order: Order,
+    },
+    CancelOrder {
+        order: Order,
+    },
+    CreateMarket {
+        market: Market,
+        outcomes: MarketOutcomes,
+    },
+    RemoveMarket {
+        market: Market,
+    },
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OrderFeed {
     pub market_id: Uuid,
@@ -195,25 +206,15 @@ pub enum ClientMessage {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 pub enum ServerMessage {
-    JoinedMarket {
-        market_id: Uuid,
-    },
-    LeftMarket {
-        market_id: Uuid,
-    },
-    OrderFeed {
-        market_id: Uuid,
-        outcome_id: Uuid,
-        quantity: Decimal,
-        price: Decimal,
-    },
-    Error {
-        message: String,
-    },
+    JoinedMarket { market_id: Uuid },
+    LeftMarket { market_id: Uuid },
+    Error { message: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FeedMessage {
-    pub order: Option<OrderFeed>,
-    pub market_id: Option<Uuid>,
+#[serde(tag = "type")]
+pub enum FeedMessage {
+    OrderFeed { feed: OrderFeed },
+    CreateMarket { market_id: Uuid },
+    RemoveMarket { market_id: Uuid },
 }

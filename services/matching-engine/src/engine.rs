@@ -177,14 +177,13 @@ impl Engine {
         // Negative value = shares were consumed (reduction)
         delta: Decimal,
     ) {
-        let feed_message = FeedMessage {
-            order: Some(OrderFeed {
+        let feed_message = FeedMessage::OrderFeed {
+            feed: OrderFeed {
                 market_id,
                 outcome_id,
                 quantity: -delta, // negative to signal reduction to feed subscribers
                 price,
-            }),
-            market_id: None,
+            },
         };
 
         if let Err(e) = nats_handler.feed_market_order(feed_message).await {

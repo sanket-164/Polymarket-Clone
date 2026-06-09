@@ -167,10 +167,8 @@ async fn place_order(
         }
     }
 
-    let order_message = MatcherMessage {
-        order: Some(order.clone()),
-        market: None,
-        outcomes: None,
+    let order_message = MatcherMessage::PlaceOrder {
+        order: order.clone(),
     };
 
     app_state
@@ -222,14 +220,13 @@ async fn place_order(
         .and_then(|v| Decimal::from_str_exact(&v).ok())
         .unwrap_or(body.shares);
 
-    let feed_order_message = FeedMessage {
-        order: Some(OrderFeed {
+    let feed_order_message = FeedMessage::OrderFeed {
+        feed: OrderFeed {
             market_id: market_outcome.market_id,
             outcome_id: market_outcome.id,
             quantity: aggregated_quantity,
             price: body.price,
-        }),
-        market_id: None,
+        },
     };
 
     app_state
