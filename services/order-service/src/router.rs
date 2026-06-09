@@ -5,7 +5,10 @@ use common::constant::{API, ORDER, ROOT};
 
 use crate::{
     AppState,
-    handler::{health_check, order::order_handler},
+    handler::{
+        health_check,
+        order::{order_handler, order_public_handler},
+    },
     middleware::auth_middleware,
 };
 
@@ -19,6 +22,7 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
                 auth_middleware,
             )),
         )
+        .nest(ORDER, order_public_handler()) // no auth layer
         .with_state(app_state);
 
     Router::new().nest(API, api_route)

@@ -25,7 +25,10 @@ pub fn order_handler() -> Router<Arc<AppState>> {
     Router::new()
         .route(ROOT, get(get_orders))
         .route(ROOT, post(place_order))
-        .route(&format!("{}{}", SNAPSHOT, ID), get(market_snapshot))
+}
+
+pub fn order_public_handler() -> Router<Arc<AppState>> {
+    Router::new().route(&format!("{}{}", SNAPSHOT, ID), get(market_snapshot))
 }
 
 async fn get_orders(
@@ -242,7 +245,6 @@ async fn place_order(
 async fn market_snapshot(
     Path(market_id): Path<Uuid>,
     State(app_state): State<Arc<AppState>>,
-    Extension(_user_id): Extension<Uuid>,
 ) -> Result<impl IntoResponse, HttpError> {
     app_state
         .pg_client
