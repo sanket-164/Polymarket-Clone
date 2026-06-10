@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    Extension, Json, Router,
+    Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
@@ -18,7 +18,7 @@ use validator::Validate;
 
 use crate::{AppState, db::MarketExt};
 
-pub fn market_handler() -> Router<Arc<AppState>> {
+pub fn public_market_handler() -> Router<Arc<AppState>> {
     Router::new()
         .route(ROOT, get(get_markets))
         .route(ID, get(get_market_details))
@@ -27,7 +27,6 @@ pub fn market_handler() -> Router<Arc<AppState>> {
 async fn get_markets(
     Query(query_params): Query<MarketQueryDTO>,
     State(app_state): State<Arc<AppState>>,
-    Extension(_user_id): Extension<Uuid>,
 ) -> Result<impl IntoResponse, HttpError> {
     query_params
         .validate()
@@ -78,7 +77,6 @@ async fn get_markets(
 async fn get_market_details(
     Path(id): Path<Uuid>,
     State(app_state): State<Arc<AppState>>,
-    Extension(_user_id): Extension<Uuid>,
 ) -> Result<impl IntoResponse, HttpError> {
     let market = app_state
         .pg_client
