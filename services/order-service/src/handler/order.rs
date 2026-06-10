@@ -14,7 +14,7 @@ use common::{
     model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderType},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
-use rust_decimal::{Decimal, prelude::ToPrimitive};
+use rust_decimal::prelude::ToPrimitive;
 use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
@@ -212,23 +212,12 @@ async fn place_order(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    let aggregated_qty: Option<String> = redis::cmd("HGET")
-        .arg(format!("{}:qty", orderbook_key))
-        .arg(&price_str)
-        .query_async(&mut *redis)
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let aggregated_quantity = aggregated_qty
-        .and_then(|v| Decimal::from_str_exact(&v).ok())
-        .unwrap_or(body.shares);
-
     let feed_order_message = FeedMessage::OrderFeed {
         feed: OrderFeed {
             market_id: market_outcome.market_id,
             outcome_id: market_outcome.id,
             side: body.order_type,
-            quantity: aggregated_quantity,
+            quantity: body.shares,
             price: body.price,
         },
     };
