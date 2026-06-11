@@ -24,7 +24,7 @@ async fn main() {
         .await
     {
         Ok(pool) => {
-            println!("Connected to database");
+            println!("Database Connected!");
             pool
         }
         Err(_err) => {
@@ -40,15 +40,6 @@ async fn main() {
 
     let pg_client = PGClient::new(pool);
 
-    let mut redis_connection = Config::from_url(RedisConfig::init().redis_url)
-        .create_pool(Some(Runtime::Tokio1))
-        .unwrap()
-        .get()
-        .await
-        .unwrap();
-
-    let mut engine = Engine::new();
-
     let nats_handler = match NatsHandler::new(&NatsConfig::init().nats_url).await {
         Ok(c) => c,
         Err(e) => {
@@ -57,10 +48,23 @@ async fn main() {
         }
     };
 
+    let mut redis_connection = Config::from_url(RedisConfig::init().redis_url)
+        .create_pool(Some(Runtime::Tokio1))
+        .unwrap()
+        .get()
+        .await
+        .unwrap();
+
+    println!("Redis Connected!");
+
     let mut message_stream = nats_handler
         .get_message_stream(MATCHER_STREAM)
         .await
         .expect("Failed to get messages");
+
+    let mut engine = Engine::new();
+
+    println!("Matcher is Ready!");
 
     while let Some(msg) = message_stream.next().await {
         let msg = match msg {

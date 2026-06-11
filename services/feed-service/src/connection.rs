@@ -11,7 +11,7 @@ pub async fn start_websocket(
         .await
         .expect("Failed to bind to address");
 
-    println!("WebSocket server running on {}", addr);
+    println!("Feed Service is listening at {addr}");
 
     while let Ok((stream, address)) = listener.accept().await {
         let channel_manager = channel_manager.clone();

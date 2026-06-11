@@ -9,7 +9,6 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait AccountExt {
-    async fn get_admin_by_email(&self, email: &str) -> Result<Option<Admin>, sqlx::Error>;
     async fn get_admin_by_id(&self, admin_id: Uuid) -> Result<Option<Admin>, sqlx::Error>;
     async fn update_admin<T: Into<String> + Send>(
         &self,
@@ -34,18 +33,6 @@ pub trait MarketExt {
 
 #[async_trait]
 impl AccountExt for PGClient {
-    async fn get_admin_by_email(&self, email: &str) -> Result<Option<Admin>, sqlx::Error> {
-        let admin = sqlx::query_as!(
-            Admin,
-            r#"SELECT id, name, email, password, created_at, updated_at FROM admins WHERE email = $1"#,
-            email
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(admin)
-    }
-
     async fn get_admin_by_id(&self, admin_id: Uuid) -> Result<Option<Admin>, sqlx::Error> {
         let admin = sqlx::query_as!(
             Admin,

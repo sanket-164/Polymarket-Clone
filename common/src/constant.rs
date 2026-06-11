@@ -2,9 +2,10 @@
 pub const API: &str = "/api";
 pub const ROOT: &str = "/";
 pub const ID: &str = "/:id";
+pub const ADMIN: &str = "/admin";
+pub const USER: &str = "/user";
 
 // Auth
-pub const AUTH: &str = "/auth";
 pub const SIGNUP: &str = "/signup";
 pub const SIGNIN: &str = "/signin";
 
@@ -40,3 +41,10 @@ pub const FEED_MARKET_ORDER: &str = "feed.market.order";
 pub const FEED_REMOVE_MARKET: &str = "feed.remove.market";
 pub const FEED_CREATE_MARKET: &str = "feed.create.market";
 pub const MAX_NATS_RECONNECTS: u8 = 5;
+
+// Service Ports
+pub const AUTH_PORT: u16 = 3001;
+pub const USER_PORT: u16 = 3002;
+pub const ORDER_PORT: u16 = 3003;
+pub const FEED_PORT: u16 = 3004;
+pub const ADMIN_PORT: u16 = 3005;

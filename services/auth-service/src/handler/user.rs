@@ -9,30 +9,61 @@ use axum::{
 };
 use axum_extra::extract::cookie::Cookie;
 use common::{
-    constant::SIGNIN,
+    constant::{SIGNIN, SIGNUP},
     error::{ErrorMessage, HttpError},
     util::{hash, jwt},
-    validation::admin_dto::LoginAdminDTO,
+    validation::user_dto::{LoginUserDTO, RegisterUserDTO, UserResponse},
 };
 use serde_json::json;
 use validator::Validate;
 
-use crate::{AppState, db::AccountExt};
+use crate::{AppState, db::AuthExt};
 
-pub fn auth_handler() -> Router<Arc<AppState>> {
-    Router::new().route(SIGNIN, post(signin))
+pub fn user_auth_handler() -> Router<Arc<AppState>> {
+    Router::new()
+        .route(SIGNUP, post(signup))
+        .route(SIGNIN, post(signin))
 }
 
-pub async fn signin(
+pub async fn signup(
     State(app_state): State<Arc<AppState>>,
-    Json(body): Json<LoginAdminDTO>,
+    Json(body): Json<RegisterUserDTO>,
 ) -> Result<impl IntoResponse, HttpError> {
     body.validate()
         .map_err(|e| HttpError::bad_request(e.to_string()))?;
 
     let existing_user = app_state
         .pg_client
-        .get_admin_by_email(&body.email)
+        .get_user_by_email(&body.email)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    if existing_user.is_some() {
+        Err(HttpError::conflict(ErrorMessage::EmailExist.to_string()))?
+    }
+
+    let hash_password =
+        hash::generate(body.password).map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let new_user = app_state
+        .pg_client
+        .create_user(&body.name, &body.email, &hash_password)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok((StatusCode::CREATED, Json(UserResponse::from(new_user))))
+}
+
+pub async fn signin(
+    State(app_state): State<Arc<AppState>>,
+    Json(body): Json<LoginUserDTO>,
+) -> Result<impl IntoResponse, HttpError> {
+    body.validate()
+        .map_err(|e| HttpError::bad_request(e.to_string()))?;
+
+    let existing_user = app_state
+        .pg_client
+        .get_user_by_email(&body.email)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

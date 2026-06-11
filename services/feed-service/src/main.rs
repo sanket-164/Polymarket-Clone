@@ -3,7 +3,7 @@ mod consumer;
 mod handler;
 mod manager;
 
-use common::{config::NatsConfig, nats_handler::NatsHandler};
+use common::{config::NatsConfig, constant::FEED_PORT, nats_handler::NatsHandler};
 use manager::ChannelManager;
 use std::sync::Arc;
 
@@ -27,7 +27,7 @@ async fn main() {
     ));
 
     // Run WebSocket server (blocks)
-    connection::start_websocket("0.0.0.0:6000", channel_manager)
+    connection::start_websocket(&format!("0.0.0.0:{}", FEED_PORT), channel_manager)
         .await
         .unwrap();
 }

@@ -1,4 +1,3 @@
-pub mod auth;
 pub mod market;
 pub mod profile;
 

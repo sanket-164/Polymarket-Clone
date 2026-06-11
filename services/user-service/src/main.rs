@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
 use axum::http::{
-    HeaderValue, Method,
+    Method,
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
-use common::config::{JWTConfig, PGConfig};
 use common::database::client::PGClient;
+use common::{
+    config::{JWTConfig, PGConfig},
+    constant::USER_PORT,
+};
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use crate::router::create_router;
 
@@ -25,7 +28,7 @@ pub struct AppState {
 #[tokio::main]
 async fn main() {
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+        .allow_origin(AllowOrigin::mirror_request())
         .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE])
         .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST, Method::PUT]);
@@ -38,7 +41,7 @@ async fn main() {
         .await
     {
         Ok(pool) => {
-            println!("Connected to database");
+            println!("Database Connected!");
             pool
         }
         Err(e) => {
@@ -62,9 +65,11 @@ async fn main() {
 
     let app = create_router(Arc::new(app_state.clone())).layer(cors.clone());
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", 3000))
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", USER_PORT))
         .await
         .unwrap();
+
+    println!("User Service is listening at http://localhost:{USER_PORT}");
 
     axum::serve(listener, app).await.unwrap()
 }

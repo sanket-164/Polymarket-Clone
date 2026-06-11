@@ -1,9 +1,10 @@
 use axum::http::{
-    HeaderValue, Method,
+    Method,
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
 use common::{
     config::{JWTConfig, PGConfig},
+    constant::ORDER_PORT,
     nats_handler::NatsHandler,
 };
 use common::{
@@ -13,7 +14,7 @@ use common::{
 use deadpool_redis::{Config, Pool, Runtime};
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use std::sync::Arc;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use crate::router::create_router;
 
@@ -33,7 +34,7 @@ pub struct AppState {
 #[tokio::main]
 async fn main() {
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+        .allow_origin(AllowOrigin::mirror_request())
         .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE])
         .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST, Method::PUT]);
@@ -46,7 +47,7 @@ async fn main() {
         .await
     {
         Ok(pool) => {
-            println!("Connected to database");
+            println!("Database Connected!");
             pool
         }
         Err(e) => {
@@ -75,6 +76,8 @@ async fn main() {
         .create_pool(Some(Runtime::Tokio1))
         .unwrap();
 
+    println!("Redis Pool Created!");
+
     let app_state = AppState {
         jwt_config,
         pg_client,
@@ -84,9 +87,11 @@ async fn main() {
 
     let app = create_router(Arc::new(app_state.clone())).layer(cors.clone());
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", 5000))
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", ORDER_PORT))
         .await
         .unwrap();
+
+    println!("Order Service is listening at http://localhost:{ORDER_PORT}");
 
     axum::serve(listener, app).await.unwrap()
 }

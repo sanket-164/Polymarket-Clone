@@ -14,7 +14,6 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait AccountExt {
-    async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error>;
     async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, sqlx::Error>;
     async fn create_user<T: Into<String> + Send>(
         &self,
@@ -83,18 +82,6 @@ pub trait HoldingExt {
 
 #[async_trait]
 impl AccountExt for PGClient {
-    async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error> {
-        let user = sqlx::query_as!(
-            User,
-            r#"SELECT id, name, email, password, picture, mobile_no, created_at, updated_at FROM users WHERE email = $1"#,
-            email
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(user)
-    }
-
     async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, sqlx::Error> {
         let user = sqlx::query_as!(
             User,
