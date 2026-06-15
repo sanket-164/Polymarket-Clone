@@ -11,7 +11,7 @@ use chrono::Utc;
 use common::{
     constant::{ID, ROOT, SNAPSHOT},
     error::{ErrorMessage, HttpError},
-    model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderType},
+    model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderSide},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
 use rust_decimal::prelude::ToPrimitive;
@@ -63,7 +63,7 @@ async fn get_orders(
         .get_user_orders(
             user_id,
             query_params.market_id,
-            query_params.order_type,
+            query_params.side,
             query_params.status,
             query_params.before,
             query_params.after,
@@ -114,8 +114,8 @@ async fn place_order(
 
     let order;
 
-    match body.order_type {
-        OrderType::BUY => {
+    match body.side {
+        OrderSide::BUY => {
             let wallet = app_state
                 .pg_client
                 .get_user_wallet(user_id)
@@ -140,7 +140,7 @@ async fn place_order(
                 .await
                 .map_err(|e| HttpError::server_error(e.to_string()))?;
         }
-        OrderType::SELL => {
+        OrderSide::SELL => {
             let holding = app_state
                 .pg_client
                 .get_user_holding(user_id, body.outcome_id)
@@ -190,9 +190,9 @@ async fn place_order(
         "orderbook:{}:{}:{}",
         body.market_id,
         body.outcome_id,
-        match body.order_type {
-            OrderType::BUY => "buy",
-            OrderType::SELL => "sell",
+        match body.side {
+            OrderSide::BUY => "buy",
+            OrderSide::SELL => "sell",
         }
     );
     let price_str = body.price.normalize().to_string();
@@ -216,7 +216,7 @@ async fn place_order(
         feed: OrderFeed {
             market_id: market_outcome.market_id,
             outcome_id: market_outcome.id,
-            side: body.order_type,
+            side: body.side,
             quantity: body.shares,
             price: body.price,
         },

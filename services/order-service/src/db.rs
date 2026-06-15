@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
-    model::{Holding, Market, Order, OrderStatus, OrderType, Outcome, User, Wallet},
+    model::{Holding, Market, Order, OrderSide, OrderStatus, Outcome, User, Wallet},
 };
 use rust_decimal::Decimal;
 use uuid::Uuid;
@@ -27,7 +27,7 @@ pub trait OrderExt {
         &self,
         user_id: Uuid,
         market_id: Option<Uuid>,
-        order_type: Option<OrderType>,
+        side: Option<OrderSide>,
         status: Option<OrderStatus>,
         before: Option<DateTime<Utc>>,
         after: Option<DateTime<Utc>>,
@@ -145,7 +145,7 @@ impl OrderExt for PGClient {
         &self,
         user_id: Uuid,
         market_id: Option<Uuid>,
-        order_type: Option<OrderType>,
+        side: Option<OrderSide>,
         status: Option<OrderStatus>,
         before: Option<DateTime<Utc>>,
         after: Option<DateTime<Utc>>,
@@ -154,7 +154,7 @@ impl OrderExt for PGClient {
         skip: i64,
     ) -> Result<Vec<Order>, sqlx::Error> {
         let mut query = String::from(
-            "SELECT id, user_id, market_id, outcome_id, type, shares, remaining_shares, price, status, created_at, updated_at
+            "SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, created_at, updated_at
             FROM orders
             WHERE user_id = $1"
         );
@@ -165,7 +165,7 @@ impl OrderExt for PGClient {
             query.push_str(&format!(" AND market_id = ${}", param_index));
             param_index += 1;
         }
-        if order_type.is_some() {
+        if side.is_some() {
             query.push_str(&format!(" AND type = ${}", param_index));
             param_index += 1;
         }
@@ -194,7 +194,7 @@ impl OrderExt for PGClient {
         if let Some(mid) = market_id {
             q = q.bind(mid);
         }
-        if let Some(ot) = order_type {
+        if let Some(ot) = side {
             q = q.bind(ot);
         }
         if let Some(s) = status {
@@ -239,10 +239,10 @@ impl OrderExt for PGClient {
                ON CONFLICT (user_id, market_id, outcome_id) DO NOTHING
            )
            INSERT INTO orders
-               (user_id, market_id, outcome_id, type, shares, remaining_shares, price)
+               (user_id, market_id, outcome_id, side, shares, remaining_shares, price)
            VALUES ($2, $3, $4, $5, $6, $6, $7)
            RETURNING
-               id, user_id, market_id, outcome_id, type,
+               id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
                created_at, updated_at"#,
         )
@@ -250,7 +250,7 @@ impl OrderExt for PGClient {
         .bind(user_id)
         .bind(market_id)
         .bind(outcome_id)
-        .bind(OrderType::BUY)
+        .bind(OrderSide::BUY)
         .bind(shares) // (shares & remaining_shares)
         .bind(price)
         .fetch_one(&mut *tx)
@@ -279,10 +279,10 @@ impl OrderExt for PGClient {
                WHERE  user_id = $2 AND market_id = $3 AND outcome_id = $4
            )
            INSERT INTO orders
-               (user_id, market_id, outcome_id, type, shares, remaining_shares, price)
+               (user_id, market_id, outcome_id, side, shares, remaining_shares, price)
            VALUES ($2, $3, $4, $5, $1, $1, $6)
            RETURNING
-               id, user_id, market_id, outcome_id, type,
+               id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
                created_at, updated_at"#,
         )
@@ -290,7 +290,7 @@ impl OrderExt for PGClient {
         .bind(user_id)
         .bind(market_id)
         .bind(outcome_id)
-        .bind(OrderType::SELL)
+        .bind(OrderSide::SELL)
         .bind(price)
         .fetch_one(&mut *tx)
         .await?;

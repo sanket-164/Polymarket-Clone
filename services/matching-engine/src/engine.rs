@@ -1,6 +1,6 @@
 use crate::db::TradeExt;
 use common::database::client::PGClient;
-use common::model::{FeedMessage, Order, OrderFeed, OrderType};
+use common::model::{FeedMessage, Order, OrderFeed, OrderSide};
 use common::nats_handler::NatsHandler;
 use deadpool_redis::Connection;
 use rust_decimal::Decimal;
@@ -129,11 +129,11 @@ impl Engine {
         redis: &mut Connection,
         market_id: &Uuid,
         outcome_id: &Uuid,
-        order_type: &str,
+        side: &str,
         price: &Decimal,
         filled_shares: Decimal,
     ) {
-        let base_key = format!("orderbook:{}:{}:{}", market_id, outcome_id, order_type);
+        let base_key = format!("orderbook:{}:{}:{}", market_id, outcome_id, side);
         let qty_key = format!("{}:qty", base_key);
         let price_str = price.normalize().to_string();
 
@@ -173,7 +173,7 @@ impl Engine {
         nats_handler: &NatsHandler,
         market_id: Uuid,
         outcome_id: Uuid,
-        side: OrderType,
+        side: OrderSide,
         price: Decimal,
         // Negative value = shares were consumed (reduction)
         delta: Decimal,
@@ -204,8 +204,8 @@ impl Engine {
             return;
         };
 
-        match order.order_type {
-            OrderType::BUY => {
+        match order.side {
+            OrderSide::BUY => {
                 let mut remaining = order;
 
                 loop {
@@ -247,7 +247,7 @@ impl Engine {
                                 nats_handler,
                                 remaining.market_id,
                                 remaining.outcome_id,
-                                OrderType::BUY,
+                                OrderSide::BUY,
                                 remaining.price,
                                 filled,
                             )
@@ -256,7 +256,7 @@ impl Engine {
                                 nats_handler,
                                 sell.market_id,
                                 sell.outcome_id,
-                                OrderType::SELL,
+                                OrderSide::SELL,
                                 sell.price,
                                 filled,
                             )
@@ -283,7 +283,7 @@ impl Engine {
                 }
             }
 
-            OrderType::SELL => {
+            OrderSide::SELL => {
                 let mut remaining = order;
 
                 loop {
@@ -326,7 +326,7 @@ impl Engine {
                                 nats_handler,
                                 remaining.market_id,
                                 remaining.outcome_id,
-                                OrderType::SELL,
+                                OrderSide::SELL,
                                 remaining.price,
                                 filled,
                             )
@@ -335,7 +335,7 @@ impl Engine {
                                 nats_handler,
                                 buy.market_id,
                                 buy.outcome_id,
-                                OrderType::BUY,
+                                OrderSide::BUY,
                                 buy.price,
                                 filled,
                             )

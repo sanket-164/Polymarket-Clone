@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
-use crate::model::{OrderStatus, OrderType};
+use crate::model::{OrderSide, OrderStatus};
 
 fn validate_positive_decimal(value: &Decimal) -> Result<(), ValidationError> {
     if *value <= Decimal::ZERO {
@@ -27,7 +27,7 @@ pub struct PlaceOrderDTO {
         message = "Price must be greater than zero"
     ))]
     pub price: Decimal,
-    pub order_type: OrderType,
+    pub side: OrderSide,
 }
 
 fn validate_after(after: &DateTime<Utc>) -> Result<(), ValidationError> {
@@ -68,7 +68,7 @@ fn validate_before_after(dto: &OrderQueryDTO) -> Result<(), ValidationError> {
 #[validate(schema(function = "validate_before_after"))]
 pub struct OrderQueryDTO {
     pub market_id: Option<Uuid>,
-    pub order_type: Option<OrderType>,
+    pub side: Option<OrderSide>,
     pub status: Option<OrderStatus>,
     pub before: Option<DateTime<Utc>>,
     #[validate(custom(function = "validate_after"))]

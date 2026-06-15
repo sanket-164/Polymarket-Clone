@@ -58,8 +58,8 @@ pub struct MarketWithOutcomes {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type, Eq)]
-#[sqlx(type_name = "order_type")]
-pub enum OrderType {
+#[sqlx(type_name = "order_side")]
+pub enum OrderSide {
     BUY,
     SELL,
 }
@@ -80,8 +80,7 @@ pub struct Order {
     pub user_id: Uuid,
     pub market_id: Uuid,
     pub outcome_id: Uuid,
-    #[sqlx(rename = "type")]
-    pub order_type: OrderType,
+    pub side: OrderSide,
     pub shares: Decimal,
     pub remaining_shares: Decimal,
     pub price: Decimal,
@@ -192,7 +191,7 @@ pub enum MatcherMessage {
 pub struct OrderFeed {
     pub market_id: Uuid,
     pub outcome_id: Uuid,
-    pub side: OrderType,
+    pub side: OrderSide,
     pub quantity: Decimal,
     pub price: Decimal,
 }

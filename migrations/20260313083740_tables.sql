@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Enum Types
 CREATE TYPE transaction_type AS ENUM ('DEPOSIT', 'WITHDRAW', 'BUY', 'SELL', 'REFUND', 'PAYOUT');
 CREATE TYPE market_status AS ENUM ('PENDING', 'ACTIVE', 'CLOSED', 'RESOLVED', 'CANCELLED');
-CREATE TYPE order_type AS ENUM ('BUY', 'SELL');
+CREATE TYPE order_side AS ENUM ('BUY', 'SELL');
 CREATE TYPE order_status AS ENUM ('PENDING', 'PARTIAL', 'FILLED', 'CANCELLED', 'EXPIRED');
 
 -- Users Table
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS orders (
     user_id UUID NOT NULL,
     market_id UUID NOT NULL,
     outcome_id UUID NOT NULL,
-    type order_type NOT NULL,
+    side order_side NOT NULL,
     shares DECIMAL(20, 8) NOT NULL,
     remaining_shares DECIMAL(20, 8) NOT NULL,
     price DECIMAL(20, 8) NOT NULL,

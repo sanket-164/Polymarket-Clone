@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use common::{
     database::client::PGClient,
-    model::{Admin, Market, MarketWithOutcomes, Order, OrderType, Outcome},
+    model::{Admin, Market, MarketWithOutcomes, Order, OrderSide, Outcome},
     validation::admin_dto::CreateMarketDTO,
 };
 use uuid::Uuid;
@@ -184,14 +184,14 @@ impl MarketExt for PGClient {
     }
 
     async fn insert_sell_order(&self, outcome: Outcome) -> Result<Order, sqlx::Error> {
-        let insert_order_query = "INSERT INTO orders (user_id, market_id, outcome_id, type, shares, remaining_shares, price)
+        let insert_order_query = "INSERT INTO orders (user_id, market_id, outcome_id, side, shares, remaining_shares, price)
                VALUES ('11111111-1111-1111-1111-111111111111', $1, $2, $3, $4, $5, $6)
-               RETURNING id, user_id, market_id, outcome_id, type, shares, remaining_shares, price, status, created_at, updated_at";
+               RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, created_at, updated_at";
 
         let order = sqlx::query_as(insert_order_query)
             .bind(outcome.market_id)
             .bind(outcome.id)
-            .bind(OrderType::SELL)
+            .bind(OrderSide::SELL)
             .bind(outcome.total_shares)
             .bind(outcome.total_shares)
             .bind(outcome.start_price)
