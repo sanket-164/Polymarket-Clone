@@ -170,16 +170,6 @@ async fn place_order(
         }
     }
 
-    let order_message = MatcherMessage::PlaceOrder {
-        order: order.clone(),
-    };
-
-    app_state
-        .publisher
-        .matcher_place_order(order_message)
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
     let mut redis = app_state
         .redis_pool
         .get()
@@ -225,6 +215,16 @@ async fn place_order(
     app_state
         .publisher
         .feed_market_order(feed_order_message)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let order_message = MatcherMessage::PlaceOrder {
+        order: order.clone(),
+    };
+
+    app_state
+        .publisher
+        .matcher_place_order(order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
