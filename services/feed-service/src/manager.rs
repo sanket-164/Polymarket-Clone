@@ -53,12 +53,9 @@ impl ChannelManager {
     pub async fn broadcast_to_market(&self, market_id: Uuid, message: Message) {
         let mut channels = self.channels.lock().await;
 
-        let senders = channels.entry(market_id).or_insert_with(Vec::new);
-
-        for sender in senders {
-            sender
-                .send(message.clone())
-                .expect("Failed to send message");
+        if let Some(senders) = channels.get_mut(&market_id) {
+            // Retain only senders that are still alive (send succeeded)
+            senders.retain(|sender| sender.send(message.clone()).is_ok());
         }
     }
 }
