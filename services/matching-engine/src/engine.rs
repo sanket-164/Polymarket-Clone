@@ -1,10 +1,5 @@
-use crate::db::TradeExt;
-use common::database::client::PGClient;
-use common::model::{FeedMessage, Order, OrderFeed, OrderSide};
+use common::model::{FeedMessage, Order, OrderFeed, OrderSide, TradeMessage};
 use common::nats_handler::NatsHandler;
-use deadpool_redis::Connection;
-use rust_decimal::Decimal;
-use rust_decimal::prelude::ToPrimitive;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use uuid::Uuid;
@@ -125,158 +120,69 @@ impl Engine {
         self.order_books.get_mut(market_id)?.get_mut(outcome_id)
     }
 
-    async fn uprem_price(
-        redis: &mut Connection,
-        market_id: &Uuid,
-        outcome_id: &Uuid,
-        side: &str,
-        price: &Decimal,
-        filled_shares: Decimal,
-    ) {
-        let base_key = format!("orderbook:{}:{}:{}", market_id, outcome_id, side);
-        let qty_key = format!("{}:qty", base_key);
-        let price_str = price.normalize().to_string();
+    async fn publish_messages(nats_handler: &NatsHandler, buy: Order, sell: Order) {
+        let filled = buy.remaining_shares.min(sell.remaining_shares);
+        println!("Trade: {} shares for {}", filled, sell.price);
 
-        // Update the shares in HashMap
-        let new_qty: f64 = match redis::cmd("HINCRBYFLOAT")
-            .arg(&qty_key)
-            .arg(&price_str)
-            .arg(-filled_shares.to_f64().unwrap_or(0.0))
-            .query_async(redis)
+        for order in [buy.clone(), sell.clone()] {
+            let feed_message = FeedMessage::OrderFeed {
+                feed: OrderFeed {
+                    market_id: order.market_id,
+                    outcome_id: order.outcome_id,
+                    side: order.side,
+                    quantity: -filled, // negative to signal reduction to feed subscribers
+                    price: order.price,
+                },
+            };
+
+            if let Err(e) = nats_handler.feed_market_order(feed_message).await {
+                eprintln!("Failed to publish feed update OrderFeed message: {:?}", e);
+            }
+        }
+
+        if let Err(e) = nats_handler
+            .trade_update_order(TradeMessage::UpdateOrders { buy, sell })
             .await
         {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!("Redis HINCRBYFLOAT failed: {:?}", e);
-                return;
-            }
-        };
-
-        // Remove price & shares from HashMap & SortedSet if share's quantity is 0
-        if new_qty <= 0.0 {
-            if let Err(e) = redis::pipe()
-                .cmd("HDEL")
-                .arg(&qty_key)
-                .arg(&price_str)
-                .cmd("ZREM")
-                .arg(&base_key)
-                .arg(&price_str)
-                .query_async::<()>(redis)
-                .await
-            {
-                eprintln!("Redis cleanup failed: {:?}", e);
-            }
+            eprintln!("Failed to publish trade UpdateOrder message: {:?}", e);
         }
     }
 
-    async fn publish_feed(
-        nats_handler: &NatsHandler,
-        market_id: Uuid,
-        outcome_id: Uuid,
-        side: OrderSide,
-        price: Decimal,
-        // Negative value = shares were consumed (reduction)
-        delta: Decimal,
-    ) {
-        let feed_message = FeedMessage::OrderFeed {
-            feed: OrderFeed {
-                market_id,
-                outcome_id,
-                side,
-                quantity: -delta, // negative to signal reduction to feed subscribers
-                price,
-            },
-        };
-
-        if let Err(e) = nats_handler.feed_market_order(feed_message).await {
-            eprintln!("Failed to publish feed message: {:?}", e);
-        }
-    }
-
-    pub async fn match_order(
-        &mut self,
-        order: Order,
-        pg_client: &PGClient,
-        redis: &mut Connection,
-        nats_handler: &NatsHandler,
-    ) {
+    pub async fn match_order(&mut self, order: Order, nats_handler: &NatsHandler) {
         let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
             return;
         };
 
         match order.side {
             OrderSide::BUY => {
-                let mut remaining = order;
+                let mut new_buy = order;
 
                 loop {
                     match book.peek_sell() {
-                        Some(best_sell) if remaining.price >= best_sell.price => {
+                        Some(best_sell) if new_buy.price >= best_sell.price => {
                             let mut sell = book.pop_sell().unwrap();
-                            let filled = remaining.remaining_shares.min(sell.remaining_shares);
 
-                            if let Err(e) = pg_client.trade(remaining.clone(), sell.clone()).await {
-                                eprintln!("Trade failed: {:?}", e);
-                                book.push_sell(sell);
-                                book.push_buy(remaining);
-                                break;
-                            }
+                            Engine::publish_messages(nats_handler, new_buy.clone(), sell.clone())
+                                .await;
 
-                            println!("Trade {} -> {}", remaining.id, sell.id);
-
-                            Engine::uprem_price(
-                                redis,
-                                &remaining.market_id,
-                                &remaining.outcome_id,
-                                "buy",
-                                &remaining.price,
-                                filled,
-                            )
-                            .await;
-                            Engine::uprem_price(
-                                redis,
-                                &sell.market_id,
-                                &sell.outcome_id,
-                                "sell",
-                                &sell.price,
-                                filled,
-                            )
-                            .await;
-
-                            // Publish feed for both sides
-                            Engine::publish_feed(
-                                nats_handler,
-                                remaining.market_id,
-                                remaining.outcome_id,
-                                OrderSide::BUY,
-                                remaining.price,
-                                filled,
-                            )
-                            .await;
-                            Engine::publish_feed(
-                                nats_handler,
-                                sell.market_id,
-                                sell.outcome_id,
-                                OrderSide::SELL,
-                                sell.price,
-                                filled,
-                            )
-                            .await;
-
-                            match remaining.remaining_shares.cmp(&sell.remaining_shares) {
+                            match new_buy.remaining_shares.cmp(&sell.remaining_shares) {
                                 Ordering::Greater => {
-                                    remaining.remaining_shares -= sell.remaining_shares;
+                                    new_buy.remaining_shares -= sell.remaining_shares;
                                 }
                                 Ordering::Less => {
-                                    sell.remaining_shares -= remaining.remaining_shares;
-                                    book.push_sell(sell);
+                                    sell.remaining_shares -= new_buy.remaining_shares;
+                                    book.push_sell(sell.clone());
                                     break;
                                 }
-                                Ordering::Equal => break,
+                                Ordering::Equal => {
+                                    break;
+                                }
                             }
                         }
+
                         // No match — unmatched remainder stays on book (already in Redis from place_order).
                         _ => {
-                            book.push_buy(remaining);
+                            book.push_buy(new_buy);
                             break;
                         }
                     }
@@ -284,78 +190,33 @@ impl Engine {
             }
 
             OrderSide::SELL => {
-                let mut remaining = order;
+                let mut new_sell = order;
 
                 loop {
                     match book.peek_buy() {
-                        Some(best_buy) if remaining.price <= best_buy.price => {
+                        Some(best_buy) if new_sell.price <= best_buy.price => {
                             let mut buy = book.pop_buy().unwrap();
-                            let filled = remaining.remaining_shares.min(buy.remaining_shares);
 
-                            if let Err(e) = pg_client.trade(buy.clone(), remaining.clone()).await {
-                                eprintln!("Trade failed: {:?}", e);
-                                book.push_buy(buy);
-                                book.push_sell(remaining);
-                                break;
-                            }
+                            Engine::publish_messages(nats_handler, buy.clone(), new_sell.clone())
+                                .await;
 
-                            println!("Trade {} -> {}", buy.id, remaining.id);
-
-                            // Update Redis for both sides of the trade.
-                            Engine::uprem_price(
-                                redis,
-                                &remaining.market_id,
-                                &remaining.outcome_id,
-                                "sell",
-                                &remaining.price,
-                                filled,
-                            )
-                            .await;
-                            Engine::uprem_price(
-                                redis,
-                                &buy.market_id,
-                                &buy.outcome_id,
-                                "buy",
-                                &buy.price,
-                                filled,
-                            )
-                            .await;
-
-                            // Publish feed for both sides
-                            Engine::publish_feed(
-                                nats_handler,
-                                remaining.market_id,
-                                remaining.outcome_id,
-                                OrderSide::SELL,
-                                remaining.price,
-                                filled,
-                            )
-                            .await;
-                            Engine::publish_feed(
-                                nats_handler,
-                                buy.market_id,
-                                buy.outcome_id,
-                                OrderSide::BUY,
-                                buy.price,
-                                filled,
-                            )
-                            .await;
-
-                            match remaining.remaining_shares.cmp(&buy.remaining_shares) {
+                            match new_sell.remaining_shares.cmp(&buy.remaining_shares) {
                                 Ordering::Greater => {
-                                    remaining.remaining_shares -= buy.remaining_shares;
+                                    new_sell.remaining_shares -= buy.remaining_shares;
                                 }
                                 Ordering::Less => {
-                                    buy.remaining_shares -= remaining.remaining_shares;
-                                    book.push_buy(buy);
+                                    buy.remaining_shares -= new_sell.remaining_shares;
+                                    book.push_buy(buy.clone());
                                     break;
                                 }
-                                Ordering::Equal => break,
+                                Ordering::Equal => {
+                                    break;
+                                }
                             }
                         }
                         // No match — unmatched remainder stays on book (already in Redis from place_order).
                         _ => {
-                            book.push_sell(remaining);
+                            book.push_sell(new_sell);
                             break;
                         }
                     }

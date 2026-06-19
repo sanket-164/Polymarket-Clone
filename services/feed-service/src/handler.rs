@@ -62,25 +62,6 @@ pub async fn handle_connection(
                                 .await;
                         }
 
-                        let market_channel = channel_manager.get_market_channel(market_id).await;
-
-                        if market_channel.is_none() {
-                            let error_message = ServerMessage::Error {
-                                message: format!(
-                                    "Channel for the market_id: {} does not exist",
-                                    market_id
-                                ),
-                            };
-
-                            if let Ok(text) = serde_json::to_string(&error_message) {
-                                if let Err(e) = tx.send(Message::Text(text.into())) {
-                                    eprintln!("Failed to send message: {}", e);
-                                }
-                            }
-
-                            continue;
-                        }
-
                         channel_manager
                             .join_market_channel(market_id, tx.clone())
                             .await;

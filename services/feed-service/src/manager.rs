@@ -30,9 +30,10 @@ impl ChannelManager {
     pub async fn join_market_channel(&self, market_id: Uuid, sender: Sender) {
         let mut channels = self.channels.lock().await;
 
-        if let Some(senders) = channels.get_mut(&market_id) {
-            senders.push(sender);
-        }
+        channels
+            .entry(market_id)
+            .or_insert_with(Vec::new)
+            .push(sender);
     }
 
     pub async fn leave_market_channel(&self, market_id: Uuid, sender: &Sender) {
@@ -52,12 +53,12 @@ impl ChannelManager {
     pub async fn broadcast_to_market(&self, market_id: Uuid, message: Message) {
         let mut channels = self.channels.lock().await;
 
-        if let Some(senders) = channels.get_mut(&market_id) {
-            for sender in senders {
-                sender
-                    .send(message.clone())
-                    .expect("Failed to send message");
-            }
+        let senders = channels.entry(market_id).or_insert_with(Vec::new);
+
+        for sender in senders {
+            sender
+                .send(message.clone())
+                .expect("Failed to send message");
         }
     }
 }

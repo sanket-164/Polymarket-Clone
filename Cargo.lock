@@ -1972,6 +1972,8 @@ dependencies = [
  "common",
  "deadpool-redis",
  "dotenv",
+ "futures",
+ "futures-util",
  "jsonwebtoken",
  "redis",
  "rust_decimal",

@@ -18,6 +18,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use crate::router::create_router;
 
+pub mod consumer;
 pub mod db;
 pub mod handler;
 pub mod middleware;
@@ -77,6 +78,12 @@ async fn main() {
         .unwrap();
 
     println!("Redis Pool Created!");
+
+    tokio::spawn(consumer::start_consumer(
+        Arc::new(publisher.clone()),
+        Arc::new(pg_client.clone()),
+        Arc::new(redis_pool.clone()),
+    ));
 
     let app_state = AppState {
         jwt_config,

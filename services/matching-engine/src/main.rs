@@ -1,45 +1,14 @@
-mod db;
 mod engine;
 
 use common::{
-    config::{NatsConfig, PGConfig, RedisConfig},
-    constant::MATCHER_STREAM,
-    database::client::PGClient,
-    model::MatcherMessage,
-    nats_handler::NatsHandler,
+    config::NatsConfig, constant::MATCHER_STREAM, model::MatcherMessage, nats_handler::NatsHandler,
 };
-use deadpool_redis::{Config, Runtime};
 use futures::StreamExt;
-use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 
 use crate::engine::Engine;
 
 #[tokio::main]
 async fn main() {
-    let pg_config = PGConfig::init();
-
-    let pool = match PgPoolOptions::new()
-        .max_connections(pg_config.pool_size_each_service)
-        .connect(&pg_config.database_url)
-        .await
-    {
-        Ok(pool) => {
-            println!("Database Connected!");
-            pool
-        }
-        Err(_err) => {
-            println!("Failed to connect to database");
-            // Fail fast: Application cannot run without DB
-            std::process::exit(1);
-        }
-    };
-
-    static MIGRATOR: Migrator = sqlx::migrate!("../../migrations");
-
-    MIGRATOR.run(&pool).await.expect("Failed to run migrations");
-
-    let pg_client = PGClient::new(pool);
-
     let nats_handler = match NatsHandler::new(&NatsConfig::init().nats_url).await {
         Ok(c) => c,
         Err(e) => {
@@ -47,15 +16,6 @@ async fn main() {
             std::process::exit(1);
         }
     };
-
-    let mut redis_connection = Config::from_url(RedisConfig::init().redis_url)
-        .create_pool(Some(Runtime::Tokio1))
-        .unwrap()
-        .get()
-        .await
-        .unwrap();
-
-    println!("Redis Connected!");
 
     let mut message_stream = nats_handler
         .get_message_stream(MATCHER_STREAM)
@@ -86,9 +46,7 @@ async fn main() {
 
         match message {
             MatcherMessage::PlaceOrder { order } => {
-                engine
-                    .match_order(order, &pg_client, &mut redis_connection, &nats_handler)
-                    .await;
+                engine.match_order(order, &nats_handler).await;
             }
             MatcherMessage::CreateMarket { market, outcomes } => {
                 engine.add_market(

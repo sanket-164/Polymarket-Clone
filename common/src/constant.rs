@@ -41,6 +41,8 @@ pub const FEED_MARKET_ORDER: &str = "feed.market.order";
 pub const FEED_REMOVE_MARKET: &str = "feed.remove.market";
 pub const FEED_CREATE_MARKET: &str = "feed.create.market";
 pub const MAX_NATS_RECONNECTS: u8 = 5;
+pub const TRADE_STREAM: &str = "trade";
+pub const TRADE_UPDATE_ORDER: &str = "trade.update.orders";
 
 // Service Ports
 pub const AUTH_PORT: u16 = 3001;

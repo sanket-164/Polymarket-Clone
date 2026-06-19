@@ -2,13 +2,15 @@ use crate::{
     constant::{
         FEED_CREATE_MARKET, FEED_MARKET_ORDER, FEED_REMOVE_MARKET, MATCHER_CANCEL_ORDER,
         MATCHER_CREATE_MARKET, MATCHER_PLACE_ORDER, MATCHER_REMOVE_MARKET, MAX_NATS_RECONNECTS,
+        TRADE_UPDATE_ORDER,
     },
-    model::{FeedMessage, MatcherMessage},
+    model::{FeedMessage, MatcherMessage, TradeMessage},
 };
 use async_nats::{
     ConnectOptions,
     jetstream::{self, consumer::pull::Stream},
 };
+use serde::Serialize;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -63,10 +65,11 @@ impl NatsHandler {
         Ok(consumer.messages().await?)
     }
 
-    async fn publish_matcher(
+    // Single generic publish function
+    async fn publish<T: Serialize>(
         &self,
         subject: &'static str,
-        message: &MatcherMessage,
+        message: &T,
     ) -> Result<(), async_nats::Error> {
         let payload = serde_json::to_vec(message).map_err(|e| {
             async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
@@ -83,55 +86,43 @@ impl NatsHandler {
         &self,
         message: MatcherMessage,
     ) -> Result<(), async_nats::Error> {
-        self.publish_matcher(MATCHER_PLACE_ORDER, &message).await
+        self.publish(MATCHER_PLACE_ORDER, &message).await
     }
 
     pub async fn matcher_cancel_order(
         &self,
         message: MatcherMessage,
     ) -> Result<(), async_nats::Error> {
-        self.publish_matcher(MATCHER_CANCEL_ORDER, &message).await
+        self.publish(MATCHER_CANCEL_ORDER, &message).await
     }
 
     pub async fn matcher_create_market(
         &self,
         message: MatcherMessage,
     ) -> Result<(), async_nats::Error> {
-        self.publish_matcher(MATCHER_CREATE_MARKET, &message).await
+        self.publish(MATCHER_CREATE_MARKET, &message).await
     }
 
     pub async fn matcher_remove_market(
         &self,
         message: MatcherMessage,
     ) -> Result<(), async_nats::Error> {
-        self.publish_matcher(MATCHER_REMOVE_MARKET, &message).await
-    }
-
-    async fn publish_feed(
-        &self,
-        subject: &'static str,
-        message: &FeedMessage,
-    ) -> Result<(), async_nats::Error> {
-        let payload = serde_json::to_vec(message).map_err(|e| {
-            async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
-        })?;
-
-        self.jetstream
-            .publish(subject, payload.into())
-            .await?
-            .await?;
-        Ok(())
+        self.publish(MATCHER_REMOVE_MARKET, &message).await
     }
 
     pub async fn feed_market_order(&self, message: FeedMessage) -> Result<(), async_nats::Error> {
-        self.publish_feed(FEED_MARKET_ORDER, &message).await
+        self.publish(FEED_MARKET_ORDER, &message).await
     }
 
     pub async fn feed_create_market(&self, message: FeedMessage) -> Result<(), async_nats::Error> {
-        self.publish_feed(FEED_CREATE_MARKET, &message).await
+        self.publish(FEED_CREATE_MARKET, &message).await
     }
 
     pub async fn feed_remove_market(&self, message: FeedMessage) -> Result<(), async_nats::Error> {
-        self.publish_feed(FEED_REMOVE_MARKET, &message).await
+        self.publish(FEED_REMOVE_MARKET, &message).await
+    }
+
+    pub async fn trade_update_order(&self, message: TradeMessage) -> Result<(), async_nats::Error> {
+        self.publish(TRADE_UPDATE_ORDER, &message).await
     }
 }

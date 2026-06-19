@@ -218,3 +218,9 @@ pub enum FeedMessage {
     CreateMarket { market_id: Uuid },
     RemoveMarket { market_id: Uuid },
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum TradeMessage {
+    UpdateOrders { buy: Order, sell: Order },
+}
