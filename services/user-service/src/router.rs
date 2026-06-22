@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
 use axum::{Router, middleware, routing::get};
-use common::constant::{API, HOLDING, MARKET, PROFILE, ROOT, WALLET};
+use common::constant::{API, HOLDING, PROFILE, ROOT, WALLET};
 
 use crate::{
     AppState,
     handler::{
-        health_check, holding::holding_handler, market::public_market_handler,
-        profile::profile_handler, wallet::wallet_handler,
+        health_check, holding::holding_handler, profile::profile_handler, wallet::wallet_handler,
     },
     middleware::auth_middleware,
 };
@@ -29,7 +28,6 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
                 auth_middleware,
             )),
         )
-        .nest(MARKET, public_market_handler())
         .nest(
             HOLDING,
             holding_handler().layer(middleware::from_fn_with_state(

@@ -2,33 +2,31 @@ use std::sync::Arc;
 
 use axum::{
     Extension, Json, Router,
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
 };
 use chrono::Utc;
 use common::{
-    constant::{ID, ROOT, SNAPSHOT},
+    constant::ROOT,
     error::{ErrorMessage, HttpError},
     model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderSide},
     validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
 use rust_decimal::prelude::ToPrimitive;
-use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::{AppState, db::OrderExt};
+use crate::{
+    AppState,
+    db::{HoldingExt, MarketExt, OrderExt, WalletExt},
+};
 
 pub fn order_handler() -> Router<Arc<AppState>> {
     Router::new()
         .route(ROOT, get(get_orders))
         .route(ROOT, post(place_order))
-}
-
-pub fn order_public_handler() -> Router<Arc<AppState>> {
-    Router::new().route(&format!("{}{}", SNAPSHOT, ID), get(market_snapshot))
 }
 
 async fn get_orders(
@@ -229,97 +227,4 @@ async fn place_order(
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     Ok((StatusCode::CREATED, Json(order)))
-}
-
-async fn market_snapshot(
-    Path(market_id): Path<Uuid>,
-    State(app_state): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, HttpError> {
-    app_state
-        .pg_client
-        .get_market_by_id(market_id)
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?
-        .ok_or(HttpError::not_found(
-            ErrorMessage::MarketNotFound.to_string(),
-        ))?;
-
-    let outcomes = app_state
-        .pg_client
-        .get_market_outcomes(market_id)
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let mut redis = app_state
-        .redis_pool
-        .get()
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let mut snapshot = vec![];
-
-    for outcome in &outcomes {
-        let buy_key = format!("orderbook:{}:{}:buy", market_id, outcome.id);
-        let sell_key = format!("orderbook:{}:{}:sell", market_id, outcome.id);
-        let buy_qty_key = format!("{}:qty", buy_key);
-        let sell_qty_key = format!("{}:qty", sell_key);
-
-        // fetch the top 10 price levels from both sorted sets.
-        let (top_buys, top_sells): (Vec<String>, Vec<String>) = redis::pipe()
-            .cmd("ZREVRANGE")
-            .arg(&buy_key)
-            .arg(0)
-            .arg(9)
-            .cmd("ZRANGE")
-            .arg(&sell_key)
-            .arg(0)
-            .arg(9)
-            .query_async(&mut *redis)
-            .await
-            .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-        // Only the qty fields we actually need.
-        let buy_levels = if top_buys.is_empty() {
-            vec![]
-        } else {
-            let buy_qtys: Vec<Option<f64>> = redis::cmd("HMGET")
-                .arg(&buy_qty_key)
-                .arg(top_buys.as_slice())
-                .query_async(&mut *redis)
-                .await
-                .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-            top_buys
-                .into_iter()
-                .zip(buy_qtys)
-                .map(|(price, qty)| json!({ "price": price, "qty": qty.unwrap_or(0.0) }))
-                .collect()
-        };
-
-        let sell_levels = if top_sells.is_empty() {
-            vec![]
-        } else {
-            let sell_qtys: Vec<Option<f64>> = redis::cmd("HMGET")
-                .arg(&sell_qty_key)
-                .arg(top_sells.as_slice())
-                .query_async(&mut *redis)
-                .await
-                .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-            top_sells
-                .into_iter()
-                .zip(sell_qtys)
-                .map(|(price, qty)| json!({ "price": price, "qty": qty.unwrap_or(0.0) }))
-                .collect()
-        };
-
-        snapshot.push(json!({
-            "outcome_id":    outcome.id,
-            "outcome_label": outcome.label,
-            "buy":           buy_levels,
-            "sell":          sell_levels,
-        }));
-    }
-
-    Ok((StatusCode::OK, Json(snapshot)))
 }

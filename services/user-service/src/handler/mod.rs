@@ -1,5 +1,4 @@
 pub mod holding;
-pub mod market;
 pub mod profile;
 pub mod wallet;
 use axum::response::IntoResponse;

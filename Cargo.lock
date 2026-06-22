@@ -1706,6 +1706,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "market-service"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "async-trait",
+ "axum",
+ "axum-extra",
+ "chrono",
+ "common",
+ "deadpool-redis",
+ "dotenv",
+ "jsonwebtoken",
+ "redis",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "time",
+ "tokio",
+ "tower-http",
+ "tracing-subscriber",
+ "uuid",
+ "validator",
+]
+
+[[package]]
 name = "matching-engine"
 version = "0.1.0"
 dependencies = [

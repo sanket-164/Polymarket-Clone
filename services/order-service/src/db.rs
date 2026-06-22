@@ -13,21 +13,36 @@ use rust_decimal::Decimal;
 use uuid::Uuid;
 
 #[async_trait]
-pub trait OrderExt {
+pub trait AccountExt {
     async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, sqlx::Error>;
+}
+
+#[async_trait]
+pub trait MarketExt {
     async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error>;
     async fn get_market_outcome(
         &self,
         outcome_id: Uuid,
         market_id: Uuid,
     ) -> Result<Option<Outcome>, sqlx::Error>;
-    async fn get_market_outcomes(&self, market_id: Uuid) -> Result<Vec<Outcome>, sqlx::Error>;
+}
+
+#[async_trait]
+pub trait WalletExt {
     async fn get_user_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error>;
+}
+
+#[async_trait]
+pub trait HoldingExt {
     async fn get_user_holding(
         &self,
         user_id: Uuid,
         outcome_id: Uuid,
     ) -> Result<Option<Holding>, sqlx::Error>;
+}
+
+#[async_trait]
+pub trait OrderExt {
     async fn get_user_orders(
         &self,
         user_id: Uuid,
@@ -60,7 +75,7 @@ pub trait OrderExt {
 }
 
 #[async_trait]
-impl OrderExt for PGClient {
+impl AccountExt for PGClient {
     async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, sqlx::Error> {
         let user = sqlx::query_as!(
             User,
@@ -70,7 +85,10 @@ impl OrderExt for PGClient {
 
         Ok(user)
     }
+}
 
+#[async_trait]
+impl MarketExt for PGClient {
     async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error> {
         let query = r#"
             SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
@@ -103,16 +121,10 @@ impl OrderExt for PGClient {
 
         Ok(outcome)
     }
+}
 
-    async fn get_market_outcomes(&self, market_id: Uuid) -> Result<Vec<Outcome>, sqlx::Error> {
-        let outcomes = sqlx::query_as::<_, Outcome>(r#"SELECT id, market_id, label, start_price, current_price, total_shares, created_at, updated_at FROM outcome WHERE market_id = $1"#)
-            .bind(market_id)
-            .fetch_all(&self.pool)
-            .await?;
-
-        Ok(outcomes)
-    }
-
+#[async_trait]
+impl WalletExt for PGClient {
     async fn get_user_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error> {
         let query = r#"
             SELECT id, user_id, balance, locked_balance, created_at, updated_at
@@ -127,7 +139,10 @@ impl OrderExt for PGClient {
 
         Ok(wallet)
     }
+}
 
+#[async_trait]
+impl HoldingExt for PGClient {
     async fn get_user_holding(
         &self,
         user_id: Uuid,
@@ -146,7 +161,10 @@ impl OrderExt for PGClient {
 
         Ok(holding)
     }
+}
 
+#[async_trait]
+impl OrderExt for PGClient {
     async fn get_user_orders(
         &self,
         user_id: Uuid,

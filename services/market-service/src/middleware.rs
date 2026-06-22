@@ -49,22 +49,22 @@ pub async fn auth_middleware(
             }
         };
 
-    let user_id = uuid::Uuid::parse_str(&token_details)
+    let admin_id = uuid::Uuid::parse_str(&token_details)
         .map_err(|_| HttpError::unauthorized(ErrorMessage::InvalidToken.to_string()))?;
 
-    let user = app_state
+    let admin = app_state
         .pg_client
-        .get_user_by_id(user_id)
+        .get_admin_by_id(admin_id)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    if user.is_none() {
+    if admin.is_none() {
         return Err(HttpError::server_error(
             ErrorMessage::InvalidToken.to_string(),
         ));
     }
 
-    req.extensions_mut().insert(user_id);
+    req.extensions_mut().insert(admin_id);
 
     Ok(next.run(req).await)
 }

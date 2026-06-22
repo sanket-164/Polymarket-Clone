@@ -50,3 +50,4 @@ pub const USER_PORT: u16 = 3002;
 pub const ORDER_PORT: u16 = 3003;
 pub const FEED_PORT: u16 = 3004;
 pub const ADMIN_PORT: u16 = 3005;
+pub const MARKET_PORT: u16 = 3006;

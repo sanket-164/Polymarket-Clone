@@ -6,6 +6,7 @@ members = [
     "services/matching-engine",
     "services/feed-service",
     "services/auth-service",
+    "services/market-service",
     "common"
 ]
 

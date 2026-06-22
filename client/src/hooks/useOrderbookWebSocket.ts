@@ -30,7 +30,7 @@ export function useOrderbookWebSocket(
     useEffect(() => {
         if (!marketId || !enabled) return;
 
-        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        const ws = new WebSocket(`ws://localhost:3004/ws`);
 
         ws.onopen = () => {
             ws.send(

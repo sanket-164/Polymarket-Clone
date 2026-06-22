@@ -1,15 +1,12 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use common::{
     database::client::PGClient,
-    model::{
-        Holding, Market, MarketStatus, MarketWithOutcomes, Outcome, Transaction, TransactionType,
-        User, Wallet,
-    },
+    model::{Holding, Market, Outcome, Transaction, TransactionType, User, Wallet},
     validation::user_dto::HoldingDetails,
 };
 use rust_decimal::Decimal;
-use sqlx::{Row, postgres::PgRow};
+use sqlx::Row;
 use uuid::Uuid;
 
 #[async_trait]
@@ -50,23 +47,6 @@ pub trait WalletExt {
         limit: i64,
         skip: i64,
     ) -> Result<Vec<Transaction>, sqlx::Error>;
-}
-
-#[async_trait]
-pub trait MarketExt {
-    async fn get_markets(
-        &self,
-        status: MarketStatus,
-        category: Option<String>,
-        start_after: Option<DateTime<Utc>>,
-        start_before: Option<DateTime<Utc>>,
-        close_after: Option<DateTime<Utc>>,
-        close_before: Option<DateTime<Utc>>,
-        order_by: String,
-        limit: i64,
-        skip: i64,
-    ) -> Result<Vec<Market>, sqlx::Error>;
-    async fn get_market_details(&self, market_id: Uuid) -> Result<MarketWithOutcomes, sqlx::Error>;
 }
 
 #[async_trait]
@@ -304,137 +284,6 @@ impl WalletExt for PGClient {
             .await?;
 
         Ok(transactions)
-    }
-}
-
-#[async_trait]
-impl MarketExt for PGClient {
-    async fn get_markets(
-        &self,
-        status: MarketStatus,
-        category: Option<String>,
-        start_after: Option<DateTime<Utc>>,
-        start_before: Option<DateTime<Utc>>,
-        close_after: Option<DateTime<Utc>>,
-        close_before: Option<DateTime<Utc>>,
-        order_by: String,
-        limit: i64,
-        skip: i64,
-    ) -> Result<Vec<Market>, sqlx::Error> {
-        let mut query = String::from(
-        "SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
-        FROM market
-        WHERE deleted_at IS NULL AND status = $1",
-    );
-
-        let mut param_index = 2;
-
-        if category.is_some() {
-            query.push_str(&format!(" AND category = ${}", param_index));
-            param_index += 1;
-        }
-        if start_after.is_some() {
-            query.push_str(&format!(" AND start_at >= ${}", param_index));
-            param_index += 1;
-        }
-        if start_before.is_some() {
-            query.push_str(&format!(" AND start_at <= ${}", param_index));
-            param_index += 1;
-        }
-        if close_after.is_some() {
-            query.push_str(&format!(" AND close_at >= ${}", param_index));
-            param_index += 1;
-        }
-        if close_before.is_some() {
-            query.push_str(&format!(" AND close_at <= ${}", param_index));
-            param_index += 1;
-        }
-
-        query.push_str(&format!(
-            " ORDER BY {} LIMIT ${} OFFSET ${}",
-            order_by,
-            param_index,
-            param_index + 1
-        ));
-
-        let mut q = sqlx::query_as::<_, Market>(&query).bind(status);
-
-        if let Some(c) = category {
-            q = q.bind(c);
-        }
-        if let Some(sa) = start_after {
-            q = q.bind(sa);
-        }
-        if let Some(sb) = start_before {
-            q = q.bind(sb);
-        }
-        if let Some(ca) = close_after {
-            q = q.bind(ca);
-        }
-        if let Some(cb) = close_before {
-            q = q.bind(cb);
-        }
-
-        q = q.bind(limit).bind(skip);
-
-        let markets = q.fetch_all(&self.pool).await?;
-
-        Ok(markets)
-    }
-
-    async fn get_market_details(&self, market_id: Uuid) -> Result<MarketWithOutcomes, sqlx::Error> {
-        let query = "
-        SELECT
-            m.id, m.title, m.description, m.category,
-            m.start_at, m.close_at, m.status,
-            m.created_at, m.updated_at, m.deleted_at,
-            o.id as outcome_id, o.market_id as outcome_market_id, o.label,
-            o.start_price, o.current_price, o.total_shares,
-            o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
-        FROM market m
-        JOIN outcome o ON o.market_id = m.id
-        WHERE m.id = $1
-        ORDER BY o.created_at ASC
-    ";
-
-        let rows = sqlx::query(query)
-            .bind(market_id)
-            .fetch_all(&self.pool)
-            .await?;
-
-        if rows.len() < 2 {
-            return Err(sqlx::Error::RowNotFound);
-        }
-
-        let market = Market {
-            id: rows[0].get("id"),
-            title: rows[0].get("title"),
-            description: rows[0].get("description"),
-            category: rows[0].get("category"),
-            start_at: rows[0].get("start_at"),
-            close_at: rows[0].get("close_at"),
-            status: rows[0].get("status"),
-            created_at: rows[0].get("created_at"),
-            updated_at: rows[0].get("updated_at"),
-            deleted_at: rows[0].get("deleted_at"),
-        };
-
-        let parse_outcome = |row: &PgRow| Outcome {
-            id: row.get("outcome_id"),
-            market_id: row.get("outcome_market_id"),
-            label: row.get("label"),
-            start_price: row.get("start_price"),
-            current_price: row.get("current_price"),
-            total_shares: row.get("total_shares"),
-            created_at: row.get("outcome_created_at"),
-            updated_at: row.get("outcome_updated_at"),
-        };
-
-        Ok(MarketWithOutcomes {
-            market,
-            first_outcome: parse_outcome(&rows[0]),
-            second_outcome: parse_outcome(&rows[1]),
-        })
     }
 }
 
