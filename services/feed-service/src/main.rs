@@ -27,7 +27,7 @@ async fn main() {
     ));
 
     // Run WebSocket server (blocks)
-    connection::start_websocket(&format!("0.0.0.0:{}", FEED_PORT), channel_manager)
+    connection::start_websocket(&format!("0.0.0.0:{FEED_PORT}"), channel_manager)
         .await
         .unwrap();
 }

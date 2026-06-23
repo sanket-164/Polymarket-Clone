@@ -2,9 +2,9 @@ use crate::{
     constant::{
         FEED_CREATE_MARKET, FEED_MARKET_ORDER, FEED_REMOVE_MARKET, MATCHER_CANCEL_ORDER,
         MATCHER_CREATE_MARKET, MATCHER_PLACE_ORDER, MATCHER_REMOVE_MARKET, MAX_NATS_RECONNECTS,
-        TRADE_UPDATE_ORDER,
+        RESOLVE_MARKET, TRADE_UPDATE_ORDER,
     },
-    model::{FeedMessage, MatcherMessage, TradeMessage},
+    model::{FeedMessage, MatcherMessage, ResolveMessage, TradeMessage},
 };
 use async_nats::{
     ConnectOptions,
@@ -47,7 +47,7 @@ impl NatsHandler {
             .jetstream
             .get_or_create_stream(jetstream::stream::Config {
                 name: stream_name.into(),
-                subjects: vec![format!("{}.>", stream_name).into()],
+                subjects: vec![format!("{stream_name}.>").into()],
                 ..Default::default()
             })
             .await?;
@@ -124,5 +124,9 @@ impl NatsHandler {
 
     pub async fn trade_update_order(&self, message: TradeMessage) -> Result<(), async_nats::Error> {
         self.publish(TRADE_UPDATE_ORDER, &message).await
+    }
+
+    pub async fn resolve_market(&self, message: ResolveMessage) -> Result<(), async_nats::Error> {
+        self.publish(RESOLVE_MARKET, &message).await
     }
 }

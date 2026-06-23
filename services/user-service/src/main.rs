@@ -65,7 +65,7 @@ async fn main() {
 
     let app = create_router(Arc::new(app_state.clone())).layer(cors.clone());
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", USER_PORT))
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{USER_PORT}"))
         .await
         .unwrap();
 

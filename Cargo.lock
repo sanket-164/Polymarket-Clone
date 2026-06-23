@@ -2815,6 +2815,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "settlement-service"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "async-nats",
+ "async-trait",
+ "chrono",
+ "common",
+ "dotenv",
+ "futures",
+ "futures-util",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "time",
+ "tokio",
+ "tracing-subscriber",
+ "uuid",
+ "validator",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

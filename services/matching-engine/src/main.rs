@@ -55,8 +55,8 @@ async fn main() {
                     outcomes.second_outcome.id,
                 );
             }
-            MatcherMessage::RemoveMarket { market } => {
-                engine.remove_market(market.id);
+            MatcherMessage::RemoveMarket { market_id } => {
+                engine.remove_market(market_id);
             }
             MatcherMessage::CancelOrder { order: _order } => {
                 // handle cancel order

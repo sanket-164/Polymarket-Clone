@@ -5,12 +5,13 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{get, post, put},
 };
+use chrono::Utc;
 use common::{
-    constant::{ID, ROOT, SNAPSHOT},
+    constant::{ID, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT},
     error::{ErrorMessage, HttpError},
-    model::{FeedMessage, MarketOutcomes, MarketStatus, MatcherMessage},
+    model::{FeedMessage, MarketOutcomes, MarketStatus, MatcherMessage, ResolveMessage},
     validation::{admin_dto::CreateMarketDTO, user_dto::MarketQueryDTO},
 };
 use rust_decimal::prelude::ToPrimitive;
@@ -21,12 +22,15 @@ use validator::Validate;
 use crate::{AppState, db::MarketExt};
 
 pub fn market_handler() -> Router<Arc<AppState>> {
-    Router::new().route(ROOT, post(create_market))
+    Router::new().route(ROOT, post(create_market)).route(
+        &format!("{MARKET_ID}{RESOLVE}{OUTCOME_ID}"),
+        put(resolve_market),
+    )
 }
 
 pub fn public_market_handler() -> Router<Arc<AppState>> {
     Router::new()
-        .route(&format!("{}{}", SNAPSHOT, ID), get(market_snapshot))
+        .route(&format!("{SNAPSHOT}{ID}"), get(market_snapshot))
         .route(ROOT, get(get_markets))
         .route(ID, get(get_market_details))
 }
@@ -131,6 +135,92 @@ async fn create_market(
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     Ok((StatusCode::CREATED, Json(market)))
+}
+
+async fn resolve_market(
+    State(app_state): State<Arc<AppState>>,
+    Path((market_id, outcome_id)): Path<(Uuid, Uuid)>,
+) -> Result<impl IntoResponse, HttpError> {
+    let market = app_state
+        .pg_client
+        .get_market_by_id(market_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?
+        .ok_or(HttpError::not_found(
+            ErrorMessage::MarketNotFound.to_string(),
+        ))?;
+
+    if (market.status != MarketStatus::ACTIVE && market.status != MarketStatus::CLOSED)
+        || market.close_at > Utc::now()
+    {
+        return Err(HttpError::bad_request(
+            ErrorMessage::MarketIsNotClosed.to_string(),
+        ));
+    }
+
+    app_state
+        .pg_client
+        .get_market_outcome(market_id, outcome_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?
+        .ok_or(HttpError::not_found(
+            ErrorMessage::OutcomeNotFound.to_string(),
+        ))?;
+
+    let mut redis = app_state
+        .redis_pool
+        .get()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let pattern = format!("orderbook:{}:*", market_id);
+    let mut cursor: u64 = 0;
+
+    loop {
+        let (next_cursor, keys): (u64, Vec<String>) = match redis::cmd("SCAN")
+            .arg(cursor)
+            .arg("MATCH")
+            .arg(&pattern)
+            .arg("COUNT")
+            .arg(100)
+            .query_async(&mut *redis)
+            .await
+        {
+            Ok(result) => result,
+            Err(e) => {
+                eprintln!("Redis SCAN error: {e}");
+                break;
+            }
+        };
+
+        if !keys.is_empty() {
+            if let Err(e) = redis::cmd("DEL")
+                .arg(&keys)
+                .query_async::<()>(&mut *redis)
+                .await
+            {
+                eprintln!("Redis DEL error: {e}");
+            }
+        }
+
+        cursor = next_cursor;
+        if cursor == 0 {
+            break;
+        }
+    }
+
+    let resolve_message = ResolveMessage::ResolveMarket {
+        market_id,
+        winning_outcome_id: outcome_id,
+    };
+
+    app_state
+        .publisher
+        .resolve_market(resolve_message)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok(())
 }
 
 async fn get_markets(

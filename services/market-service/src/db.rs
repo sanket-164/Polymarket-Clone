@@ -32,10 +32,16 @@ pub trait MarketExt {
         limit: i64,
         skip: i64,
     ) -> Result<Vec<Market>, sqlx::Error>;
+    async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error>;
     async fn get_market_details(
         &self,
         market_id: Uuid,
     ) -> Result<Option<MarketWithOutcomes>, sqlx::Error>;
+    async fn get_market_outcome(
+        &self,
+        market_id: Uuid,
+        outcome_id: Uuid,
+    ) -> Result<Option<Outcome>, sqlx::Error>;
 }
 
 #[async_trait]
@@ -163,23 +169,23 @@ impl MarketExt for PGClient {
         let mut param_index = 2;
 
         if category.is_some() {
-            query.push_str(&format!(" AND category = ${}", param_index));
+            query.push_str(&format!(" AND category = ${param_index}"));
             param_index += 1;
         }
         if start_after.is_some() {
-            query.push_str(&format!(" AND start_at >= ${}", param_index));
+            query.push_str(&format!(" AND start_at >= ${param_index}"));
             param_index += 1;
         }
         if start_before.is_some() {
-            query.push_str(&format!(" AND start_at <= ${}", param_index));
+            query.push_str(&format!(" AND start_at <= ${param_index}"));
             param_index += 1;
         }
         if close_after.is_some() {
-            query.push_str(&format!(" AND close_at >= ${}", param_index));
+            query.push_str(&format!(" AND close_at >= ${param_index}"));
             param_index += 1;
         }
         if close_before.is_some() {
-            query.push_str(&format!(" AND close_at <= ${}", param_index));
+            query.push_str(&format!(" AND close_at <= ${param_index}"));
             param_index += 1;
         }
 
@@ -215,23 +221,37 @@ impl MarketExt for PGClient {
         Ok(markets)
     }
 
+    async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error> {
+        let query = r#"
+            SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
+            FROM market
+            WHERE id = $1"#;
+
+        let market = sqlx::query_as::<_, Market>(query)
+            .bind(market_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(market)
+    }
+
     async fn get_market_details(
         &self,
         market_id: Uuid,
     ) -> Result<Option<MarketWithOutcomes>, sqlx::Error> {
         let query = "
-        SELECT
-            m.id, m.title, m.description, m.category,
-            m.start_at, m.close_at, m.status,
-            m.created_at, m.updated_at, m.deleted_at,
-            o.id as outcome_id, o.market_id as outcome_market_id, o.label,
-            o.start_price, o.current_price, o.total_shares,
-            o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
-        FROM market m
-        JOIN outcome o ON o.market_id = m.id
-        WHERE m.id = $1
-        ORDER BY o.created_at ASC
-    ";
+            SELECT
+                m.id, m.title, m.description, m.category,
+                m.start_at, m.close_at, m.status,
+                m.created_at, m.updated_at, m.deleted_at,
+                o.id as outcome_id, o.market_id as outcome_market_id, o.label,
+                o.start_price, o.current_price, o.total_shares,
+                o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
+            FROM market m
+            JOIN outcome o ON o.market_id = m.id
+            WHERE m.id = $1
+            ORDER BY o.created_at ASC
+        ";
 
         let rows = sqlx::query(query)
             .bind(market_id)
@@ -271,5 +291,25 @@ impl MarketExt for PGClient {
             first_outcome: parse_outcome(&rows[0]),
             second_outcome: parse_outcome(&rows[1]),
         }))
+    }
+
+    async fn get_market_outcome(
+        &self,
+        market_id: Uuid,
+        outcome_id: Uuid,
+    ) -> Result<Option<Outcome>, sqlx::Error> {
+        let query = r#"
+            SELECT id, market_id, label, start_price, current_price, total_shares, created_at, updated_at
+            FROM outcome
+            WHERE id = $1 AND market_id = $2
+        "#;
+
+        let outcome = sqlx::query_as::<_, Outcome>(query)
+            .bind(outcome_id)
+            .bind(market_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(outcome)
     }
 }

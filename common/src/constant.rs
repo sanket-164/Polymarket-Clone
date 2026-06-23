@@ -26,6 +26,9 @@ pub const SNAPSHOT: &str = "/snapshot";
 
 // Market
 pub const MARKET: &str = "/market";
+pub const MARKET_ID: &str = "/:market_id";
+pub const RESOLVE: &str = "/resolve";
+pub const OUTCOME_ID: &str = "/:outcome_id";
 
 // Holding
 pub const HOLDING: &str = "/holding";
@@ -43,6 +46,8 @@ pub const FEED_CREATE_MARKET: &str = "feed.create.market";
 pub const MAX_NATS_RECONNECTS: u8 = 5;
 pub const TRADE_STREAM: &str = "trade";
 pub const TRADE_UPDATE_ORDER: &str = "trade.update.orders";
+pub const RESOLVE_STREAM: &str = "resolve";
+pub const RESOLVE_MARKET: &str = "resolve.market";
 
 // Service Ports
 pub const AUTH_PORT: u16 = 3001;

@@ -310,8 +310,7 @@ impl HoldingExt for PGClient {
         JOIN market m ON h.market_id = m.id
         JOIN outcome o ON h.outcome_id = o.id
         WHERE h.user_id = $1
-        ORDER BY {} LIMIT $2 OFFSET $3",
-            order_by
+        ORDER BY {order_by} LIMIT $2 OFFSET $3"
         );
 
         let rows = sqlx::query(&query)

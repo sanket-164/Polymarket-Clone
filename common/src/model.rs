@@ -183,7 +183,7 @@ pub enum MatcherMessage {
         outcomes: MarketOutcomes,
     },
     RemoveMarket {
-        market: Market,
+        market_id: Uuid,
     },
 }
 
@@ -223,4 +223,13 @@ pub enum FeedMessage {
 #[serde(tag = "type")]
 pub enum TradeMessage {
     UpdateOrders { buy: Order, sell: Order },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ResolveMessage {
+    ResolveMarket {
+        market_id: Uuid,
+        winning_outcome_id: Uuid,
+    },
 }

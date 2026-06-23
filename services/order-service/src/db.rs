@@ -186,23 +186,23 @@ impl OrderExt for PGClient {
         let mut param_index = 2;
 
         if market_id.is_some() {
-            query.push_str(&format!(" AND market_id = ${}", param_index));
+            query.push_str(&format!(" AND market_id = ${param_index}"));
             param_index += 1;
         }
         if side.is_some() {
-            query.push_str(&format!(" AND type = ${}", param_index));
+            query.push_str(&format!(" AND type = ${param_index}"));
             param_index += 1;
         }
         if status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_index));
+            query.push_str(&format!(" AND status = ${param_index}"));
             param_index += 1;
         }
         if before.is_some() {
-            query.push_str(&format!(" AND created_at < ${}", param_index));
+            query.push_str(&format!(" AND created_at < ${param_index}"));
             param_index += 1;
         }
         if after.is_some() {
-            query.push_str(&format!(" AND created_at > ${}", param_index));
+            query.push_str(&format!(" AND created_at > ${param_index}"));
             param_index += 1;
         }
 

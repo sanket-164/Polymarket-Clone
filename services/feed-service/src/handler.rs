@@ -81,8 +81,7 @@ pub async fn handle_connection(
                         if !current_channel.eq(&market_id) || current_channel.is_nil() {
                             let error_message = ServerMessage::Error {
                                 message: format!(
-                                    "You are not in channel of market_id: {}",
-                                    market_id
+                                    "You are not in channel of market_id: {market_id}"
                                 ),
                             };
 
@@ -100,8 +99,7 @@ pub async fn handle_connection(
                         if market_channel.is_none() {
                             let error_message = ServerMessage::Error {
                                 message: format!(
-                                    "Channel for the market_id: {} does not exist",
-                                    market_id
+                                    "Channel for the market_id: {market_id} does not exist"
                                 ),
                             };
 
