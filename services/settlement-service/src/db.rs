@@ -121,12 +121,26 @@ impl MarketExt for PGClient {
         .execute(&mut *tx)
         .await?;
 
+        sqlx::query(
+            "INSERT INTO transactions (wallet_id, amount, type)
+            SELECT w.id, h.shares, 'PAYOUT'
+            FROM holdings h
+            JOIN wallets w ON w.user_id = h.user_id
+            WHERE h.market_id = $1
+            AND h.outcome_id = $2
+            AND h.shares > 0.0",
+        )
+        .bind(market_id)
+        .bind(winning_outcome_id)
+        .execute(&mut *tx)
+        .await?;
+
         // 6. Expire all open orders for this market
         sqlx::query(
             "UPDATE orders
             SET status = 'EXPIRED'
             WHERE market_id = $1
-           AND status IN ('PENDING', 'PARTIAL')",
+            AND status IN ('PENDING', 'PARTIAL')",
         )
         .bind(market_id)
         .execute(&mut *tx)
