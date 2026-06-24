@@ -5,16 +5,7 @@ edition = "2024"
 
 [dependencies]
 common = { path = "../../common" }
-async-nats.workspace = true
 futures.workspace = true
 tokio.workspace = true
-rust_decimal.workspace = true
-rust_decimal_macros.workspace = true
-serde.workspace = true
 serde_json.workspace = true
-sqlx.workspace = true
-chrono.workspace = true
 uuid.workspace = true
-async-trait.workspace = true
-redis.workspace = true
-deadpool-redis.workspace = true

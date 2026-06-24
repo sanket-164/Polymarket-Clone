@@ -6,22 +6,14 @@ version = 4
 name = "admin-service"
 version = "0.1.0"
 dependencies = [
- "argon2",
  "async-trait",
  "axum",
  "axum-extra",
  "chrono",
  "common",
  "deadpool-redis",
- "dotenv",
- "jsonwebtoken",
  "redis",
- "rust_decimal",
- "rust_decimal_macros",
- "serde",
- "serde_json",
  "sqlx",
- "time",
  "tokio",
  "tower-http",
  "tracing-subscriber",
@@ -293,24 +285,16 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "auth-service"
 version = "0.1.0"
 dependencies = [
- "argon2",
  "async-trait",
  "axum",
  "axum-extra",
- "chrono",
  "common",
- "dotenv",
- "jsonwebtoken",
- "rust_decimal",
- "rust_decimal_macros",
- "serde",
  "serde_json",
  "sqlx",
  "time",
  "tokio",
  "tower-http",
  "tracing-subscriber",
- "uuid",
  "validator",
 ]
 
@@ -592,11 +576,9 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "async-nats",
- "async-trait",
  "axum",
  "chrono",
  "dotenv",
- "futures",
  "jsonwebtoken",
  "rust_decimal",
  "rust_decimal_macros",
@@ -983,12 +965,9 @@ version = "0.1.0"
 dependencies = [
  "common",
  "futures",
- "futures-util",
- "serde",
  "serde_json",
  "tokio",
  "tokio-tungstenite",
- "tungstenite",
  "uuid",
 ]
 
@@ -1709,22 +1688,16 @@ dependencies = [
 name = "market-service"
 version = "0.1.0"
 dependencies = [
- "argon2",
  "async-trait",
  "axum",
  "axum-extra",
  "chrono",
  "common",
  "deadpool-redis",
- "dotenv",
- "jsonwebtoken",
  "redis",
  "rust_decimal",
- "rust_decimal_macros",
- "serde",
  "serde_json",
  "sqlx",
- "time",
  "tokio",
  "tower-http",
  "tracing-subscriber",
@@ -1736,18 +1709,9 @@ dependencies = [
 name = "matching-engine"
 version = "0.1.0"
 dependencies = [
- "async-nats",
- "async-trait",
- "chrono",
  "common",
- "deadpool-redis",
  "futures",
- "redis",
- "rust_decimal",
- "rust_decimal_macros",
- "serde",
  "serde_json",
- "sqlx",
  "tokio",
  "uuid",
 ]
@@ -1990,25 +1954,17 @@ dependencies = [
 name = "order-service"
 version = "0.1.0"
 dependencies = [
- "argon2",
- "async-nats",
  "async-trait",
  "axum",
  "axum-extra",
  "chrono",
  "common",
  "deadpool-redis",
- "dotenv",
  "futures",
- "futures-util",
- "jsonwebtoken",
  "redis",
  "rust_decimal",
- "rust_decimal_macros",
- "serde",
  "serde_json",
  "sqlx",
- "time",
  "tokio",
  "tower-http",
  "tracing-subscriber",
@@ -2818,26 +2774,16 @@ dependencies = [
 name = "settlement-service"
 version = "0.1.0"
 dependencies = [
- "argon2",
- "async-nats",
  "async-trait",
  "chrono",
  "common",
  "deadpool-redis",
- "dotenv",
  "futures",
- "futures-util",
  "redis",
- "rust_decimal",
- "rust_decimal_macros",
- "serde",
  "serde_json",
  "sqlx",
- "time",
  "tokio",
- "tracing-subscriber",
  "uuid",
- "validator",
 ]
 
 [[package]]
@@ -3663,22 +3609,16 @@ dependencies = [
 name = "user-service"
 version = "0.1.0"
 dependencies = [
- "argon2",
  "async-trait",
  "axum",
  "axum-extra",
  "chrono",
  "common",
  "deadpool-redis",
- "dotenv",
- "jsonwebtoken",
  "redis",
  "rust_decimal",
- "rust_decimal_macros",
- "serde",
  "serde_json",
  "sqlx",
- "time",
  "tokio",
  "tower-http",
  "tracing-subscriber",
