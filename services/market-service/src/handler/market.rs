@@ -11,7 +11,10 @@ use chrono::Utc;
 use common::{
     constant::{ID, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT},
     error::{ErrorMessage, HttpError},
-    model::{FeedMessage, MarketOutcomes, MarketStatus, MatcherMessage, ResolveMessage},
+    model::{
+        FeedMessage, MarketOutcomes, MarketStatus, MarketWithOutcomes, MatcherMessage,
+        ResolveMessage,
+    },
     validation::{admin_dto::CreateMarketDTO, user_dto::MarketQueryDTO},
 };
 use rust_decimal::prelude::ToPrimitive;
@@ -167,48 +170,6 @@ async fn resolve_market(
             ErrorMessage::OutcomeNotFound.to_string(),
         ))?;
 
-    let mut redis = app_state
-        .redis_pool
-        .get()
-        .await
-        .map_err(|e| HttpError::server_error(e.to_string()))?;
-
-    let pattern = format!("orderbook:{}:*", market_id);
-    let mut cursor: u64 = 0;
-
-    loop {
-        let (next_cursor, keys): (u64, Vec<String>) = match redis::cmd("SCAN")
-            .arg(cursor)
-            .arg("MATCH")
-            .arg(&pattern)
-            .arg("COUNT")
-            .arg(100)
-            .query_async(&mut *redis)
-            .await
-        {
-            Ok(result) => result,
-            Err(e) => {
-                eprintln!("Redis SCAN error: {e}");
-                break;
-            }
-        };
-
-        if !keys.is_empty() {
-            if let Err(e) = redis::cmd("DEL")
-                .arg(&keys)
-                .query_async::<()>(&mut *redis)
-                .await
-            {
-                eprintln!("Redis DEL error: {e}");
-            }
-        }
-
-        cursor = next_cursor;
-        if cursor == 0 {
-            break;
-        }
-    }
-
     let resolve_message = ResolveMessage::ResolveMarket {
         market_id,
         winning_outcome_id: outcome_id,
@@ -220,7 +181,7 @@ async fn resolve_market(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    Ok(())
+    Ok(StatusCode::OK)
 }
 
 async fn get_markets(
@@ -277,6 +238,26 @@ async fn get_market_details(
     Path(id): Path<Uuid>,
     State(app_state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, HttpError> {
+    let cache_key = format!("market:{}", id);
+
+    let mut redis = app_state
+        .redis_pool
+        .get()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let cached: Option<String> = redis::cmd("GET")
+        .arg(&cache_key)
+        .query_async(&mut *redis)
+        .await
+        .unwrap_or(None);
+
+    if let Some(cached_json) = cached {
+        let market: MarketWithOutcomes = serde_json::from_str(&cached_json)
+            .map_err(|e| HttpError::server_error(e.to_string()))?;
+        return Ok((StatusCode::OK, Json(market)));
+    }
+
     let market = app_state
         .pg_client
         .get_market_details(id)
@@ -285,6 +266,16 @@ async fn get_market_details(
         .ok_or(HttpError::not_found(
             ErrorMessage::MarketNotFound.to_string(),
         ))?;
+
+    if let Ok(json) = serde_json::to_string(&market) {
+        let _: Result<(), _> = redis::cmd("SET")
+            .arg(&cache_key)
+            .arg(&json)
+            .arg("EX")
+            .arg(1800) // 30 minute TTL
+            .query_async(&mut *redis)
+            .await;
+    }
 
     Ok((StatusCode::OK, Json(market)))
 }

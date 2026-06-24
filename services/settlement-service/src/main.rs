@@ -1,7 +1,11 @@
-use common::constant::RESOLVE_STREAM;
-use common::model::{FeedMessage, MatcherMessage, ResolveMessage};
-use common::{config::NatsConfig, database::client::PGClient};
-use common::{config::PGConfig, nats_handler::NatsHandler};
+use common::{
+    config::{NatsConfig, PGConfig, RedisConfig},
+    constant::RESOLVE_STREAM,
+    database::client::PGClient,
+    model::{FeedMessage, MatcherMessage, ResolveMessage},
+    nats_handler::NatsHandler,
+};
+use deadpool_redis::{Config, Runtime};
 use futures::StreamExt;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 
@@ -43,6 +47,12 @@ async fn main() {
         }
     };
 
+    let redis_pool = Config::from_url(RedisConfig::init().redis_url)
+        .create_pool(Some(Runtime::Tokio1))
+        .unwrap();
+
+    println!("Redis Pool Created!");
+
     let mut message_stream = nats_handler
         .get_message_stream(RESOLVE_STREAM)
         .await
@@ -83,6 +93,55 @@ async fn main() {
                         continue;
                     }
                     Ok(_) => {
+                        let mut redis = redis_pool
+                            .get()
+                            .await
+                            .expect("Cannot create redis connection");
+                        let pattern = format!("orderbook:{}:*", market_id);
+                        let mut cursor: u64 = 0;
+
+                        loop {
+                            let (next_cursor, keys): (u64, Vec<String>) = match redis::cmd("SCAN")
+                                .arg(cursor)
+                                .arg("MATCH")
+                                .arg(&pattern)
+                                .arg("COUNT")
+                                .arg(100)
+                                .query_async(&mut *redis)
+                                .await
+                            {
+                                Ok(result) => result,
+                                Err(e) => {
+                                    eprintln!("Redis SCAN error: {e}");
+                                    break;
+                                }
+                            };
+
+                            if !keys.is_empty() {
+                                if let Err(e) = redis::cmd("DEL")
+                                    .arg(&keys)
+                                    .query_async::<()>(&mut *redis)
+                                    .await
+                                {
+                                    eprintln!("Redis Orderbook DEL error: {e}");
+                                }
+                            }
+
+                            cursor = next_cursor;
+                            if cursor == 0 {
+                                break;
+                            }
+                        }
+
+                        let market_cache_key = format!("market:{}", market_id);
+
+                        if let Err(e) = redis::cmd("DEL")
+                            .arg(&market_cache_key)
+                            .query_async::<()>(&mut *redis)
+                            .await
+                        {
+                            eprintln!("Redis Market DEL error: {e}");
+                        }
                         if let Err(e) = nats_handler
                             .feed_remove_market(FeedMessage::RemoveMarket { market_id })
                             .await
