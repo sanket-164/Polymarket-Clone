@@ -194,7 +194,7 @@ pub struct HoldingQueryDTO {
     pub skip: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserResponse {
     pub id: Uuid,
     pub name: String,

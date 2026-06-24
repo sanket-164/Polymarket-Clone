@@ -8,7 +8,7 @@ use axum::{
     routing::{get, put},
 };
 use common::{
-    constant::{PICTURE, ROOT},
+    constant::{PICTURE, ROOT, USER_CACHE_TTL},
     error::{ErrorMessage, HttpError},
     validation::user_dto::{UpdateUserDTO, UpdateUserPictureDTO, UserResponse},
 };
@@ -28,6 +28,26 @@ async fn get_me(
     State(app_state): State<Arc<AppState>>,
     Extension(user_id): Extension<Uuid>,
 ) -> Result<impl IntoResponse, HttpError> {
+    let cache_key = format!("user:{}", user_id);
+
+    let mut redis = app_state
+        .redis_pool
+        .get()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let cached: Option<String> = redis::cmd("GET")
+        .arg(&cache_key)
+        .query_async(&mut *redis)
+        .await
+        .unwrap_or(None);
+
+    if let Some(cached_json) = cached {
+        let user_response: UserResponse = serde_json::from_str(&cached_json)
+            .map_err(|e| HttpError::server_error(e.to_string()))?;
+        return Ok((StatusCode::OK, Json(user_response)));
+    }
+
     let user = app_state
         .pg_client
         .get_user_by_id(user_id)
@@ -35,7 +55,19 @@ async fn get_me(
         .map_err(|e| HttpError::server_error(e.to_string()))?
         .ok_or(HttpError::not_found(ErrorMessage::UserNotFound.to_string()))?;
 
-    Ok((StatusCode::OK, Json(UserResponse::from(user))))
+    let user_response = UserResponse::from(user);
+
+    if let Ok(json) = serde_json::to_string(&user_response) {
+        let _: Result<(), _> = redis::cmd("SET")
+            .arg(&cache_key)
+            .arg(&json)
+            .arg("EX")
+            .arg(USER_CACHE_TTL)
+            .query_async::<()>(&mut *redis)
+            .await;
+    }
+
+    Ok((StatusCode::OK, Json(user_response)))
 }
 
 async fn update_user_profile(
@@ -52,7 +84,26 @@ async fn update_user_profile(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    Ok((StatusCode::OK, Json(UserResponse::from(updated_user))))
+    let user_response = UserResponse::from(updated_user);
+
+    let cache_key = format!("user:{}", user_id);
+    let mut redis = app_state
+        .redis_pool
+        .get()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    if let Ok(json) = serde_json::to_string(&user_response) {
+        let _: Result<(), _> = redis::cmd("SET")
+            .arg(&cache_key)
+            .arg(&json)
+            .arg("EX")
+            .arg(USER_CACHE_TTL)
+            .query_async::<()>(&mut *redis)
+            .await;
+    }
+
+    Ok((StatusCode::OK, Json(user_response)))
 }
 
 async fn update_user_picture(
@@ -69,5 +120,24 @@ async fn update_user_picture(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    Ok((StatusCode::OK, Json(UserResponse::from(updated_user))))
+    let user_response = UserResponse::from(updated_user);
+
+    let cache_key = format!("user:{}", user_id);
+    let mut redis = app_state
+        .redis_pool
+        .get()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    if let Ok(json) = serde_json::to_string(&user_response) {
+        let _: Result<(), _> = redis::cmd("SET")
+            .arg(&cache_key)
+            .arg(&json)
+            .arg("EX")
+            .arg(USER_CACHE_TTL)
+            .query_async::<()>(&mut *redis)
+            .await;
+    }
+
+    Ok((StatusCode::OK, Json(user_response)))
 }

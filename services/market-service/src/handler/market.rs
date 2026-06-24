@@ -9,7 +9,7 @@ use axum::{
 };
 use chrono::Utc;
 use common::{
-    constant::{ID, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT},
+    constant::{ID, MARKET_CACHE_TTL, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT},
     error::{ErrorMessage, HttpError},
     model::{
         FeedMessage, MarketOutcomes, MarketStatus, MarketWithOutcomes, MatcherMessage,
@@ -272,7 +272,7 @@ async fn get_market_details(
             .arg(&cache_key)
             .arg(&json)
             .arg("EX")
-            .arg(1800) // 30 minute TTL
+            .arg(MARKET_CACHE_TTL)
             .query_async(&mut *redis)
             .await;
     }

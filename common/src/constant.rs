@@ -56,3 +56,7 @@ pub const ORDER_PORT: u16 = 3003;
 pub const FEED_PORT: u16 = 3004;
 pub const ADMIN_PORT: u16 = 3005;
 pub const MARKET_PORT: u16 = 3006;
+
+// Redis
+pub const MARKET_CACHE_TTL: u64 = 1800; // 30 min
+pub const USER_CACHE_TTL: u64 = 3600; // 60 min
