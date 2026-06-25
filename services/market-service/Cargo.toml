@@ -18,5 +18,5 @@ tower-http.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio.workspace = true
-redis.workspace = true
 deadpool-redis.workspace = true
+redis = { version = "0.32", features = ["tokio-comp"] }

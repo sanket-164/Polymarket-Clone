@@ -12,5 +12,4 @@ sqlx.workspace = true
 uuid.workspace = true
 tokio.workspace = true
 futures.workspace = true
-redis.workspace = true
 deadpool-redis.workspace = true

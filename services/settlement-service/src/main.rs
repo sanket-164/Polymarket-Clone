@@ -5,7 +5,7 @@ use common::{
     model::{FeedMessage, MatcherMessage, ResolveMessage},
     nats_handler::NatsHandler,
 };
-use deadpool_redis::{Config, Runtime};
+use deadpool_redis::{Config, Runtime, redis::AsyncCommands};
 use futures::StreamExt;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 
@@ -97,19 +97,11 @@ async fn main() {
                             .get()
                             .await
                             .expect("Cannot create redis connection");
-                        let pattern = format!("orderbook:{}:*", market_id);
-                        let mut cursor: u64 = 0;
 
-                        loop {
-                            let (next_cursor, keys): (u64, Vec<String>) = match redis::cmd("SCAN")
-                                .arg(cursor)
-                                .arg("MATCH")
-                                .arg(&pattern)
-                                .arg("COUNT")
-                                .arg(100)
-                                .query_async(&mut *redis)
-                                .await
-                            {
+                        let pattern = format!("orderbook:{}:*", market_id);
+
+                        let keys: Vec<String> = {
+                            let mut iter = match redis.scan_match::<_, String>(&pattern).await {
                                 Ok(result) => result,
                                 Err(e) => {
                                     eprintln!("Redis SCAN error: {e}");
@@ -117,31 +109,25 @@ async fn main() {
                                 }
                             };
 
-                            if !keys.is_empty() {
-                                if let Err(e) = redis::cmd("DEL")
-                                    .arg(&keys)
-                                    .query_async::<()>(&mut *redis)
-                                    .await
-                                {
-                                    eprintln!("Redis Orderbook DEL error: {e}");
-                                }
+                            let mut keys = Vec::new();
+                            while let Some(key) = iter.next_item().await {
+                                keys.push(key);
                             }
+                            keys
+                        }; // iter is dropped here, releasing the mutable borrow on redis
 
-                            cursor = next_cursor;
-                            if cursor == 0 {
-                                break;
+                        if !keys.is_empty() {
+                            if let Err(e) = redis.del::<&Vec<String>, ()>(&keys).await {
+                                eprintln!("Redis Orderbook DEL error: {e}");
                             }
                         }
 
                         let market_cache_key = format!("market:{}", market_id);
 
-                        if let Err(e) = redis::cmd("DEL")
-                            .arg(&market_cache_key)
-                            .query_async::<()>(&mut *redis)
-                            .await
-                        {
+                        if let Err(e) = redis.del::<&String, ()>(&market_cache_key).await {
                             eprintln!("Redis Market DEL error: {e}");
                         }
+
                         if let Err(e) = nats_handler
                             .feed_remove_market(FeedMessage::RemoveMarket { market_id })
                             .await

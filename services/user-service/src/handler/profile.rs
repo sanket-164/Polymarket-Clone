@@ -12,6 +12,7 @@ use common::{
     error::{ErrorMessage, HttpError},
     validation::user_dto::{UpdateUserDTO, UpdateUserPictureDTO, UserResponse},
 };
+use deadpool_redis::redis::AsyncCommands;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -36,11 +37,7 @@ async fn get_me(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    let cached: Option<String> = redis::cmd("GET")
-        .arg(&cache_key)
-        .query_async(&mut *redis)
-        .await
-        .unwrap_or(None);
+    let cached: Option<String> = redis.get(&cache_key).await.unwrap_or(None);
 
     if let Some(cached_json) = cached {
         let user_response: UserResponse = serde_json::from_str(&cached_json)
@@ -58,13 +55,7 @@ async fn get_me(
     let user_response = UserResponse::from(user);
 
     if let Ok(json) = serde_json::to_string(&user_response) {
-        let _: Result<(), _> = redis::cmd("SET")
-            .arg(&cache_key)
-            .arg(&json)
-            .arg("EX")
-            .arg(USER_CACHE_TTL)
-            .query_async::<()>(&mut *redis)
-            .await;
+        let _: Result<(), _> = redis.set_ex(&cache_key, json, USER_CACHE_TTL).await;
     }
 
     Ok((StatusCode::OK, Json(user_response)))
@@ -94,13 +85,7 @@ async fn update_user_profile(
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     if let Ok(json) = serde_json::to_string(&user_response) {
-        let _: Result<(), _> = redis::cmd("SET")
-            .arg(&cache_key)
-            .arg(&json)
-            .arg("EX")
-            .arg(USER_CACHE_TTL)
-            .query_async::<()>(&mut *redis)
-            .await;
+        let _: Result<(), _> = redis.set_ex(&cache_key, json, USER_CACHE_TTL).await;
     }
 
     Ok((StatusCode::OK, Json(user_response)))
@@ -130,13 +115,7 @@ async fn update_user_picture(
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     if let Ok(json) = serde_json::to_string(&user_response) {
-        let _: Result<(), _> = redis::cmd("SET")
-            .arg(&cache_key)
-            .arg(&json)
-            .arg("EX")
-            .arg(USER_CACHE_TTL)
-            .query_async::<()>(&mut *redis)
-            .await;
+        let _: Result<(), _> = redis.set_ex(&cache_key, json, USER_CACHE_TTL).await;
     }
 
     Ok((StatusCode::OK, Json(user_response)))
