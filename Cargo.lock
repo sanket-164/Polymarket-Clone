@@ -11,8 +11,6 @@ dependencies = [
  "axum-extra",
  "chrono",
  "common",
- "deadpool-redis",
- "redis",
  "sqlx",
  "tokio",
  "tower-http",

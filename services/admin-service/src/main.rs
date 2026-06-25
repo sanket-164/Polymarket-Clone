@@ -5,12 +5,10 @@ use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
 use common::{
-    config::{JWTConfig, NatsConfig, PGConfig, RedisConfig, ServerConfig},
+    config::{JWTConfig, PGConfig, ServerConfig},
     constant::ADMIN_PORT,
     database::client::PGClient,
-    nats_handler::NatsHandler,
 };
-use deadpool_redis::{Config, Pool, Runtime};
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
@@ -26,8 +24,6 @@ pub mod router;
 pub struct AppState {
     pub jwt_config: JWTConfig,
     pub pg_client: PGClient,
-    pub publisher: NatsHandler,
-    pub redis_pool: Pool,
 }
 
 #[tokio::main]
@@ -96,25 +92,9 @@ async fn main() {
     let pg_client = PGClient::new(pool);
     let jwt_config = JWTConfig::init();
 
-    let publisher = match NatsHandler::new(&NatsConfig::init().nats_url).await {
-        Ok(p) => p,
-        Err(e) => {
-            println!("Failed to connect publisher: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    let redis_pool = Config::from_url(RedisConfig::init().redis_url)
-        .create_pool(Some(Runtime::Tokio1))
-        .unwrap();
-
-    println!("Redis Pool Created!");
-
     let app_state = AppState {
         jwt_config,
         pg_client,
-        publisher,
-        redis_pool,
     };
 
     let app = create_router(Arc::new(app_state.clone())).layer(cors.clone());
