@@ -179,9 +179,8 @@ CREATE INDEX idx_orders_status ON orders(status) WHERE status IN ('PENDING', 'PA
 CREATE INDEX idx_orders_created_at ON orders(created_at DESC);
 
 -- Trades
+CREATE INDEX idx_trades_market ON trades(market_id);
 CREATE INDEX idx_trades_market_outcome ON trades(market_id, outcome_id);
-CREATE INDEX idx_trades_buy_order ON trades(buy_order_id);
-CREATE INDEX idx_trades_sell_order ON trades(sell_order_id);
 CREATE INDEX idx_trades_created_at ON trades(created_at DESC);
 
 -- Resolved Markets
@@ -189,8 +188,8 @@ CREATE INDEX idx_resolved_markets_market_id ON resolved_markets(market_id);
 
 -- Password: 12345678 (hashed using Argon2id)
 INSERT INTO admins (id, name, email, password) VALUES ('00000000-0000-0000-0000-000000000000', 'Admin', 'admin@polymarketclone.com', '$argon2id$v=19$m=19456,t=2,p=1$AaHZRuAc1RJtu7JC9k9Jag$CkH8UBnDyZaPZd1Y2IzEP83F5W03oVdwzQQzESbDzWM');
-INSERT INTO users (id, name, email, password) VALUES ('11111111-1111-1111-1111-111111111111', 'User', 'user@polymarketclone.com', '$argon2id$v=19$m=19456,t=2,p=1$AaHZRuAc1RJtu7JC9k9Jag$CkH8UBnDyZaPZd1Y2IzEP83F5W03oVdwzQQzESbDzWM');
-INSERT INTO wallets (id, user_id, balance, locked_balance) VALUES ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 0.00, 0.00);
+INSERT INTO users (id, name, email, password) VALUES ('00000000-0000-0000-0000-000000000000', 'User', 'user@polymarketclone.com', '$argon2id$v=19$m=19456,t=2,p=1$AaHZRuAc1RJtu7JC9k9Jag$CkH8UBnDyZaPZd1Y2IzEP83F5W03oVdwzQQzESbDzWM');
+INSERT INTO wallets (id, user_id, balance, locked_balance) VALUES ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 0.00, 0.00);
 
 -- required for Debezium CDC before-state
 ALTER TABLE orders REPLICA IDENTITY FULL;

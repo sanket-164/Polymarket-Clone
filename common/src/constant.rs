@@ -1,3 +1,5 @@
+use uuid::Uuid;
+
 // API CONSTANTS
 pub const API: &str = "/api";
 pub const ROOT: &str = "/";
@@ -60,3 +62,5 @@ pub const MARKET_PORT: u16 = 3006;
 // Redis
 pub const MARKET_CACHE_TTL: u64 = 1800; // 30 min
 pub const USER_CACHE_TTL: u64 = 3600; // 60 min
+
+pub const ADMIN_UUID: Uuid = Uuid::nil();

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use common::database::client::PGClient;
+use common::{constant::ADMIN_UUID, database::client::PGClient};
 use uuid::Uuid;
 
 #[async_trait]
@@ -76,10 +76,11 @@ impl MarketExt for PGClient {
                 WHERE market_id = $1
                 AND outcome_id != $2
             ) AS losers
-            WHERE w.user_id = '11111111-1111-1111-1111-111111111111'",
+            WHERE w.user_id = $3",
         )
         .bind(market_id)
         .bind(winning_outcome_id)
+        .bind(ADMIN_UUID)
         .execute(&mut *tx)
         .await?;
 
@@ -94,11 +95,12 @@ impl MarketExt for PGClient {
                 WHERE market_id  = $2
                 AND outcome_id = $3
             ) AS winners
-            WHERE w.user_id = '11111111-1111-1111-1111-111111111111'",
+            WHERE w.user_id = $4",
         )
         .bind(Utc::now())
         .bind(market_id)
         .bind(winning_outcome_id)
+        .bind(ADMIN_UUID)
         .execute(&mut *tx)
         .await?;
 
