@@ -30,7 +30,8 @@ tokio = { version = "1.39.3", features = ["full"] }
 uuid = { version = "1.4.1", features = ["serde", "v4"] }
 validator = { version = "0.20.0", features = ["derive"] }
 tower-http = { version = "0.5.2", features = ["cors", "trace"] }
-tracing-subscriber = { version = "0.3.18" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 async-nats = "0.35"
 redis = { version = "0.32", features = ["tokio-comp"] }
 deadpool-redis = "0.22"

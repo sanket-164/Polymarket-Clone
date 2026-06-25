@@ -1,6 +1,29 @@
 use dotenv::dotenv;
 
 #[derive(Debug, Clone)]
+pub struct ServerConfig {
+    pub allow_origin: String,
+    pub environment: String,
+}
+
+impl ServerConfig {
+    pub fn init() -> Self {
+        dotenv().ok();
+
+        let allow_origin =
+            std::env::var("ALLOW_ORIGIN").expect("ALLOW_ORIGIN is not set in .env file");
+
+        let environment =
+            std::env::var("ENVIRONMENT").expect("ENVIRONMENT is not set in .env file");
+
+        ServerConfig {
+            allow_origin,
+            environment,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct PGConfig {
     pub database_url: String,
     pub pool_size_each_service: u32,

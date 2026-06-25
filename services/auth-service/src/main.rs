@@ -4,13 +4,14 @@ use axum::http::{
     Method,
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
-use common::database::client::PGClient;
 use common::{
-    config::{JWTConfig, PGConfig},
+    config::{ServerConfig, JWTConfig, PGConfig},
     constant::AUTH_PORT,
+    database::client::PGClient,
 };
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::router::create_router;
 
@@ -31,6 +32,39 @@ async fn main() {
         .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE])
         .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST, Method::PUT]);
+
+    match ServerConfig::init().environment.as_str() {
+        "production" => {
+            tracing_subscriber::registry()
+                .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")))
+                .with(
+                    fmt::layer()
+                        .json()
+                        .with_current_span(true)
+                        .with_span_list(true)
+                        .with_target(true)
+                        .with_thread_ids(true)
+                        .with_ansi(false),
+                )
+                .init();
+
+            tracing::info!(env = "production", "Tracer initialized");
+        }
+        _ => {
+            tracing_subscriber::registry()
+                .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug")))
+                .with(
+                    fmt::layer()
+                        .pretty()
+                        .with_target(true)
+                        .with_thread_ids(false)
+                        .with_ansi(true),
+                )
+                .init();
+
+            tracing::debug!(env = "development", "Tracer initialized");
+        }
+    }
 
     let pg_config = PGConfig::init();
 
