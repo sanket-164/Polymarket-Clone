@@ -48,7 +48,7 @@ impl ErrorMessage {
             ErrorMessage::InsufficientBalance => "Insufficient Balance".to_string(),
             ErrorMessage::MarketNotFound => "Market does not exist".to_string(),
             ErrorMessage::MarketIsNotActive => "Market is not active".to_string(),
-            ErrorMessage::MarketIsNotClosed => "Market is not closed yet".to_string(),
+            ErrorMessage::MarketIsNotClosed => "Market is not closed".to_string(),
             ErrorMessage::OutcomeNotFound => "Outcome does not exist".to_string(),
             ErrorMessage::InsufficientShares => "Insufficient Shares".to_string(),
             ErrorMessage::CannotPublishOrder => "Failed to publish order".to_string(),

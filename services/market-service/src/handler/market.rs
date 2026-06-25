@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
@@ -22,7 +22,10 @@ use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::{AppState, db::MarketExt};
+use crate::{
+    AppState,
+    db::{MarketExt, WalletExt},
+};
 
 pub fn market_handler() -> Router<Arc<AppState>> {
     Router::new().route(ROOT, post(create_market)).route(
@@ -40,14 +43,30 @@ pub fn public_market_handler() -> Router<Arc<AppState>> {
 
 async fn create_market(
     State(app_state): State<Arc<AppState>>,
+    Extension(admin_id): Extension<Uuid>,
     Json(body): Json<CreateMarketDTO>,
 ) -> Result<impl IntoResponse, HttpError> {
     body.validate()
         .map_err(|e| HttpError::bad_request(e.to_string()))?;
 
+    let wallet = app_state
+        .pg_client
+        .get_wallet(admin_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let capital_amount = body.first_outcome.start_price * body.first_outcome.total_shares
+        + body.second_outcome.start_price * body.second_outcome.total_shares;
+
+    if wallet.balance < capital_amount {
+        return Err(HttpError::forbidden(
+            ErrorMessage::InsufficientBalance.to_string(),
+        ));
+    }
+
     let market = app_state
         .pg_client
-        .create_market(body)
+        .create_market(body, admin_id)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
@@ -80,13 +99,13 @@ async fn create_market(
 
     let first_outcome_order = app_state
         .pg_client
-        .insert_sell_order(first_outcome)
+        .insert_sell_order(first_outcome, admin_id)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     let second_outcome_order = app_state
         .pg_client
-        .insert_sell_order(second_outcome)
+        .insert_sell_order(second_outcome, admin_id)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

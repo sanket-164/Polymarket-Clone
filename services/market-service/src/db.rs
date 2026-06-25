@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
-    constant::ADMIN_UUID,
     database::client::PGClient,
-    model::{Admin, Market, MarketStatus, MarketWithOutcomes, Order, OrderSide, Outcome},
+    model::{Admin, Market, MarketStatus, MarketWithOutcomes, Order, OrderSide, Outcome, Wallet},
     validation::admin_dto::CreateMarketDTO,
 };
+use rust_decimal::Decimal;
 use sqlx::{Row, postgres::PgRow};
 use uuid::Uuid;
 
@@ -19,8 +19,13 @@ pub trait MarketExt {
     async fn create_market(
         &self,
         market: CreateMarketDTO,
+        admin_id: Uuid,
     ) -> Result<MarketWithOutcomes, sqlx::Error>;
-    async fn insert_sell_order(&self, outcome: Outcome) -> Result<Order, sqlx::Error>;
+    async fn insert_sell_order(
+        &self,
+        outcome: Outcome,
+        admin_id: Uuid,
+    ) -> Result<Order, sqlx::Error>;
     async fn get_markets(
         &self,
         status: MarketStatus,
@@ -46,6 +51,11 @@ pub trait MarketExt {
 }
 
 #[async_trait]
+pub trait WalletExt {
+    async fn get_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error>;
+}
+
+#[async_trait]
 impl AccountExt for PGClient {
     async fn get_admin_by_id(&self, admin_id: Uuid) -> Result<Option<Admin>, sqlx::Error> {
         let admin = sqlx::query_as!(
@@ -65,6 +75,7 @@ impl MarketExt for PGClient {
     async fn create_market(
         &self,
         market_data: CreateMarketDTO,
+        admin_id: Uuid,
     ) -> Result<MarketWithOutcomes, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
@@ -113,7 +124,7 @@ impl MarketExt for PGClient {
         ";
 
         sqlx::query(insert_holdings_query)
-            .bind(ADMIN_UUID)
+            .bind(admin_id)
             .bind(market.id)
             .bind(first_outcome.id)
             .bind(first_outcome.total_shares)
@@ -132,21 +143,39 @@ impl MarketExt for PGClient {
         })
     }
 
-    async fn insert_sell_order(&self, outcome: Outcome) -> Result<Order, sqlx::Error> {
-        let insert_order_query = "INSERT INTO orders (user_id, market_id, outcome_id, side, shares, remaining_shares, price)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
-               RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, created_at, updated_at";
+    async fn insert_sell_order(
+        &self,
+        outcome: Outcome,
+        admin_id: Uuid,
+    ) -> Result<Order, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
 
-        let order = sqlx::query_as(insert_order_query)
-            .bind(ADMIN_UUID)
+        let insert_order_query = "INSERT INTO orders (user_id, market_id, outcome_id, side, shares, remaining_shares, price)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, created_at, updated_at";
+
+        let order: Order = sqlx::query_as(insert_order_query)
+            .bind(admin_id)
             .bind(outcome.market_id)
             .bind(outcome.id)
             .bind(OrderSide::SELL)
             .bind(outcome.total_shares)
             .bind(outcome.total_shares)
             .bind(outcome.start_price)
-            .fetch_one(&self.pool)
+            .fetch_one(&mut *tx)
             .await?;
+
+        let cost = outcome.total_shares * outcome.start_price;
+
+        sqlx::query(
+            "UPDATE wallets SET balance = balance - $1, updated_at = NOW() WHERE user_id = $2",
+        )
+        .bind(cost)
+        .bind(admin_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
 
         Ok(order)
     }
@@ -314,5 +343,24 @@ impl MarketExt for PGClient {
             .await?;
 
         Ok(outcome)
+    }
+}
+
+#[async_trait]
+impl WalletExt for PGClient {
+    async fn get_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error> {
+        let wallet = sqlx::query_as!(
+            Wallet,
+            r#"
+            SELECT id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
+            FROM wallets 
+            WHERE user_id = $1
+            "#,
+            user_id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(wallet)
     }
 }
