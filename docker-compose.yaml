@@ -31,20 +31,22 @@ services:
       - --reserve-memory 0M
       - --node-id 0
       - --check=false
-      - --kafka-addr PLAINTEXT://0.0.0.0:9092
-      - --advertise-kafka-addr PLAINTEXT://redpanda:9092
+      # FIX: Define two listeners (Internal for Docker, External for Host)
+      - --kafka-addr INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      - --advertise-kafka-addr INTERNAL://redpanda:29092,EXTERNAL://localhost:9092
       - --pandaproxy-addr 0.0.0.0:8082
       - --advertise-pandaproxy-addr redpanda:8082
       - --schema-registry-addr 0.0.0.0:8081
     ports:
       - "9092:9092"
+      - "29092:29092"
       - "8081:8081"
       - "8082:8082"
 
   redpanda-console:
     image: redpandadata/console:latest
     environment:
-      KAFKA_BROKERS: redpanda:9092
+      KAFKA_BROKERS: redpanda:29092
       KAFKA_SCHEMAREGISTRY_ENABLED: "false"
     ports:
       - "8080:8080"
@@ -54,7 +56,7 @@ services:
   kafka-connect:
     image: debezium/connect:2.5
     environment:
-      BOOTSTRAP_SERVERS: redpanda:9092
+      BOOTSTRAP_SERVERS: redpanda:29092
       GROUP_ID: debezium-group
       CONFIG_STORAGE_TOPIC: debezium_configs
       OFFSET_STORAGE_TOPIC: debezium_offsets
