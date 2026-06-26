@@ -11,10 +11,7 @@ use chrono::Utc;
 use common::{
     constant::{ID, MARKET_CACHE_TTL, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT},
     error::{ErrorMessage, HttpError},
-    model::{
-        FeedMessage, MarketOutcomes, MarketStatus, MarketWithOutcomes, MatcherMessage,
-        ResolveMessage,
-    },
+    model::{FeedMessage, MarketOutcomes, MarketStatus, MarketWithOutcomes, MatcherMessage},
     validation::{admin_dto::CreateMarketDTO, user_dto::MarketQueryDTO},
 };
 use rust_decimal::prelude::ToPrimitive;
@@ -161,6 +158,7 @@ async fn create_market(
 
 async fn resolve_market(
     State(app_state): State<Arc<AppState>>,
+    Extension(admin_id): Extension<Uuid>,
     Path((market_id, outcome_id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, HttpError> {
     let market = app_state
@@ -189,14 +187,9 @@ async fn resolve_market(
             ErrorMessage::OutcomeNotFound.to_string(),
         ))?;
 
-    let resolve_message = ResolveMessage::ResolveMarket {
-        market_id,
-        winning_outcome_id: outcome_id,
-    };
-
     app_state
-        .publisher
-        .resolve_market(resolve_message)
+        .pg_client
+        .resolve_market(admin_id, market_id, outcome_id)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

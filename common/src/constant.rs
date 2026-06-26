@@ -1,5 +1,3 @@
-use uuid::Uuid;
-
 // API CONSTANTS
 pub const API: &str = "/api";
 pub const ROOT: &str = "/";
@@ -48,8 +46,6 @@ pub const FEED_CREATE_MARKET: &str = "feed.create.market";
 pub const MAX_NATS_RECONNECTS: u8 = 5;
 pub const TRADE_STREAM: &str = "trade";
 pub const TRADE_UPDATE_ORDER: &str = "trade.update.orders";
-pub const RESOLVE_STREAM: &str = "resolve";
-pub const RESOLVE_MARKET: &str = "resolve.market";
 
 // Service Ports
 pub const AUTH_PORT: u16 = 3001;
@@ -62,5 +58,3 @@ pub const MARKET_PORT: u16 = 3006;
 // Redis
 pub const MARKET_CACHE_TTL: u64 = 1800; // 30 min
 pub const USER_CACHE_TTL: u64 = 3600; // 60 min
-
-pub const ADMIN_UUID: Uuid = Uuid::nil();

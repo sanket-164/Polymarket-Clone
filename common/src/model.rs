@@ -224,12 +224,3 @@ pub enum FeedMessage {
 pub enum TradeMessage {
     UpdateOrders { buy: Order, sell: Order },
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum ResolveMessage {
-    ResolveMarket {
-        market_id: Uuid,
-        winning_outcome_id: Uuid,
-    },
-}

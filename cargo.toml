@@ -7,7 +7,6 @@ members = [
     "services/feed-service",
     "services/auth-service",
     "services/market-service",
-    "services/settlement-service",
     "services/cdc-service",
     "common"
 ]
