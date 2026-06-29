@@ -10,13 +10,16 @@ use axum::{
 use common::{
     constant::{PICTURE, ROOT, USER_CACHE_TTL},
     error::{ErrorMessage, HttpError},
-    validation::user_dto::{UpdateUserDTO, UpdateUserPictureDTO, UserResponse},
 };
 use deadpool_redis::redis::AsyncCommands;
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::{AppState, db::AccountExt};
+use crate::{
+    AppState,
+    db::AccountExt,
+    dto::{UpdateUserDTO, UpdateUserPictureDTO, UserResponse},
+};
 
 pub fn profile_handler() -> Router<Arc<AppState>> {
     Router::new()

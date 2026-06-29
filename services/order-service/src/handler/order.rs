@@ -12,7 +12,6 @@ use common::{
     constant::ROOT,
     error::{ErrorMessage, HttpError},
     model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderSide},
-    validation::order_dto::{OrderQueryDTO, PlaceOrderDTO},
 };
 use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
@@ -21,6 +20,7 @@ use validator::Validate;
 use crate::{
     AppState,
     db::{HoldingExt, MarketExt, OrderExt, WalletExt},
+    dto::{OrderQueryDTO, PlaceOrderDTO},
 };
 
 pub fn order_handler() -> Router<Arc<AppState>> {

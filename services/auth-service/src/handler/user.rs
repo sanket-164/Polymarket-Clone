@@ -12,12 +12,15 @@ use common::{
     constant::{SIGNIN, SIGNUP},
     error::{ErrorMessage, HttpError},
     util::{hash, jwt},
-    validation::user_dto::{LoginUserDTO, RegisterUserDTO, UserResponse},
 };
 use serde_json::json;
 use validator::Validate;
 
-use crate::{AppState, db::AuthExt};
+use crate::{
+    AppState,
+    db::AuthExt,
+    dto::{LoginUserDTO, RegisterUserDTO, UserResponse},
+};
 
 pub fn user_auth_handler() -> Router<Arc<AppState>> {
     Router::new()

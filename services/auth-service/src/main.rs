@@ -5,7 +5,7 @@ use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
 use common::{
-    config::{ServerConfig, JWTConfig, PGConfig},
+    config::{JWTConfig, PGConfig, ServerConfig},
     constant::AUTH_PORT,
     database::client::PGClient,
 };
@@ -16,6 +16,7 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 use crate::router::create_router;
 
 pub mod db;
+pub mod dto;
 pub mod handler;
 pub mod router;
 

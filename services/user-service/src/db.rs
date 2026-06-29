@@ -3,11 +3,12 @@ use chrono::Utc;
 use common::{
     database::client::PGClient,
     model::{Holding, Market, Outcome, Transaction, TransactionType, User, Wallet},
-    validation::user_dto::HoldingDetails,
 };
 use rust_decimal::Decimal;
 use sqlx::Row;
 use uuid::Uuid;
+
+use crate::dto::HoldingDetails;
 
 #[async_trait]
 pub trait AccountExt {

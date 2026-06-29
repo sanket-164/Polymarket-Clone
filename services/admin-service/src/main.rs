@@ -16,6 +16,7 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 use crate::router::create_router;
 
 pub mod db;
+pub mod dto;
 pub mod handler;
 pub mod middleware;
 pub mod router;

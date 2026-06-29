@@ -10,12 +10,15 @@ use axum::{
 use common::{
     constant::ROOT,
     error::{ErrorMessage, HttpError},
-    validation::admin_dto::{AdminResponse, UpdateAdminDTO},
 };
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::{AppState, db::AccountExt};
+use crate::{
+    AppState,
+    db::AccountExt,
+    dto::{AdminResponse, UpdateAdminDTO},
+};
 
 pub fn profile_handler() -> Router<Arc<AppState>> {
     Router::new()

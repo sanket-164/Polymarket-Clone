@@ -4,59 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
-use crate::model::{Holding, Market, MarketStatus, Outcome, TransactionType, User};
-
-#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct RegisterUserDTO {
-    #[validate(length(min = 1, message = "Name is required"))]
-    pub name: String,
-
-    #[validate(
-        length(min = 1, message = "Email is required"),
-        email(message = "Provide valid email address")
-    )]
-    pub email: String,
-
-    #[validate(length(min = 8, message = "Password must be at least 8 characters"))]
-    pub password: String,
-
-    #[validate(
-        length(min = 1, message = "Confirm password is required"),
-        must_match(other = "password", message = "Passwords do not match")
-    )]
-    #[serde(rename = "confirmPassword")]
-    pub confirm_password: String,
-}
-
-#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct LoginUserDTO {
-    #[validate(
-        length(min = 1, message = "Email is required"),
-        email(message = "Provide valid email address")
-    )]
-    pub email: String,
-
-    #[validate(length(min = 8, message = "Password must be at least 8 charaters"))]
-    pub password: String,
-}
-
-#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct ResetPassword {
-    #[validate(length(min = 8, message = "Old Password must be at least 8 characters"))]
-    #[serde(rename = "oldPassword")]
-    pub old_password: String,
-
-    #[validate(length(min = 8, message = "New Password must be at least 8 characters"))]
-    #[serde(rename = "newPassword")]
-    pub new_password: String,
-
-    #[validate(
-        length(min = 1, message = "Confirm password is required"),
-        must_match(other = "new_password", message = "Passwords do not match")
-    )]
-    #[serde(rename = "confirmPassword")]
-    pub confirm_password: String,
-}
+use common::model::{Holding, Market, Outcome, TransactionType, User};
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateUserDTO {
@@ -113,15 +61,6 @@ fn validate_order_field(value: &str) -> Result<(), ValidationError> {
     }
 }
 
-fn validate_market_order_field(value: &str) -> Result<(), ValidationError> {
-    match value {
-        "start_at" | "close_at" | "created_at" => Ok(()),
-        _ => Err(ValidationError::new(
-            "Invalid order field. Must be 'start_at', 'close_at' or 'created_at'",
-        )),
-    }
-}
-
 fn validate_holding_order_field(value: &str) -> Result<(), ValidationError> {
     match value {
         "shares" | "close_at" | "created_at" => Ok(()),
@@ -149,28 +88,6 @@ pub struct TransactionsQueryDTO {
     pub order_by: Option<String>,
 
     pub transaction_type: Option<TransactionType>,
-
-    #[validate(range(min = 1))]
-    pub limit: Option<i64>,
-
-    #[validate(range(min = 0))]
-    pub skip: Option<i64>,
-}
-
-#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct MarketQueryDTO {
-    #[validate(custom(function = "validate_market_order_field"))]
-    pub order_field: Option<String>,
-
-    #[validate(custom(function = "validate_order_by"))]
-    pub order_by: Option<String>,
-
-    pub status: Option<MarketStatus>,
-    pub category: Option<String>,
-    pub start_after: Option<DateTime<Utc>>,
-    pub start_before: Option<DateTime<Utc>>,
-    pub close_after: Option<DateTime<Utc>>,
-    pub close_before: Option<DateTime<Utc>>,
 
     #[validate(range(min = 1))]
     pub limit: Option<i64>,

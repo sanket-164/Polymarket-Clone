@@ -12,7 +12,6 @@ use common::{
     constant::{ID, MARKET_CACHE_TTL, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT},
     error::{ErrorMessage, HttpError},
     model::{FeedMessage, MarketOutcomes, MarketStatus, MarketWithOutcomes, MatcherMessage},
-    validation::{admin_dto::CreateMarketDTO, user_dto::MarketQueryDTO},
 };
 use rust_decimal::prelude::ToPrimitive;
 use serde_json::json;
@@ -22,6 +21,7 @@ use validator::Validate;
 use crate::{
     AppState,
     db::{MarketExt, WalletExt},
+    dto::{CreateMarketDTO, MarketQueryDTO},
 };
 
 pub fn market_handler() -> Router<Arc<AppState>> {

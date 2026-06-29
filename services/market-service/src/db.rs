@@ -3,11 +3,12 @@ use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
     model::{Admin, Market, MarketStatus, MarketWithOutcomes, Order, OrderSide, Outcome, Wallet},
-    validation::admin_dto::CreateMarketDTO,
 };
 use rust_decimal::Decimal;
 use sqlx::{Row, postgres::PgRow};
 use uuid::Uuid;
+
+use crate::dto::CreateMarketDTO;
 
 #[async_trait]
 pub trait AccountExt {

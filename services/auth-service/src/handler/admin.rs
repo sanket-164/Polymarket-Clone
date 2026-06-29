@@ -12,12 +12,11 @@ use common::{
     constant::SIGNIN,
     error::{ErrorMessage, HttpError},
     util::{hash, jwt},
-    validation::admin_dto::LoginAdminDTO,
 };
 use serde_json::json;
 use validator::Validate;
 
-use crate::{AppState, db::AuthExt};
+use crate::{AppState, db::AuthExt, dto::LoginAdminDTO};
 
 pub fn admin_auth_handler() -> Router<Arc<AppState>> {
     Router::new().route(SIGNIN, post(signin))

@@ -4,31 +4,48 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
-use crate::model::Admin;
+use common::model::MarketStatus;
 
-#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct LoginAdminDTO {
-    #[validate(
-        length(min = 1, message = "Email is required"),
-        email(message = "Provide valid email address")
-    )]
-    pub email: String,
+fn validate_market_order_field(value: &str) -> Result<(), ValidationError> {
+    match value {
+        "start_at" | "close_at" | "created_at" => Ok(()),
+        _ => Err(ValidationError::new(
+            "Invalid order field. Must be 'start_at', 'close_at' or 'created_at'",
+        )),
+    }
+}
 
-    #[validate(length(min = 8, message = "Password must be at least 8 charaters"))]
-    pub password: String,
+fn validate_order_by(value: &str) -> Result<(), ValidationError> {
+    match value {
+        "ASC" | "DESC" => Ok(()),
+        _ => Err(ValidationError::new(
+            "Invalid order direction. Must be 'ASC' or 'DESC'",
+        )),
+    }
 }
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateAdminDTO {
-    #[validate(length(min = 1, message = "Name is required"))]
-    pub name: String,
+pub struct MarketQueryDTO {
+    #[validate(custom(function = "validate_market_order_field"))]
+    pub order_field: Option<String>,
 
-    #[validate(
-        length(min = 1, message = "Email is required"),
-        email(message = "Provide valid email address")
-    )]
-    pub email: String,
+    #[validate(custom(function = "validate_order_by"))]
+    pub order_by: Option<String>,
+
+    pub status: Option<MarketStatus>,
+    pub category: Option<String>,
+    pub start_after: Option<DateTime<Utc>>,
+    pub start_before: Option<DateTime<Utc>>,
+    pub close_after: Option<DateTime<Utc>>,
+    pub close_before: Option<DateTime<Utc>>,
+
+    #[validate(range(min = 1))]
+    pub limit: Option<i64>,
+
+    #[validate(range(min = 0))]
+    pub skip: Option<i64>,
 }
+
 trait MarketDates {
     fn start_at(&self) -> Option<DateTime<Utc>>;
     fn close_at(&self) -> Option<DateTime<Utc>>;
@@ -172,25 +189,4 @@ pub struct UpdateMarketDTO {
 
     #[validate(nested)]
     pub second_outcome: UpdateOutcomeDTO,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct AdminResponse {
-    pub id: Uuid,
-    pub name: String,
-    pub email: String,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
-}
-
-impl From<Admin> for AdminResponse {
-    fn from(admin: Admin) -> Self {
-        AdminResponse {
-            id: admin.id,
-            name: admin.name,
-            email: admin.email,
-            created_at: admin.created_at,
-            updated_at: admin.updated_at,
-        }
-    }
 }

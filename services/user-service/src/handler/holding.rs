@@ -7,15 +7,15 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use common::{
-    constant::ROOT,
-    error::HttpError,
-    validation::user_dto::{HoldingQueryDTO, HoldingsResponse},
-};
+use common::{constant::ROOT, error::HttpError};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::{AppState, db::HoldingExt};
+use crate::{
+    AppState,
+    db::HoldingExt,
+    dto::{HoldingQueryDTO, HoldingsResponse},
+};
 
 pub fn holding_handler() -> Router<Arc<AppState>> {
     Router::new().route(ROOT, get(get_user_holdings))

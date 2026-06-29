@@ -10,13 +10,16 @@ use axum::{
 use common::{
     constant::{BALANCE, DEPOSIT, TRANSACTIONS, WITHDRAW},
     error::{ErrorMessage, HttpError},
-    validation::user_dto::{DepositBalanceDTO, TransactionsQueryDTO},
 };
 use rust_decimal::{Decimal, prelude::Zero};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::{AppState, db::WalletExt};
+use crate::{
+    AppState,
+    db::WalletExt,
+    dto::{DepositBalanceDTO, TransactionsQueryDTO},
+};
 
 pub fn wallet_handler() -> Router<Arc<AppState>> {
     Router::new()
