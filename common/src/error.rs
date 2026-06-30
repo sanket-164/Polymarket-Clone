@@ -22,6 +22,8 @@ impl fmt::Display for ErrorResponse {
 #[derive(Debug, PartialEq)]
 pub enum ErrorMessage {
     WrongCredentials,
+    OtpOrPasswordRequired,
+    InvalidOtp,
     InvalidToken,
     EmailExist,
     TokenNotGiven,
@@ -40,6 +42,10 @@ impl ErrorMessage {
     fn to_str(&self) -> String {
         match self {
             ErrorMessage::WrongCredentials => "Wrong credentials are given".to_string(),
+            ErrorMessage::OtpOrPasswordRequired => {
+                "Either old password or OTP is required".to_string()
+            }
+            ErrorMessage::InvalidOtp => "Invalid OTP".to_string(),
             ErrorMessage::EmailExist => "Email already exist".to_string(),
             ErrorMessage::InvalidToken => "Token is invalid".to_string(),
             ErrorMessage::TokenNotGiven => "Token is not given".to_string(),

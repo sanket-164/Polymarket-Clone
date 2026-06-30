@@ -8,6 +8,8 @@ pub const USER: &str = "/user";
 // Auth
 pub const SIGNUP: &str = "/signup";
 pub const SIGNIN: &str = "/signin";
+pub const SEND_OTP: &str = "/send-otp";
+pub const RESET_PASSWORD: &str = "/reset-password";
 
 // Profile
 pub const PROFILE: &str = "/profile";
@@ -58,3 +60,4 @@ pub const MARKET_PORT: u16 = 3006;
 // Redis
 pub const MARKET_CACHE_TTL: u64 = 1800; // 30 min
 pub const USER_CACHE_TTL: u64 = 3600; // 60 min
+pub const OTP_CACHE_TTL: u64 = 60; // 1 min

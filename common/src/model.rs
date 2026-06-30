@@ -3,6 +3,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
 pub struct Admin {
     pub id: Uuid,
     pub name: String,

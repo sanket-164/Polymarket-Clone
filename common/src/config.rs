@@ -102,3 +102,28 @@ impl NatsConfig {
         NatsConfig { nats_url }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct SmtpConfig {
+    pub smtp_host: String,
+    pub smtp_username: String,
+    pub smtp_password: String,
+}
+
+impl SmtpConfig {
+    pub fn init() -> Self {
+        dotenv().ok();
+
+        let smtp_host = std::env::var("SMTP_HOST").expect("SMTP_HOST is not set in .env file.");
+        let smtp_username =
+            std::env::var("SMTP_USERNAME").expect("SMTP_USERNAME is not set in .env file.");
+        let smtp_password =
+            std::env::var("SMTP_PASSWORD").expect("SMTP_PASSWORD is not set in .env file.");
+
+        SmtpConfig {
+            smtp_host,
+            smtp_username,
+            smtp_password,
+        }
+    }
+}

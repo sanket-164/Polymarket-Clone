@@ -51,20 +51,35 @@ pub struct LoginUserDTO {
 }
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
+pub struct SendOtpDTO {
+    #[validate(
+        length(min = 1, message = "Email is required"),
+        email(message = "Provide valid email address")
+    )]
+    pub email: String,
+}
+
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct ResetPassword {
+    #[validate(
+        length(min = 1, message = "Email is required"),
+        email(message = "Provide valid email address")
+    )]
+    pub email: String,
+
+    #[validate(range(min = 100000, max = 999999, message = "OTP must be a 6 digit number"))]
+    pub otp: Option<u32>,
+
     #[validate(length(min = 8, message = "Old Password must be at least 8 characters"))]
-    #[serde(rename = "oldPassword")]
-    pub old_password: String,
+    pub old_password: Option<String>,
 
     #[validate(length(min = 8, message = "New Password must be at least 8 characters"))]
-    #[serde(rename = "newPassword")]
     pub new_password: String,
 
     #[validate(
         length(min = 1, message = "Confirm password is required"),
         must_match(other = "new_password", message = "Passwords do not match")
     )]
-    #[serde(rename = "confirmPassword")]
     pub confirm_password: String,
 }
 
