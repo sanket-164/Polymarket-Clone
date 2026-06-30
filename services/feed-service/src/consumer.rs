@@ -1,11 +1,11 @@
-use crate::manager::ChannelManager;
-use common::{constant::FEED_STREAM, model::FeedMessage, nats_handler::NatsHandler};
+use crate::{manager::ChannelManager, nats_handler::NatsClient};
+use common::model::FeedMessage;
 use futures::StreamExt;
 use std::sync::Arc;
 use tokio_tungstenite::tungstenite::Message;
 
-pub async fn start_consumer(nats_handler: Arc<NatsHandler>, channel_manager: Arc<ChannelManager>) {
-    let mut message_stream = match nats_handler.get_message_stream(FEED_STREAM).await {
+pub async fn start_consumer(nats_client: Arc<NatsClient>, channel_manager: Arc<ChannelManager>) {
+    let mut subscriber = match nats_client.get_feed_subscriber().await {
         Ok(s) => s,
         Err(e) => {
             eprintln!("Failed to get NATS message stream: {}", e);
@@ -13,20 +13,11 @@ pub async fn start_consumer(nats_handler: Arc<NatsHandler>, channel_manager: Arc
         }
     };
 
-    while let Some(msg) = message_stream.next().await {
-        let msg = match msg {
-            Ok(m) => m,
-            Err(e) => {
-                eprintln!("NATS message error: {}", e);
-                continue;
-            }
-        };
-
+    while let Some(msg) = subscriber.next().await {
         let feed_message: FeedMessage = match serde_json::from_slice(&msg.payload) {
             Ok(m) => m,
             Err(e) => {
                 eprintln!("Failed to deserialize NATS message: {}", e);
-                let _ = msg.ack().await;
                 continue;
             }
         };
@@ -53,10 +44,6 @@ pub async fn start_consumer(nats_handler: Arc<NatsHandler>, channel_manager: Arc
                     Err(e) => eprintln!("Failed to serialize OrderPlaced message: {}", e),
                 }
             }
-        }
-
-        if let Err(e) = msg.ack().await {
-            eprintln!("NATS ack failed: {}", e);
         }
     }
 }

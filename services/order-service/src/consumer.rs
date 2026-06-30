@@ -1,9 +1,8 @@
-use crate::db::OrderExt;
+use crate::{db::OrderExt, nats_handler::NatsHandler};
 use common::{
     constant::TRADE_STREAM,
     database::client::PGClient,
     model::{OrderSide, TradeMessage},
-    nats_handler::NatsHandler,
 };
 use deadpool_redis::Pool;
 use futures::StreamExt;

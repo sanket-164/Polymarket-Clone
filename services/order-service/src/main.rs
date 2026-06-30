@@ -3,11 +3,10 @@ use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
 use common::{
-    config::{ServerConfig, NatsConfig, RedisConfig},
     config::{JWTConfig, PGConfig},
+    config::{NatsConfig, RedisConfig, ServerConfig},
     constant::ORDER_PORT,
     database::client::PGClient,
-    nats_handler::NatsHandler,
 };
 use deadpool_redis::{Config, Pool, Runtime};
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
@@ -15,13 +14,14 @@ use std::sync::Arc;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::router::create_router;
+use crate::{nats_handler::NatsHandler, router::create_router};
 
 pub mod consumer;
 pub mod db;
 pub mod dto;
 pub mod handler;
 pub mod middleware;
+pub mod nats_handler;
 pub mod router;
 
 #[derive(Debug, Clone)]

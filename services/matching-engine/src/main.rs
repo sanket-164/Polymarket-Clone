@@ -1,11 +1,10 @@
 mod engine;
+mod nats_handler;
 
-use common::{
-    config::NatsConfig, constant::MATCHER_STREAM, model::MatcherMessage, nats_handler::NatsHandler,
-};
+use common::{config::NatsConfig, model::MatcherMessage};
 use futures::StreamExt;
 
-use crate::engine::Engine;
+use crate::{engine::Engine, nats_handler::NatsHandler};
 
 #[tokio::main]
 async fn main() {
@@ -18,7 +17,7 @@ async fn main() {
     };
 
     let mut message_stream = nats_handler
-        .get_message_stream(MATCHER_STREAM)
+        .get_matcher_stream()
         .await
         .expect("Failed to get messages");
 

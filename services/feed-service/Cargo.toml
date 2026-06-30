@@ -8,5 +8,7 @@ common = { path = "../../common" }
 futures.workspace = true
 tokio.workspace = true
 tokio-tungstenite = "0.28.0"
+serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
+async-nats.workspace = true

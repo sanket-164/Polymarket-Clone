@@ -15,4 +15,3 @@ serde_json.workspace = true
 sqlx.workspace = true
 uuid.workspace = true
 axum.workspace = true
-async-nats.workspace = true

@@ -602,7 +602,6 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "argon2",
- "async-nats",
  "axum",
  "chrono",
  "dotenv",
@@ -989,8 +988,10 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 name = "feed-service"
 version = "0.1.0"
 dependencies = [
+ "async-nats",
  "common",
  "futures",
+ "serde",
  "serde_json",
  "tokio",
  "tokio-tungstenite",
@@ -1726,6 +1727,7 @@ dependencies = [
 name = "market-service"
 version = "0.1.0"
 dependencies = [
+ "async-nats",
  "async-trait",
  "axum",
  "axum-extra",
@@ -1758,8 +1760,10 @@ dependencies = [
 name = "matching-engine"
 version = "0.1.0"
 dependencies = [
+ "async-nats",
  "common",
  "futures",
+ "serde",
  "serde_json",
  "tokio",
  "uuid",
@@ -2025,6 +2029,7 @@ dependencies = [
 name = "order-service"
 version = "0.1.0"
 dependencies = [
+ "async-nats",
  "async-trait",
  "axum",
  "axum-extra",

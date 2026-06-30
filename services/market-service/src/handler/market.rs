@@ -193,6 +193,18 @@ async fn resolve_market(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
+    app_state
+        .publisher
+        .matcher_remove_market(MatcherMessage::RemoveMarket { market_id })
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    app_state
+        .publisher
+        .feed_remove_market(FeedMessage::RemoveMarket { market_id })
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
     Ok(StatusCode::OK)
 }
 

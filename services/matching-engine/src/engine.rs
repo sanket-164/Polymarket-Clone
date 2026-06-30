@@ -1,5 +1,5 @@
+use crate::nats_handler::NatsHandler;
 use common::model::{FeedMessage, Order, OrderFeed, OrderSide, TradeMessage};
-use common::nats_handler::NatsHandler;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use uuid::Uuid;

@@ -8,19 +8,19 @@ use common::{
     config::{JWTConfig, NatsConfig, PGConfig, RedisConfig, ServerConfig},
     constant::MARKET_PORT,
     database::client::PGClient,
-    nats_handler::NatsHandler,
 };
 use deadpool_redis::{Config, Pool, Runtime};
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::router::create_router;
+use crate::{nats_handler::NatsHandler, router::create_router};
 
 pub mod db;
 pub mod dto;
 pub mod handler;
 pub mod middleware;
+pub mod nats_handler;
 pub mod router;
 
 #[derive(Debug, Clone)]
