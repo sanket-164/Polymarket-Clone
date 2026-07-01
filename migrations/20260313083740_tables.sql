@@ -193,3 +193,4 @@ INSERT INTO wallets (id, user_id, balance, locked_balance) VALUES ('11111111-111
 
 -- required for Debezium CDC before-state
 ALTER TABLE orders REPLICA IDENTITY FULL;
+ALTER TABLE holdings REPLICA IDENTITY FULL;

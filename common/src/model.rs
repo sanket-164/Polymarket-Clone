@@ -147,6 +147,7 @@ pub struct Transaction {
     pub id: Uuid,
     pub wallet_id: Uuid,
     #[sqlx(rename = "type")]
+    #[serde(rename = "type")]
     pub transaction_type: TransactionType,
     pub amount: Decimal,
     pub created_at: Option<DateTime<Utc>>,
