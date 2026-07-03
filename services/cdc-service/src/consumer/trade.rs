@@ -1,23 +1,27 @@
+use common::constant::{
+    AUTO_COMMIT_INTERVAL_MS, AUTO_OFFSET_RESET, CDC_TRADE_TOPIC, ENABLE_AUTO_COMMIT,
+    SESSION_TIMEOUT_MS, TRADE_GROUP_ID,
+};
 use common::model::Trade;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::Message;
 
-use crate::consumer::{ConsumerEvent, Operation};
+use crate::dto::{ConsumerEvent, Operation};
 
 pub struct TradeConsumer {
     pub consumer: StreamConsumer,
 }
 
 impl TradeConsumer {
-    pub fn init() -> Self {
+    pub fn init(bootstrap_servers: &str) -> Self {
         let consumer: StreamConsumer = ClientConfig::new()
-            .set("bootstrap.servers", "localhost:9092")
-            .set("group.id", "trade-rust-consumer")
-            .set("auto.offset.reset", "earliest")
-            .set("enable.auto.commit", "true")
-            .set("auto.commit.interval.ms", "1000")
-            .set("session.timeout.ms", "6000")
+            .set("bootstrap.servers", bootstrap_servers)
+            .set("group.id", TRADE_GROUP_ID)
+            .set("auto.offset.reset", AUTO_OFFSET_RESET)
+            .set("enable.auto.commit", ENABLE_AUTO_COMMIT)
+            .set("auto.commit.interval.ms", AUTO_COMMIT_INTERVAL_MS)
+            .set("session.timeout.ms", SESSION_TIMEOUT_MS)
             .create()
             .expect("Failed to create Kafka consumer");
 
@@ -26,7 +30,7 @@ impl TradeConsumer {
 
     pub async fn listen(self) {
         self.consumer
-            .subscribe(&["polymarket.public.trades"])
+            .subscribe(&[CDC_TRADE_TOPIC])
             .expect("Failed to subscribe to topic");
 
         println!("Trade Consumer started, waiting for messages...");

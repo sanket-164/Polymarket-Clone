@@ -61,3 +61,17 @@ pub const MARKET_PORT: u16 = 3006;
 pub const MARKET_CACHE_TTL: u64 = 1800; // 30 min
 pub const USER_CACHE_TTL: u64 = 3600; // 60 min
 pub const OTP_CACHE_TTL: u64 = 60; // 1 min
+
+// Redpanda
+pub const AUTO_OFFSET_RESET: &str = "earliest";
+pub const ENABLE_AUTO_COMMIT: &str = "true";
+pub const AUTO_COMMIT_INTERVAL_MS: &str = "1000";
+pub const SESSION_TIMEOUT_MS: &str = "6000";
+pub const HOLDING_GROUP_ID: &str = "holding-rust-consumer";
+pub const ORDER_GROUP_ID: &str = "order-rust-consumer";
+pub const TRADE_GROUP_ID: &str = "trade-rust-consumer";
+pub const TRANSACTION_GROUP_ID: &str = "transaction-rust-consumer";
+pub const CDC_HOLDING_TOPIC: &str = "polymarket.public.holdings";
+pub const CDC_ORDER_TOPIC: &str = "polymarket.public.orders";
+pub const CDC_TRADE_TOPIC: &str = "polymarket.public.trades";
+pub const CDC_TRANSACTION_TOPIC: &str = "polymarket.public.transactions";

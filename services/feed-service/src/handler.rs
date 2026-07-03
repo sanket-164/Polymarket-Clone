@@ -1,10 +1,25 @@
 use crate::manager::ChannelManager;
-use common::model::{ClientMessage, ServerMessage};
 use futures::{SinkExt, stream::StreamExt};
+use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpStream, sync::mpsc};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 use uuid::Uuid;
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+enum ClientMessage {
+    JoinMarket { market_id: Uuid },
+    LeaveMarket { market_id: Uuid },
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+enum ServerMessage {
+    JoinedMarket { market_id: Uuid },
+    LeftMarket { market_id: Uuid },
+    Error { message: String },
+}
 
 pub async fn handle_connection(
     stream: TcpStream,

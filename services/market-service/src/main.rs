@@ -16,12 +16,12 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 
 use crate::{nats_handler::NatsHandler, router::create_router};
 
-pub mod db;
-pub mod dto;
-pub mod handler;
-pub mod middleware;
-pub mod nats_handler;
-pub mod router;
+mod db;
+mod dto;
+mod handler;
+mod middleware;
+mod nats_handler;
+mod router;
 
 #[derive(Debug, Clone)]
 pub struct AppState {

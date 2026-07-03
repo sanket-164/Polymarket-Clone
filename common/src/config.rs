@@ -127,3 +127,19 @@ impl SmtpConfig {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct RedpandaConfig {
+    pub bootstrap_servers: String,
+}
+
+impl RedpandaConfig {
+    pub fn init() -> Self {
+        dotenv().ok();
+
+        let bootstrap_servers =
+            std::env::var("BOOTSTRAP_SERVERS").expect("BOOTSTRAP_SERVERS is not set in .env file.");
+
+        RedpandaConfig { bootstrap_servers }
+    }
+}

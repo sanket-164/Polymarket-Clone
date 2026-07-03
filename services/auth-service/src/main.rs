@@ -16,10 +16,10 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 
 use crate::router::create_router;
 
-pub mod db;
-pub mod dto;
-pub mod handler;
-pub mod router;
+mod db;
+mod dto;
+mod handler;
+mod router;
 
 #[derive(Debug, Clone)]
 pub struct AppState {

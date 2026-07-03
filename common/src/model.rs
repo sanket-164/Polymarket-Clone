@@ -198,21 +198,6 @@ pub struct OrderFeed {
     pub price: Decimal,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
-pub enum ClientMessage {
-    JoinMarket { market_id: Uuid },
-    LeaveMarket { market_id: Uuid },
-}
-
-#[derive(Debug, Serialize)]
-#[serde(tag = "type")]
-pub enum ServerMessage {
-    JoinedMarket { market_id: Uuid },
-    LeftMarket { market_id: Uuid },
-    Error { message: String },
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FeedMessage {
