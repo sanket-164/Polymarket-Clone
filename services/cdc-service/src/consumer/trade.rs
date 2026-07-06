@@ -2,19 +2,22 @@ use common::constant::{
     AUTO_COMMIT_INTERVAL_MS, AUTO_OFFSET_RESET, CDC_TRADE_TOPIC, ENABLE_AUTO_COMMIT,
     SESSION_TIMEOUT_MS, TRADE_GROUP_ID,
 };
-use common::model::Trade;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::Message;
 
-use crate::dto::{ConsumerEvent, Operation};
+use crate::{
+    ch_client::CHClient,
+    model::{ConsumerEvent, Operation, TradeRow},
+};
 
 pub struct TradeConsumer {
     pub consumer: StreamConsumer,
+    pub ch_client: CHClient,
 }
 
 impl TradeConsumer {
-    pub fn init(bootstrap_servers: &str) -> Self {
+    pub fn init(bootstrap_servers: &str, ch_client: CHClient) -> Self {
         let consumer: StreamConsumer = ClientConfig::new()
             .set("bootstrap.servers", bootstrap_servers)
             .set("group.id", TRADE_GROUP_ID)
@@ -25,7 +28,10 @@ impl TradeConsumer {
             .create()
             .expect("Failed to create Kafka consumer");
 
-        TradeConsumer { consumer }
+        TradeConsumer {
+            consumer,
+            ch_client,
+        }
     }
 
     pub async fn listen(self) {
@@ -51,8 +57,8 @@ impl TradeConsumer {
                         }
                     };
 
-                    match serde_json::from_str::<ConsumerEvent<Trade>>(payload) {
-                        Ok(event) => handle_trade_event(event).await,
+                    match serde_json::from_str::<ConsumerEvent<TradeRow>>(payload) {
+                        Ok(event) => handle_trade_event(event, &self.ch_client).await,
                         Err(e) => eprintln!("Failed to parse event: {} \nRaw: {}", e, payload),
                     }
                 }
@@ -61,7 +67,7 @@ impl TradeConsumer {
     }
 }
 
-async fn handle_trade_event(event: ConsumerEvent<Trade>) {
+async fn handle_trade_event(event: ConsumerEvent<TradeRow>, ch_client: &CHClient) {
     match event.op {
         Operation::Create => {
             if let Some(after) = event.after {
@@ -74,7 +80,10 @@ async fn handle_trade_event(event: ConsumerEvent<Trade>) {
                     after.shares,
                     after.price
                 );
-                // TODO: insert into ClickHouse `trade` table
+
+                if let Err(err) = ch_client.insert_trade(&after).await {
+                    eprintln!("Failed to insert trade into ClickHouse: {}", err);
+                }
             }
         }
         Operation::Update => {

@@ -2,19 +2,22 @@ use common::constant::{
     AUTO_COMMIT_INTERVAL_MS, AUTO_OFFSET_RESET, CDC_TRANSACTION_TOPIC, ENABLE_AUTO_COMMIT,
     SESSION_TIMEOUT_MS, TRANSACTION_GROUP_ID,
 };
-use common::model::Transaction;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::Message;
 
-use crate::dto::{ConsumerEvent, Operation};
+use crate::{
+    ch_client::CHClient,
+    model::{ConsumerEvent, Operation, TransactionRow},
+};
 
 pub struct TransactionConsumer {
     pub consumer: StreamConsumer,
+    pub ch_client: CHClient,
 }
 
 impl TransactionConsumer {
-    pub fn init(bootstrap_servers: &str) -> Self {
+    pub fn init(bootstrap_servers: &str, ch_client: CHClient) -> Self {
         let consumer: StreamConsumer = ClientConfig::new()
             .set("bootstrap.servers", bootstrap_servers)
             .set("group.id", TRANSACTION_GROUP_ID)
@@ -25,7 +28,10 @@ impl TransactionConsumer {
             .create()
             .expect("Failed to create Kafka consumer");
 
-        TransactionConsumer { consumer }
+        TransactionConsumer {
+            consumer,
+            ch_client,
+        }
     }
 
     pub async fn listen(self) {
@@ -51,8 +57,8 @@ impl TransactionConsumer {
                         }
                     };
 
-                    match serde_json::from_str::<ConsumerEvent<Transaction>>(payload) {
-                        Ok(event) => handle_transaction_event(event).await,
+                    match serde_json::from_str::<ConsumerEvent<TransactionRow>>(payload) {
+                        Ok(event) => handle_transaction_event(event, &self.ch_client).await,
                         Err(e) => eprintln!("Failed to parse event: {} \nRaw: {}", e, payload),
                     }
                 }
@@ -61,7 +67,7 @@ impl TransactionConsumer {
     }
 }
 
-async fn handle_transaction_event(event: ConsumerEvent<Transaction>) {
+async fn handle_transaction_event(event: ConsumerEvent<TransactionRow>, ch_client: &CHClient) {
     match event.op {
         Operation::Create => {
             if let Some(after) = event.after {
@@ -69,7 +75,10 @@ async fn handle_transaction_event(event: ConsumerEvent<Transaction>) {
                     "NEW TRANSACTION | id={} wallet={} type={:?} amount={}",
                     after.id, after.wallet_id, after.transaction_type, after.amount
                 );
-                // TODO: insert into ClickHouse `transaction` table
+
+                if let Err(err) = ch_client.insert_transaction(&after).await {
+                    eprintln!("Failed to insert transaction into ClickHouse: {}", err);
+                }
             }
         }
         Operation::Update => {

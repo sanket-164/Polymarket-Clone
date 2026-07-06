@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.9"
 
 services:
   postgres:
@@ -105,8 +105,24 @@ services:
       timeout: 5s
       retries: 5
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: polymarket
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+
 volumes:
   nats_data:
     driver: local
   redis_data:
+    driver: local
+  clickhouse_data:
     driver: local

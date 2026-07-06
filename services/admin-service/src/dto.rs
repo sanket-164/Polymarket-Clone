@@ -6,18 +6,6 @@ use validator::Validate;
 use common::model::Admin;
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct LoginAdminDTO {
-    #[validate(
-        length(min = 1, message = "Email is required"),
-        email(message = "Provide valid email address")
-    )]
-    pub email: String,
-
-    #[validate(length(min = 8, message = "Password must be at least 8 charaters"))]
-    pub password: String,
-}
-
-#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateAdminDTO {
     #[validate(length(min = 1, message = "Name is required"))]
     pub name: String,

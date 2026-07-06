@@ -18,7 +18,7 @@ use validator::Validate;
 use crate::{
     AppState,
     db::WalletExt,
-    dto::{DepositBalanceDTO, TransactionsQueryDTO},
+    dto::{TransactionsQueryDTO, UpdateBalanceDTO},
 };
 
 pub fn wallet_handler() -> Router<Arc<AppState>> {
@@ -45,7 +45,7 @@ async fn get_balance(
 async fn deposite_balance(
     State(app_state): State<Arc<AppState>>,
     Extension(user_id): Extension<Uuid>,
-    Json(body): Json<DepositBalanceDTO>,
+    Json(body): Json<UpdateBalanceDTO>,
 ) -> Result<impl IntoResponse, HttpError> {
     body.validate()
         .map_err(|e| HttpError::bad_request(e.to_string()))?;
@@ -62,7 +62,7 @@ async fn deposite_balance(
 async fn withdraw_balance(
     State(app_state): State<Arc<AppState>>,
     Extension(user_id): Extension<Uuid>,
-    Json(body): Json<DepositBalanceDTO>,
+    Json(body): Json<UpdateBalanceDTO>,
 ) -> Result<impl IntoResponse, HttpError> {
     body.validate()
         .map_err(|e| HttpError::bad_request(e.to_string()))?;

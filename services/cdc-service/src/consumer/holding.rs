@@ -2,19 +2,22 @@ use common::constant::{
     AUTO_COMMIT_INTERVAL_MS, AUTO_OFFSET_RESET, CDC_HOLDING_TOPIC, ENABLE_AUTO_COMMIT,
     HOLDING_GROUP_ID, SESSION_TIMEOUT_MS,
 };
-use common::model::Holding;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::Message;
 
-use crate::dto::{ConsumerEvent, Operation};
+use crate::{
+    ch_client::CHClient,
+    model::{ConsumerEvent, HoldingRow, Operation},
+};
 
 pub struct HoldingConsumer {
     pub consumer: StreamConsumer,
+    pub ch_client: CHClient,
 }
 
 impl HoldingConsumer {
-    pub fn init(bootstrap_servers: &str) -> Self {
+    pub fn init(bootstrap_servers: &str, ch_client: CHClient) -> Self {
         let consumer: StreamConsumer = ClientConfig::new()
             .set("bootstrap.servers", bootstrap_servers)
             .set("group.id", HOLDING_GROUP_ID)
@@ -25,7 +28,10 @@ impl HoldingConsumer {
             .create()
             .expect("Failed to create Kafka consumer");
 
-        HoldingConsumer { consumer }
+        HoldingConsumer {
+            consumer,
+            ch_client,
+        }
     }
 
     pub async fn listen(self) {
@@ -51,8 +57,8 @@ impl HoldingConsumer {
                         }
                     };
 
-                    match serde_json::from_str::<ConsumerEvent<Holding>>(payload) {
-                        Ok(event) => handle_holding_event(event).await,
+                    match serde_json::from_str::<ConsumerEvent<HoldingRow>>(payload) {
+                        Ok(event) => handle_holding_event(event, &self.ch_client).await,
                         Err(e) => eprintln!("Failed to parse event: {} \nRaw: {}", e, payload),
                     }
                 }
@@ -61,7 +67,7 @@ impl HoldingConsumer {
     }
 }
 
-async fn handle_holding_event(event: ConsumerEvent<Holding>) {
+async fn handle_holding_event(event: ConsumerEvent<HoldingRow>, ch_client: &CHClient) {
     match event.op {
         Operation::Create => {
             if let Some(after) = event.after {
@@ -74,7 +80,10 @@ async fn handle_holding_event(event: ConsumerEvent<Holding>) {
                     after.shares,
                     after.locked_shares
                 );
-                // TODO: insert into ClickHouse `holding` table
+
+                if let Err(err) = ch_client.insert_holding(&after).await {
+                    eprintln!("Failed to insert holding into ClickHouse: {}", err);
+                }
             }
         }
         Operation::Update => {
@@ -87,12 +96,16 @@ async fn handle_holding_event(event: ConsumerEvent<Holding>) {
                     before.shares, before.locked_shares
                 );
             }
+
             if let Some(after) = event.after {
                 println!(
                     "  after  | shares={} locked_shares={}",
                     after.shares, after.locked_shares
                 );
-                // TODO: upsert into ClickHouse (ReplacingMergeTree handles this on insert)
+
+                if let Err(err) = ch_client.insert_holding(&after).await {
+                    eprintln!("Failed to update holding in ClickHouse: {}", err);
+                }
             }
         }
     }

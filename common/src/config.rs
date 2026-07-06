@@ -143,3 +143,32 @@ impl RedpandaConfig {
         RedpandaConfig { bootstrap_servers }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct ClickhouseConfig {
+    pub url: String,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+}
+
+impl ClickhouseConfig {
+    pub fn init() -> Self {
+        dotenv().ok();
+
+        let url = std::env::var("CLICKHOUSE_URL").expect("CLICKHOUSE_URL is not set in .env file.");
+        let user =
+            std::env::var("CLICKHOUSE_USER").expect("CLICKHOUSE_USER is not set in .env file.");
+        let password = std::env::var("CLICKHOUSE_PASSWORD")
+            .expect("CLICKHOUSE_PASSWORD is not set in .env file.");
+        let database = std::env::var("CLICKHOUSE_DATABASE")
+            .expect("CLICKHOUSE_DATABASE is not set in .env file.");
+
+        ClickhouseConfig {
+            url,
+            user,
+            password,
+            database,
+        }
+    }
+}

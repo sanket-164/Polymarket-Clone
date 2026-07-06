@@ -6,8 +6,13 @@ edition = "2024"
 [dependencies]
 common = { path = "../../common" }
 rdkafka = { version = "0.36", features = ["cmake-build"] }
+clickhouse = { version = "0.13", features = ["uuid", "chrono", ] }
+serde_repr = "0.1"
+uuid.workspace = true
+rust_decimal.workspace = true
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+chrono.workspace = true

@@ -2,19 +2,22 @@ use common::constant::{
     AUTO_COMMIT_INTERVAL_MS, AUTO_OFFSET_RESET, CDC_ORDER_TOPIC, ENABLE_AUTO_COMMIT,
     ORDER_GROUP_ID, SESSION_TIMEOUT_MS,
 };
-use common::model::Order;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::Message;
 
-use crate::dto::{ConsumerEvent, Operation};
+use crate::{
+    ch_client::CHClient,
+    model::{ConsumerEvent, Operation, OrderRow},
+};
 
 pub struct OrderConsumer {
     pub consumer: StreamConsumer,
+    pub ch_client: CHClient,
 }
 
 impl OrderConsumer {
-    pub fn init(bootstrap_servers: &str) -> Self {
+    pub fn init(bootstrap_servers: &str, ch_client: CHClient) -> Self {
         let consumer: StreamConsumer = ClientConfig::new()
             .set("bootstrap.servers", bootstrap_servers)
             .set("group.id", ORDER_GROUP_ID)
@@ -25,7 +28,10 @@ impl OrderConsumer {
             .create()
             .expect("Failed to create Kafka consumer");
 
-        OrderConsumer { consumer }
+        Self {
+            consumer,
+            ch_client,
+        }
     }
 
     pub async fn listen(self) {
@@ -51,8 +57,8 @@ impl OrderConsumer {
                         }
                     };
 
-                    match serde_json::from_str::<ConsumerEvent<Order>>(payload) {
-                        Ok(event) => handle_order_event(event).await,
+                    match serde_json::from_str::<ConsumerEvent<OrderRow>>(payload) {
+                        Ok(event) => handle_order_event(event, &self.ch_client).await,
                         Err(e) => eprintln!("Failed to parse event: {} \nRaw: {}", e, payload),
                     }
                 }
@@ -61,33 +67,40 @@ impl OrderConsumer {
     }
 }
 
-async fn handle_order_event(event: ConsumerEvent<Order>) {
+async fn handle_order_event(event: ConsumerEvent<OrderRow>, ch_client: &CHClient) {
     match event.op {
         Operation::Create => {
             if let Some(after) = event.after {
                 println!(
-                    "NEW ORDER  | id={} user={} side={:?} shares={} price={} status={:?}",
+                    "NEW ORDER | id={} user={} side={:?} shares={} price={} status={:?}",
                     after.id, after.user_id, after.side, after.shares, after.price, after.status
                 );
-                // TODO: insert into ClickHouse `order` table
+
+                if let Err(err) = ch_client.insert_order(&after).await {
+                    eprintln!("Failed to insert order into ClickHouse: {}", err);
+                }
             }
         }
+
         Operation::Update => {
-            // order IS mutable (status/remaining_shares change as fills happen),
-            // so unlike Trades/Transactions, this branch will fire regularly.
             println!("ORDER UPDATE");
+
             if let Some(before) = event.before {
                 println!(
-                    "  before | status={:?} remaining={}",
+                    "before | status={:?} remaining={}",
                     before.status, before.remaining_shares
                 );
             }
+
             if let Some(after) = event.after {
                 println!(
-                    "  after  | status={:?} remaining={}",
+                    "after | status={:?} remaining={}",
                     after.status, after.remaining_shares
                 );
-                // TODO: insert into ClickHouse (ReplacingMergeTree(updated_at) handles dedup on merge)
+
+                if let Err(err) = ch_client.insert_order(&after).await {
+                    eprintln!("Failed to update order in ClickHouse: {}", err);
+                }
             }
         }
     }
