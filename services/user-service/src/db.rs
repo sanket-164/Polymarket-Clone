@@ -58,11 +58,12 @@ pub trait HoldingExt {
 #[async_trait]
 impl AccountExt for PGClient {
     async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, sqlx::Error> {
-        let user = sqlx::query_as!(
-            User,
-            r#"SELECT id, name, email, password, picture, mobile_no, created_at, updated_at FROM users WHERE id = $1"#,
-            user_id
-        ).fetch_optional(&self.pool).await?;
+        let query = r#"SELECT id, name, email, password, picture, mobile_no, created_at, updated_at FROM users WHERE id = $1 AND deleted_at IS NULL"#;
+
+        let user = sqlx::query_as::<_, User>(query)
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
         Ok(user)
     }
@@ -78,22 +79,21 @@ impl AccountExt for PGClient {
         let email = email.into();
         let mobile_no = mobile_no.map(|m| m.into());
 
-        let user = sqlx::query_as!(
-            User,
-            r#"
-            UPDATE users 
+        let query = r#"
+            UPDATE users
             SET name = $1, email = $2, mobile_no = COALESCE($3, mobile_no), updated_at = $4
             WHERE id = $5
             RETURNING id, name, email, password, picture, mobile_no, created_at, updated_at
-            "#,
-            name,
-            email,
-            mobile_no,
-            Utc::now(),
-            user_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        "#;
+
+        let user = sqlx::query_as::<_, User>(query)
+            .bind(name)
+            .bind(email)
+            .bind(mobile_no)
+            .bind(Utc::now())
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         Ok(user)
     }
@@ -103,19 +103,18 @@ impl AccountExt for PGClient {
         user_id: Uuid,
         picture: T,
     ) -> Result<User, sqlx::Error> {
-        let user = sqlx::query_as!(
-            User,
-            r#"
+        let query = r#"
             UPDATE users SET picture = $1, updated_at = $2
-            WHERE id = $3 
+            WHERE id = $3
             RETURNING id, name, email, password, picture, mobile_no, created_at, updated_at
-            "#,
-            picture.into(),
-            Utc::now(),
-            user_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        "#;
+
+        let user = sqlx::query_as::<_, User>(query)
+            .bind(picture.into())
+            .bind(Utc::now())
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         Ok(user)
     }
@@ -124,17 +123,16 @@ impl AccountExt for PGClient {
 #[async_trait]
 impl WalletExt for PGClient {
     async fn get_balance(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error> {
-        let wallet = sqlx::query_as!(
-            Wallet,
-            r#"
-            SELECT id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
-            FROM wallets 
+        let query = r#"
+            SELECT id, user_id, balance, locked_balance, created_at, updated_at
+            FROM wallets
             WHERE user_id = $1
-            "#,
-            user_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        "#;
+
+        let wallet = sqlx::query_as::<_, Wallet>(query)
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         Ok(wallet)
     }
@@ -146,19 +144,18 @@ impl WalletExt for PGClient {
     ) -> Result<Wallet, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
-        let wallet = sqlx::query_as!(
-            Wallet,
-            r#"
-            UPDATE wallets SET balance = balance + $1, updated_at = $2
-            WHERE user_id = $3
-            RETURNING id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
-            "#,
-            amount,
-            Utc::now(),
-            user_id
-        )
-        .fetch_one(&mut *tx)
-        .await?;
+        let query = r#"
+                UPDATE wallets SET balance = balance + $1, updated_at = $2
+                WHERE user_id = $3
+                RETURNING id, user_id, balance, locked_balance, created_at, updated_at
+            "#;
+
+        let wallet = sqlx::query_as::<_, Wallet>(query)
+            .bind(amount)
+            .bind(Utc::now())
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await?;
 
         sqlx::query!(
             r#"
@@ -183,19 +180,18 @@ impl WalletExt for PGClient {
     ) -> Result<Wallet, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
-        let wallet = sqlx::query_as!(
-            Wallet,
-            r#"
-            UPDATE wallets SET balance = balance - $1, updated_at = $2
-            WHERE user_id = $3
-            RETURNING id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
-            "#,
-            amount,
-            Utc::now(),
-            user_id
-        )
-        .fetch_one(&mut *tx)
-        .await?;
+        let query = r#"
+                UPDATE wallets SET balance = balance - $1, updated_at = $2
+                WHERE user_id = $3
+                RETURNING id, user_id, balance, locked_balance, created_at, updated_at
+            "#;
+
+        let wallet = sqlx::query_as::<_, Wallet>(query)
+            .bind(amount)
+            .bind(Utc::now())
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await?;
 
         sqlx::query!(
             r#"
@@ -260,19 +256,19 @@ impl HoldingExt for PGClient {
     ) -> Result<Vec<HoldingDetails>, sqlx::Error> {
         let query = format!(
             "SELECT
-            h.id, h.user_id, h.market_id, h.outcome_id, h.shares, h.locked_shares,
-            h.created_at, h.updated_at,
-            m.id as market_id, m.title, m.description, m.category,
-            m.start_at, m.close_at, m.status, m.created_at as market_created_at,
-            m.updated_at as market_updated_at, m.deleted_at,
-            o.id as outcome_id, o.market_id as outcome_market_id, o.label,
-            o.start_price, o.current_price, o.total_shares,
-            o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
-        FROM holdings h
-        JOIN market m ON h.market_id = m.id
-        JOIN outcome o ON h.outcome_id = o.id
-        WHERE h.user_id = $1
-        ORDER BY {order_by} LIMIT $2 OFFSET $3"
+                h.id, h.user_id, h.market_id, h.outcome_id, h.shares, h.locked_shares,
+                h.created_at, h.updated_at,
+                m.id as market_id, m.title, m.description, m.category,
+                m.start_at, m.close_at, m.status, m.created_at as market_created_at,
+                m.updated_at as market_updated_at, m.deleted_at,
+                o.id as outcome_id, o.market_id as outcome_market_id, o.label,
+                o.start_price, o.current_price, o.total_shares,
+                o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
+            FROM holdings h
+            JOIN market m ON h.market_id = m.id
+            JOIN outcome o ON h.outcome_id = o.id
+            WHERE h.user_id = $1 AND m.deleted_at IS NULL
+            ORDER BY {order_by} LIMIT $2 OFFSET $3"
         );
 
         let rows = sqlx::query(&query)

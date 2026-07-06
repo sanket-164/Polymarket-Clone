@@ -4,7 +4,6 @@ use common::{
     database::client::PGClient,
     model::{Admin, Market, MarketStatus, MarketWithOutcomes, Order, OrderSide, Outcome, Wallet},
 };
-use rust_decimal::Decimal;
 use sqlx::{Row, postgres::PgRow};
 use uuid::Uuid;
 
@@ -65,13 +64,13 @@ pub trait WalletExt {
 #[async_trait]
 impl AccountExt for PGClient {
     async fn get_admin_by_id(&self, admin_id: Uuid) -> Result<Option<Admin>, sqlx::Error> {
-        let admin = sqlx::query_as!(
-            Admin,
-            r#"SELECT id, name, email, password, created_at, updated_at FROM admins WHERE id = $1"#,
-            admin_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
+        let query =
+            r#"SELECT id, name, email, password, created_at, updated_at FROM admins WHERE id = $1"#;
+
+        let admin = sqlx::query_as::<_, Admin>(query)
+            .bind(admin_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
         Ok(admin)
     }
@@ -264,7 +263,7 @@ impl MarketExt for PGClient {
         let query = r#"
             SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
             FROM market
-            WHERE id = $1"#;
+            WHERE id = $1 AND deleted_at IS NULL"#;
 
         let market = sqlx::query_as::<_, Market>(query)
             .bind(market_id)
@@ -288,7 +287,7 @@ impl MarketExt for PGClient {
                 o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
             FROM market m
             JOIN outcome o ON o.market_id = m.id
-            WHERE m.id = $1
+            WHERE m.id = $1 AND m.deleted_at IS NULL
             ORDER BY o.created_at ASC
         ";
 
@@ -518,17 +517,16 @@ impl MarketExt for PGClient {
 #[async_trait]
 impl WalletExt for PGClient {
     async fn get_wallet(&self, user_id: Uuid) -> Result<Wallet, sqlx::Error> {
-        let wallet = sqlx::query_as!(
-            Wallet,
-            r#"
-            SELECT id, user_id, balance as "balance!: Decimal", locked_balance as "locked_balance!: Decimal", created_at, updated_at
-            FROM wallets 
+        let query = r#"
+            SELECT id, user_id, balance, locked_balance, created_at, updated_at
+            FROM wallets
             WHERE user_id = $1
-            "#,
-            user_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        "#;
+
+        let wallet = sqlx::query_as::<_, Wallet>(query)
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
 
         Ok(wallet)
     }
