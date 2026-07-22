@@ -10,6 +10,7 @@ pub const SIGNUP: &str = "/signup";
 pub const SIGNIN: &str = "/signin";
 pub const SEND_OTP: &str = "/send-otp";
 pub const RESET_PASSWORD: &str = "/reset-password";
+pub const REFRESH: &str = "/refresh";
 
 // Profile
 pub const PROFILE: &str = "/profile";
@@ -75,3 +76,7 @@ pub const CDC_HOLDING_TOPIC: &str = "polymarket.public.holdings";
 pub const CDC_ORDER_TOPIC: &str = "polymarket.public.orders";
 pub const CDC_TRADE_TOPIC: &str = "polymarket.public.trades";
 pub const CDC_TRANSACTION_TOPIC: &str = "polymarket.public.transactions";
+
+pub const ADMIN_TOKEN: &str = "admin-token";
+pub const USER_TOKEN: &str = "user-token";
+pub const REFRESH_TOKEN: &str = "refresh-token";

@@ -1,8 +1,10 @@
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
-    model::{Admin, User},
+    model::{Admin, Session, User},
 };
+use uuid::Uuid;
 
 #[async_trait]
 pub trait AuthExt {
@@ -14,6 +16,16 @@ pub trait AuthExt {
         email: T,
         password: T,
     ) -> Result<User, sqlx::Error>;
+    async fn create_session(
+        &self,
+        user_id: Uuid,
+        token_hash: &str,
+        expires_at: DateTime<Utc>,
+    ) -> Result<Session, sqlx::Error>;
+    async fn get_session_by_token_hash(
+        &self,
+        token_hash: &str,
+    ) -> Result<Option<Session>, sqlx::Error>;
     async fn reset_password(
         &self,
         email: &str,
@@ -87,6 +99,46 @@ impl AuthExt for PGClient {
         tx.commit().await?;
 
         Ok(user)
+    }
+
+    async fn create_session(
+        &self,
+        user_id: Uuid,
+        token_hash: &str,
+        expires_at: DateTime<Utc>,
+    ) -> Result<Session, sqlx::Error> {
+        let session = sqlx::query_as::<_, Session>(
+            r#"
+            INSERT INTO sessions (user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3)
+            RETURNING id, user_id, token_hash, expires_at, revoked_at, created_at, updated_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(token_hash)
+        .bind(expires_at)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(session)
+    }
+
+    async fn get_session_by_token_hash(
+        &self,
+        token_hash: &str,
+    ) -> Result<Option<Session>, sqlx::Error> {
+        let session = sqlx::query_as::<_, Session>(
+            r#"
+            SELECT id, user_id, token_hash, expires_at, revoked_at, created_at, updated_at
+            FROM sessions
+            WHERE token_hash = $1
+        "#,
+        )
+        .bind(token_hash)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(session)
     }
 
     async fn reset_password(

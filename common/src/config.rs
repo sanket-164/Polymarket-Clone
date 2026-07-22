@@ -52,6 +52,7 @@ impl PGConfig {
 pub struct JWTConfig {
     pub jwt_secret_key: String,
     pub jwt_expiration_time: u64,
+    pub refresh_jwt_expiration_time: u64,
 }
 
 impl JWTConfig {
@@ -66,9 +67,15 @@ impl JWTConfig {
             .parse::<u64>()
             .expect("JWT_EXPIRATION_TIME must be a valid integer");
 
+        let refresh_jwt_expiration_time = std::env::var("REFRESH_JWT_EXPIRATION_TIME")
+            .expect("REFRESH_JWT_EXPIRATION_TIME is not set in .env file.")
+            .parse::<u64>()
+            .expect("REFRESH_JWT_EXPIRATION_TIME must be a valid integer");
+
         JWTConfig {
             jwt_secret_key,
             jwt_expiration_time,
+            refresh_jwt_expiration_time,
         }
     }
 }

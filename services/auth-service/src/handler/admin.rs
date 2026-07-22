@@ -9,7 +9,7 @@ use axum::{
 };
 use axum_extra::extract::cookie::Cookie;
 use common::{
-    constant::SIGNIN,
+    constant::{ADMIN_TOKEN, SIGNIN},
     error::{ErrorMessage, HttpError},
     util::{hash, jwt},
 };
@@ -53,7 +53,7 @@ pub async fn signin(
         let cookie_duration =
             time::Duration::minutes(app_state.jwt_config.jwt_expiration_time as i64 * 60);
 
-        let cookie = Cookie::build(("token", jwt_token.clone()))
+        let cookie = Cookie::build((ADMIN_TOKEN, jwt_token.clone()))
             .path("/")
             .max_age(cookie_duration)
             .http_only(true)
@@ -62,7 +62,7 @@ pub async fn signin(
         let response = (
             StatusCode::OK,
             Json(json!({
-                "token": jwt_token
+                ADMIN_TOKEN: jwt_token
             })),
         );
 

@@ -7,9 +7,16 @@ use axum::{
     response::IntoResponse,
     routing::post,
 };
-use axum_extra::extract::cookie::Cookie;
+use axum_extra::extract::{
+    CookieJar,
+    cookie::{Cookie, SameSite},
+};
+use base64::{Engine, engine::general_purpose};
+use chrono::Utc;
 use common::{
-    constant::{OTP_CACHE_TTL, RESET_PASSWORD, SEND_OTP, SIGNIN, SIGNUP},
+    constant::{
+        OTP_CACHE_TTL, REFRESH, REFRESH_TOKEN, RESET_PASSWORD, SEND_OTP, SIGNIN, SIGNUP, USER_TOKEN,
+    },
     error::{ErrorMessage, HttpError},
     util::{hash, jwt},
 };
@@ -18,9 +25,11 @@ use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor, message::header::ContentType,
     transport::smtp::authentication::Credentials,
 };
-use rand::Rng;
+use rand::{Rng, RngCore};
 use serde_json::json;
 use validator::Validate;
+
+use sha2::{Digest, Sha256};
 
 use crate::{
     AppState,
@@ -33,6 +42,7 @@ pub fn user_auth_handler() -> Router<Arc<AppState>> {
         .route(SIGNUP, post(signup))
         .route(SIGNIN, post(signin))
         .route(SEND_OTP, post(send_otp))
+        .route(REFRESH, post(refresh))
         .route(RESET_PASSWORD, post(reset_password))
 }
 
@@ -78,7 +88,7 @@ fn build_otp_email_html(name: &str, otp: &str) -> String {
                     </tr>
                     <tr>
                         <td style="padding: 20px 40px; border-top:1px solid #f0f0f0; text-align:center;">
-                        <p style="margin:0; font-size:12px; color:#9ca3af;">&copy; {year} Your Company. All rights reserved.</p>
+                        <p style="margin:0; font-size:12px; color:#9ca3af;">&copy; {year} Polymarket Clone. All rights reserved.</p>
                         </td>
                     </tr>
                     </table>
@@ -142,43 +152,154 @@ pub async fn signin(
     let password_matched = hash::compare(&body.password, &user.password)
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    if password_matched {
-        let jwt_token = jwt::generate_token(
-            &user.id.to_string(),
-            app_state.jwt_config.jwt_secret_key.as_bytes(),
-            app_state.jwt_config.jwt_expiration_time,
-        )
+    if !password_matched {
+        return Err(HttpError::unauthorized(
+            ErrorMessage::WrongCredentials.to_string(),
+        ));
+    }
+
+    // Access token (short-lived)
+    let access_token = jwt::generate_token(
+        &user.id.to_string(),
+        app_state.jwt_config.jwt_secret_key.as_bytes(),
+        app_state.jwt_config.jwt_expiration_time,
+    )
+    .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    // Refresh token (long-lived)
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    let refresh_token = general_purpose::URL_SAFE_NO_PAD.encode(bytes);
+
+    let mut hasher = Sha256::new();
+    hasher.update(refresh_token.as_bytes());
+    let refresh_token_hash = hex::encode(hasher.finalize());
+
+    let refresh_expires_at = Utc::now()
+        + chrono::Duration::minutes(app_state.jwt_config.refresh_jwt_expiration_time as i64);
+
+    // Persist the hashed refresh token so it can be validated/revoked later
+    app_state
+        .pg_client
+        .create_session(user.id, &refresh_token_hash, refresh_expires_at)
+        .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-        let cookie_duration =
-            time::Duration::minutes(app_state.jwt_config.jwt_expiration_time as i64 * 60);
+    let access_cookie_duration =
+        time::Duration::minutes(app_state.jwt_config.jwt_expiration_time as i64);
+    let refresh_cookie_duration =
+        time::Duration::minutes(app_state.jwt_config.refresh_jwt_expiration_time as i64);
 
-        let cookie = Cookie::build(("token", jwt_token.clone()))
-            .path("/")
-            .max_age(cookie_duration)
-            .http_only(true)
-            .build();
+    let access_cookie = Cookie::build((USER_TOKEN, access_token.clone()))
+        .path("/")
+        .max_age(access_cookie_duration)
+        .http_only(true)
+        .secure(true)
+        .same_site(SameSite::Lax)
+        .build();
 
-        let response = (
-            StatusCode::OK,
-            Json(json!({
-                "token": jwt_token
-            })),
-        );
+    let refresh_cookie = Cookie::build((REFRESH_TOKEN, refresh_token))
+        .path("/api/user/refresh") // scope it to the refresh endpoint only
+        .max_age(refresh_cookie_duration)
+        .http_only(true)
+        .secure(true)
+        .same_site(SameSite::Strict)
+        .build();
 
-        let mut headers = HeaderMap::new();
+    let mut headers = HeaderMap::new();
+    headers.append(
+        header::SET_COOKIE,
+        access_cookie.to_string().parse().unwrap(),
+    );
+    headers.append(
+        header::SET_COOKIE,
+        refresh_cookie.to_string().parse().unwrap(),
+    );
 
-        headers.append(header::SET_COOKIE, cookie.to_string().parse().unwrap());
+    let response = (
+        StatusCode::OK,
+        Json(json!({
+            "access_token": access_token,
+        })),
+    );
 
-        let mut response = response.into_response();
-        response.headers_mut().extend(headers);
+    let mut response = response.into_response();
+    response.headers_mut().extend(headers);
 
-        Ok(response)
-    } else {
-        Err(HttpError::unauthorized(
-            ErrorMessage::WrongCredentials.to_string(),
-        ))
+    Ok(response)
+}
+
+pub async fn refresh(
+    State(app_state): State<Arc<AppState>>,
+    jar: CookieJar,
+) -> Result<impl IntoResponse, HttpError> {
+    let refresh_token = jar
+        .get(REFRESH_TOKEN)
+        .map(|c| c.value().to_string())
+        .ok_or(HttpError::unauthorized(
+            ErrorMessage::InvalidToken.to_string(),
+        ))?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(refresh_token.as_bytes());
+    let token_hash = hex::encode(hasher.finalize());
+
+    let session = app_state
+        .pg_client
+        .get_session_by_token_hash(&token_hash)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?
+        .ok_or(HttpError::unauthorized(
+            ErrorMessage::InvalidToken.to_string(),
+        ))?;
+
+    if session.revoked_at.is_some() {
+        return Err(HttpError::unauthorized(
+            ErrorMessage::InvalidToken.to_string(),
+        ));
     }
+
+    if session.expires_at < Utc::now() {
+        return Err(HttpError::unauthorized(
+            ErrorMessage::InvalidToken.to_string(),
+        ));
+    }
+
+    let access_token = jwt::generate_token(
+        &session.user_id.to_string(),
+        app_state.jwt_config.jwt_secret_key.as_bytes(),
+        app_state.jwt_config.jwt_expiration_time,
+    )
+    .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let access_cookie_duration =
+        time::Duration::seconds(app_state.jwt_config.jwt_expiration_time as i64);
+
+    let access_cookie = Cookie::build((USER_TOKEN, access_token.clone()))
+        .path("/")
+        .max_age(access_cookie_duration)
+        .http_only(true)
+        .secure(true)
+        .same_site(SameSite::Lax)
+        .build();
+
+    let mut headers = HeaderMap::new();
+    headers.append(
+        header::SET_COOKIE,
+        access_cookie.to_string().parse().unwrap(),
+    );
+
+    let response = (
+        StatusCode::OK,
+        Json(json!({
+            "access_token": access_token,
+        })),
+    );
+
+    let mut response = response.into_response();
+    response.headers_mut().extend(headers);
+
+    Ok(response)
 }
 
 pub async fn send_otp(

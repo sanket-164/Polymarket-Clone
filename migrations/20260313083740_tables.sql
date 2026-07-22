@@ -135,6 +135,18 @@ CREATE TABLE IF NOT EXISTS admins (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Session
+CREATE TABLE IF NOT EXISTS sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 ALTER TABLE wallets ADD CONSTRAINT check_balance_non_negative CHECK (balance >= 0 AND locked_balance >= 0);
 ALTER TABLE holdings ADD CONSTRAINT unique_user_market_outcome UNIQUE (user_id, market_id, outcome_id);
 ALTER TABLE holdings ADD CONSTRAINT check_shares_non_negative CHECK (shares >= 0 AND locked_shares >= 0);
@@ -182,6 +194,9 @@ CREATE INDEX idx_trades_created_at ON trades(created_at DESC);
 
 -- Resolved Markets
 CREATE INDEX idx_resolved_markets_market_id ON resolved_markets(market_id);
+
+-- Sessions
+CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 
 -- Password: 12345678 (hashed using Argon2id)
 INSERT INTO admins (id, name, email, password) VALUES ('00000000-0000-0000-0000-000000000000', 'Admin', 'admin@polymarketclone.com', '$argon2id$v=19$m=19456,t=2,p=1$AaHZRuAc1RJtu7JC9k9Jag$CkH8UBnDyZaPZd1Y2IzEP83F5W03oVdwzQQzESbDzWM');

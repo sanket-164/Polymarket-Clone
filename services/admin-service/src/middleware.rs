@@ -8,6 +8,7 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use common::{
+    constant::ADMIN_TOKEN,
     error::{ErrorMessage, HttpError},
     util::jwt,
 };
@@ -21,7 +22,7 @@ pub async fn auth_middleware(
     next: Next,
 ) -> Result<impl IntoResponse, HttpError> {
     let auth_token = cookie_jar
-        .get("token")
+        .get(ADMIN_TOKEN)
         .map(|cookie| cookie.value().to_string())
         .or_else(|| {
             req.headers()
