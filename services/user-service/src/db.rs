@@ -260,14 +260,14 @@ impl HoldingExt for PGClient {
                 h.created_at, h.updated_at,
                 m.id as market_id, m.title, m.description, m.category,
                 m.start_at, m.close_at, m.status, m.created_at as market_created_at,
-                m.updated_at as market_updated_at, m.deleted_at,
+                m.updated_at as market_updated_at,
                 o.id as outcome_id, o.market_id as outcome_market_id, o.label,
                 o.start_price, o.current_price, o.total_shares,
                 o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
             FROM holdings h
             JOIN market m ON h.market_id = m.id
             JOIN outcome o ON h.outcome_id = o.id
-            WHERE h.user_id = $1 AND m.deleted_at IS NULL
+            WHERE h.user_id = $1
             ORDER BY {order_by} LIMIT $2 OFFSET $3"
         );
 
@@ -302,7 +302,6 @@ impl HoldingExt for PGClient {
                     status: row.get("status"),
                     created_at: row.get("market_created_at"),
                     updated_at: row.get("market_updated_at"),
-                    deleted_at: row.get("deleted_at"),
                 };
 
                 let outcome = Outcome {

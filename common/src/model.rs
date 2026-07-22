@@ -34,7 +34,6 @@ pub struct Market {
     pub status: MarketStatus,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
-    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]

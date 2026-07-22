@@ -51,8 +51,7 @@ CREATE TABLE IF NOT EXISTS market (
     close_at TIMESTAMP WITH TIME ZONE NOT NULL,
     status market_status DEFAULT 'PENDING' NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Outcome Table
@@ -78,7 +77,6 @@ CREATE TABLE IF NOT EXISTS holdings (
     locked_shares DECIMAL(20, 8) DEFAULT 0.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (market_id) REFERENCES market(id) ON DELETE CASCADE,
     FOREIGN KEY (outcome_id) REFERENCES outcome(id) ON DELETE CASCADE
@@ -157,10 +155,9 @@ CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
 CREATE INDEX idx_transactions_type ON transactions(type);
 
 -- Market
-CREATE INDEX idx_market_status ON market(status) WHERE deleted_at IS NULL;
-CREATE INDEX idx_market_category ON market(category) WHERE deleted_at IS NULL;
-CREATE INDEX idx_market_close_at ON market(close_at) WHERE deleted_at IS NULL;
-CREATE INDEX idx_market_deleted_at ON market(deleted_at) WHERE deleted_at IS NULL;
+CREATE INDEX idx_market_status ON market(status);
+CREATE INDEX idx_market_category ON market(category);
+CREATE INDEX idx_market_close_at ON market(close_at);
 
 -- Outcome
 CREATE INDEX idx_outcome_market_id ON outcome(market_id);

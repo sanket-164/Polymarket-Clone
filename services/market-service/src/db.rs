@@ -88,7 +88,7 @@ impl MarketExt for PGClient {
         let insert_market_query = "
             INSERT INTO market (title, description, category, start_at, close_at)
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
+            RETURNING id, title, description, category, start_at, close_at, status, created_at, updated_at
         ";
 
         let market: Market = sqlx::query_as(insert_market_query)
@@ -199,9 +199,9 @@ impl MarketExt for PGClient {
         skip: i64,
     ) -> Result<Vec<Market>, sqlx::Error> {
         let mut query = String::from(
-        "SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
+        "SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at
         FROM market
-        WHERE deleted_at IS NULL AND status = $1",
+        WHERE status = $1",
     );
 
         let mut param_index = 2;
@@ -261,9 +261,9 @@ impl MarketExt for PGClient {
 
     async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error> {
         let query = r#"
-            SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
+            SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at
             FROM market
-            WHERE id = $1 AND deleted_at IS NULL"#;
+            WHERE id = $1"#;
 
         let market = sqlx::query_as::<_, Market>(query)
             .bind(market_id)
@@ -281,13 +281,13 @@ impl MarketExt for PGClient {
             SELECT
                 m.id, m.title, m.description, m.category,
                 m.start_at, m.close_at, m.status,
-                m.created_at, m.updated_at, m.deleted_at,
+                m.created_at, m.updated_at,
                 o.id as outcome_id, o.market_id as outcome_market_id, o.label,
                 o.start_price, o.current_price, o.total_shares,
                 o.created_at as outcome_created_at, o.updated_at as outcome_updated_at
             FROM market m
             JOIN outcome o ON o.market_id = m.id
-            WHERE m.id = $1 AND m.deleted_at IS NULL
+            WHERE m.id = $1
             ORDER BY o.created_at ASC
         ";
 
@@ -310,7 +310,6 @@ impl MarketExt for PGClient {
             status: rows[0].get("status"),
             created_at: rows[0].get("created_at"),
             updated_at: rows[0].get("updated_at"),
-            deleted_at: rows[0].get("deleted_at"),
         };
 
         let parse_outcome = |row: &PgRow| Outcome {

@@ -77,7 +77,7 @@ pub trait OrderExt {
 #[async_trait]
 impl AccountExt for PGClient {
     async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, sqlx::Error> {
-        let query = r#"SELECT id, name, email, password, picture, mobile_no, created_at, updated_at FROM users WHERE id = $1 AND deleted_at IS NULL"#;
+        let query = r#"SELECT id, name, email, password, picture, mobile_no, created_at, updated_at FROM users WHERE id = $1"#;
 
         let user = sqlx::query_as::<_, User>(query)
             .bind(user_id)
@@ -92,9 +92,9 @@ impl AccountExt for PGClient {
 impl MarketExt for PGClient {
     async fn get_market_by_id(&self, market_id: Uuid) -> Result<Option<Market>, sqlx::Error> {
         let query = r#"
-            SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at, deleted_at
+            SELECT id, title, description, category, start_at, close_at, status, created_at, updated_at
             FROM market
-            WHERE id = $1 AND deleted_at IS NULL"#;
+            WHERE id = $1"#;
 
         let market = sqlx::query_as::<_, Market>(query)
             .bind(market_id)
@@ -152,7 +152,7 @@ impl HoldingExt for PGClient {
         let query = r#"
             SELECT id, user_id, market_id, outcome_id, shares, locked_shares, created_at, updated_at
             FROM holdings
-            WHERE user_id = $1 AND outcome_id = $2 AND deleted_at IS NULL"#;
+            WHERE user_id = $1 AND outcome_id = $2"#;
 
         let holding = sqlx::query_as::<_, Holding>(query)
             .bind(user_id)
