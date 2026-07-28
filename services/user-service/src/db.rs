@@ -157,16 +157,17 @@ impl WalletExt for PGClient {
             .fetch_one(&mut *tx)
             .await?;
 
-        sqlx::query!(
-            r#"
+        let transaction_query = r#"
             INSERT INTO transactions (wallet_id, amount, type) 
-            VALUES ($1, $2, 'DEPOSIT')
-            "#,
-            wallet.id,
-            amount
-        )
-        .execute(&mut *tx)
-        .await?;
+            VALUES ($1, $2, $3)
+            "#;
+
+        sqlx::query(transaction_query)
+            .bind(wallet.id)
+            .bind(amount)
+            .bind(TransactionType::DEPOSIT)
+            .execute(&mut *tx)
+            .await?;
 
         tx.commit().await?;
 
@@ -193,16 +194,17 @@ impl WalletExt for PGClient {
             .fetch_one(&mut *tx)
             .await?;
 
-        sqlx::query!(
-            r#"
-            INSERT INTO transactions (wallet_id, amount, type) 
-            VALUES ($1, $2, 'WITHDRAW')
-            "#,
-            wallet.id,
-            amount
-        )
-        .execute(&mut *tx)
-        .await?;
+        let transaction_query = r#"
+            INSERT INTO transactions (wallet_id, amount, type)
+            VALUES ($1, $2, $3)
+        "#;
+
+        sqlx::query(transaction_query)
+            .bind(wallet.id)
+            .bind(amount)
+            .bind(TransactionType::WITHDRAW)
+            .execute(&mut *tx)
+            .await?;
 
         tx.commit().await?;
 

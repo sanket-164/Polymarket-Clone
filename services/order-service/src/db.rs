@@ -191,7 +191,7 @@ impl OrderExt for PGClient {
             param_index += 1;
         }
         if side.is_some() {
-            query.push_str(&format!(" AND type = ${param_index}"));
+            query.push_str(&format!(" AND side = ${param_index}"));
             param_index += 1;
         }
         if status.is_some() {
