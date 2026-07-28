@@ -26,11 +26,8 @@ pub trait AuthExt {
         &self,
         token_hash: &str,
     ) -> Result<Option<Session>, sqlx::Error>;
-    async fn reset_password(
-        &self,
-        email: &str,
-        hashed_password: String,
-    ) -> Result<Option<User>, sqlx::Error>;
+    async fn reset_password(&self, email: &str, hashed_password: String)
+    -> Result<(), sqlx::Error>;
     async fn logout(&self, token_hash: &str) -> Result<(), sqlx::Error>;
 }
 
@@ -146,7 +143,7 @@ impl AuthExt for PGClient {
         &self,
         email: &str,
         hashed_password: String,
-    ) -> Result<Option<User>, sqlx::Error> {
+    ) -> Result<(), sqlx::Error> {
         let query = r#"
             UPDATE users
             SET password = $1, updated_at = CURRENT_TIMESTAMP
@@ -157,10 +154,18 @@ impl AuthExt for PGClient {
         let user = sqlx::query_as::<_, User>(query)
             .bind(hashed_password)
             .bind(email)
-            .fetch_optional(&self.pool)
+            .fetch_one(&self.pool)
             .await?;
 
-        Ok(user)
+        let query = r#"
+            UPDATE sessions
+            SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = (SELECT id FROM sessions WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1)
+        "#;
+
+        sqlx::query(query).bind(user.id).execute(&self.pool).await?;
+
+        Ok(())
     }
 
     async fn logout(&self, token_hash: &str) -> Result<(), sqlx::Error> {
