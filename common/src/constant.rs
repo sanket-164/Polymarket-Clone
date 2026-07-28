@@ -11,6 +11,7 @@ pub const SIGNIN: &str = "/signin";
 pub const SEND_OTP: &str = "/send-otp";
 pub const RESET_PASSWORD: &str = "/reset-password";
 pub const REFRESH: &str = "/refresh";
+pub const LOGOUT: &str = "/logout";
 
 // Profile
 pub const PROFILE: &str = "/profile";

@@ -15,7 +15,8 @@ use base64::{Engine, engine::general_purpose};
 use chrono::Utc;
 use common::{
     constant::{
-        OTP_CACHE_TTL, REFRESH, REFRESH_TOKEN, RESET_PASSWORD, SEND_OTP, SIGNIN, SIGNUP, USER_TOKEN,
+        LOGOUT, OTP_CACHE_TTL, REFRESH, REFRESH_TOKEN, RESET_PASSWORD, SEND_OTP, SIGNIN, SIGNUP,
+        USER_TOKEN,
     },
     error::{ErrorMessage, HttpError},
     util::{hash, jwt},
@@ -44,6 +45,7 @@ pub fn user_auth_handler() -> Router<Arc<AppState>> {
         .route(SEND_OTP, post(send_otp))
         .route(REFRESH, post(refresh))
         .route(RESET_PASSWORD, post(reset_password))
+        .route(LOGOUT, post(logout))
 }
 
 fn build_otp_email_html(name: &str, otp: &str) -> String {
@@ -199,7 +201,7 @@ pub async fn signin(
         .build();
 
     let refresh_cookie = Cookie::build((REFRESH_TOKEN, refresh_token))
-        .path("/api/user/refresh") // scope it to the refresh endpoint only
+        .path("/")
         .max_age(refresh_cookie_duration)
         .http_only(true)
         .secure(true)
@@ -444,4 +446,62 @@ pub async fn reset_password(
     Ok(Json(serde_json::json!({
         "message": "Password reset successfully"
     })))
+}
+
+pub async fn logout(
+    State(app_state): State<Arc<AppState>>,
+    jar: CookieJar,
+) -> Result<impl IntoResponse, HttpError> {
+    let refresh_token = jar
+        .get(REFRESH_TOKEN)
+        .map(|c| c.value().to_string())
+        .ok_or(HttpError::unauthorized(
+            ErrorMessage::InvalidToken.to_string(),
+        ))?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(refresh_token.as_bytes());
+    let token_hash = hex::encode(hasher.finalize());
+
+    app_state
+        .pg_client
+        .logout(&token_hash)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let access_cookie = Cookie::build((USER_TOKEN, String::new()))
+        .path("/")
+        .max_age(time::Duration::seconds(0))
+        .http_only(true)
+        .secure(true)
+        .same_site(SameSite::Lax)
+        .build();
+
+    let refresh_cookie = Cookie::build((REFRESH_TOKEN, String::new()))
+        .path("/")
+        .max_age(time::Duration::seconds(0))
+        .http_only(true)
+        .secure(true)
+        .same_site(SameSite::Strict)
+        .build();
+
+    let mut headers = HeaderMap::new();
+    headers.append(
+        header::SET_COOKIE,
+        access_cookie.to_string().parse().unwrap(),
+    );
+    headers.append(
+        header::SET_COOKIE,
+        refresh_cookie.to_string().parse().unwrap(),
+    );
+
+    let response = (
+        StatusCode::OK,
+        Json(json!({ "message": "Logged out successfully" })),
+    );
+
+    let mut response = response.into_response();
+    response.headers_mut().extend(headers);
+
+    Ok(response)
 }

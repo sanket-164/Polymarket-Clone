@@ -31,6 +31,7 @@ pub trait AuthExt {
         email: &str,
         hashed_password: String,
     ) -> Result<Option<User>, sqlx::Error>;
+    async fn logout(&self, token_hash: &str) -> Result<(), sqlx::Error>;
 }
 
 #[async_trait]
@@ -160,5 +161,20 @@ impl AuthExt for PGClient {
             .await?;
 
         Ok(user)
+    }
+
+    async fn logout(&self, token_hash: &str) -> Result<(), sqlx::Error> {
+        let query = r#"
+            UPDATE sessions
+            SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE token_hash = $1 AND revoked_at IS NULL
+        "#;
+
+        sqlx::query(query)
+            .bind(token_hash)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 }
