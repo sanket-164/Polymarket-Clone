@@ -200,6 +200,15 @@ async fn place_order(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
+    let order_timestamp = order.created_at.timestamp_millis();
+
+    redis::cmd("SET")
+        .arg(&format!("orderbook:{}:timestamp", body.market_id))
+        .arg(order_timestamp)
+        .query_async::<()>(&mut *redis)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
     let feed_order_message = FeedMessage::OrderFeed {
         feed: OrderFeed {
             market_id: market_outcome.market_id,
@@ -207,6 +216,7 @@ async fn place_order(
             side: body.side,
             quantity: body.shares,
             price: body.price,
+            timestamp: order_timestamp,
         },
     };
 

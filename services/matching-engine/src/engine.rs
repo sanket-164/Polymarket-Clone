@@ -1,4 +1,5 @@
 use crate::nats_handler::NatsHandler;
+use chrono::Utc;
 use common::model::{FeedMessage, Order, OrderFeed, OrderSide, TradeMessage};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
@@ -132,6 +133,7 @@ impl Engine {
                     side: order.side,
                     quantity: -filled, // negative to signal reduction to feed subscribers
                     price: order.price,
+                    timestamp: Utc::now().timestamp_millis(),
                 },
             };
 

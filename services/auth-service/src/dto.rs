@@ -90,8 +90,8 @@ pub struct UserResponse {
     pub email: String,
     pub picture: Option<String>,
     pub mobile_no: Option<String>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl From<User> for UserResponse {

@@ -49,11 +49,14 @@ pub async fn start_consumer(
 
         match message {
             TradeMessage::UpdateOrders { buy, sell } => {
-                if let Err(e) = pg_client.trade(buy.clone(), sell.clone()).await {
-                    eprintln!("Trade error: {e}");
-                    let _ = msg.ack().await;
-                    continue;
-                }
+                let trade = match pg_client.trade(buy.clone(), sell.clone()).await {
+                    Ok(trade) => trade,
+                    Err(e) => {
+                        eprintln!("Trade error: {e}");
+                        let _ = msg.ack().await;
+                        continue;
+                    }
+                };
 
                 let filled_shares = buy.remaining_shares.min(sell.remaining_shares);
 
@@ -100,6 +103,15 @@ pub async fn start_consumer(
                             eprintln!("Redis cleanup failed: {:?}", e);
                         }
                     }
+                }
+
+                if let Err(e) = redis::cmd("SET")
+                    .arg(&format!("orderbook:{}:timestamp", trade.market_id))
+                    .arg(trade.created_at.timestamp_millis())
+                    .query_async::<()>(&mut *redis)
+                    .await
+                {
+                    eprintln!("Redis SET failed: {:?}", e);
                 }
             }
         }

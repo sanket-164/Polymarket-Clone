@@ -11,8 +11,8 @@ pub struct Session {
     pub expires_at: DateTime<Utc>,
     pub revoked_at: Option<DateTime<Utc>>,
     pub revoke_reason: Option<String>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
@@ -21,8 +21,8 @@ pub struct Admin {
     pub name: String,
     pub email: String,
     pub password: String,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type)]
@@ -44,8 +44,8 @@ pub struct Market {
     pub start_at: DateTime<Utc>,
     pub close_at: DateTime<Utc>,
     pub status: MarketStatus,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]
@@ -56,8 +56,8 @@ pub struct Outcome {
     pub start_price: Decimal,
     pub current_price: Decimal,
     pub total_shares: Decimal,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,8 +97,8 @@ pub struct Order {
     pub remaining_shares: Decimal,
     pub price: Decimal,
     pub status: OrderStatus,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]
@@ -109,7 +109,7 @@ pub struct Trade {
     pub sell_order_id: Uuid,
     pub shares: Decimal,
     pub price: Decimal,
-    pub created_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]
@@ -117,7 +117,7 @@ pub struct ResolvedMarket {
     pub id: Uuid,
     pub market_id: Uuid,
     pub winning_outcome_id: Uuid,
-    pub created_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
@@ -128,8 +128,8 @@ pub struct User {
     pub password: String,
     pub picture: Option<String>,
     pub mobile_no: Option<String>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
@@ -138,8 +138,8 @@ pub struct Wallet {
     pub user_id: Uuid,
     pub balance: Decimal,
     pub locked_balance: Decimal,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, sqlx::Type)]
@@ -161,7 +161,7 @@ pub struct Transaction {
     #[serde(rename = "type")]
     pub transaction_type: TransactionType,
     pub amount: Decimal,
-    pub created_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, sqlx::FromRow)]
@@ -172,8 +172,8 @@ pub struct Holding {
     pub outcome_id: Uuid,
     pub shares: Decimal,
     pub locked_shares: Decimal,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,6 +207,7 @@ pub struct OrderFeed {
     pub side: OrderSide,
     pub quantity: Decimal,
     pub price: Decimal,
+    pub timestamp: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

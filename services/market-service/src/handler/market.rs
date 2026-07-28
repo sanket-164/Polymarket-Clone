@@ -133,6 +133,13 @@ async fn create_market(
             .map_err(|e| HttpError::server_error(e.to_string()))?;
     }
 
+    redis::cmd("SET")
+        .arg(&format!("orderbook:{}:timestamp", market.market.id))
+        .arg(market.market.created_at.timestamp_millis())
+        .query_async::<()>(&mut *redis)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
     let first_order_message = MatcherMessage::PlaceOrder {
         order: first_outcome_order,
     };
@@ -390,5 +397,17 @@ async fn market_snapshot(
         }));
     }
 
-    Ok((StatusCode::OK, Json(snapshot)))
+    let updated_at: Option<i64> = redis::cmd("GET")
+        .arg(&format!("orderbook:{}:timestamp", market_id))
+        .query_async(&mut *redis)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let response = json!({
+        "market_id":  market_id,
+        "updated_at": updated_at,
+        "snapshot":   snapshot,
+    });
+
+    Ok((StatusCode::OK, Json(response)))
 }

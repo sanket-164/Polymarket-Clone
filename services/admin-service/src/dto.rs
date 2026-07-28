@@ -22,8 +22,8 @@ pub struct AdminResponse {
     pub id: Uuid,
     pub name: String,
     pub email: String,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl From<Admin> for AdminResponse {

@@ -1892,6 +1892,7 @@ name = "matching-engine"
 version = "0.1.0"
 dependencies = [
  "async-nats",
+ "chrono",
  "common",
  "futures",
  "serde",
