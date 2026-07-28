@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
+    constant::{REVOKE_REASON_LOGOUT, REVOKE_REASON_PASSWORD_RESET},
     database::client::PGClient,
     model::{Admin, Session, User},
 };
@@ -109,7 +110,7 @@ impl AuthExt for PGClient {
             r#"
             INSERT INTO sessions (user_id, token_hash, expires_at)
             VALUES ($1, $2, $3)
-            RETURNING id, user_id, token_hash, expires_at, revoked_at, created_at, updated_at
+            RETURNING id, user_id, token_hash, expires_at, revoked_at, revoke_reason, created_at, updated_at
             "#,
         )
         .bind(user_id)
@@ -127,7 +128,7 @@ impl AuthExt for PGClient {
     ) -> Result<Option<Session>, sqlx::Error> {
         let session = sqlx::query_as::<_, Session>(
             r#"
-            SELECT id, user_id, token_hash, expires_at, revoked_at, created_at, updated_at
+            SELECT id, user_id, token_hash, expires_at, revoked_at, revoke_reason, created_at, updated_at
             FROM sessions
             WHERE token_hash = $1
         "#,
@@ -159,11 +160,15 @@ impl AuthExt for PGClient {
 
         let query = r#"
             UPDATE sessions
-            SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-            WHERE id = (SELECT id FROM sessions WHERE user_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1)
+            SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, revoke_reason = $1
+            WHERE id = (SELECT id FROM sessions WHERE user_id = $2 AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1)
         "#;
 
-        sqlx::query(query).bind(user.id).execute(&self.pool).await?;
+        sqlx::query(query)
+            .bind(REVOKE_REASON_PASSWORD_RESET)
+            .bind(user.id)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }
@@ -171,11 +176,12 @@ impl AuthExt for PGClient {
     async fn logout(&self, token_hash: &str) -> Result<(), sqlx::Error> {
         let query = r#"
             UPDATE sessions
-            SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-            WHERE token_hash = $1 AND revoked_at IS NULL
+            SET revoked_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP, revoke_reason = $1
+            WHERE token_hash = $2 AND revoked_at IS NULL
         "#;
 
         sqlx::query(query)
+            .bind(REVOKE_REASON_LOGOUT)
             .bind(token_hash)
             .execute(&self.pool)
             .await?;

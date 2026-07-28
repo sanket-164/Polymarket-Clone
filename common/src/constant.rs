@@ -81,3 +81,5 @@ pub const CDC_TRANSACTION_TOPIC: &str = "polymarket.public.transactions";
 pub const ADMIN_TOKEN: &str = "admin-token";
 pub const USER_TOKEN: &str = "user-token";
 pub const REFRESH_TOKEN: &str = "refresh-token";
+pub const REVOKE_REASON_LOGOUT: &str = "LOGOUT";
+pub const REVOKE_REASON_PASSWORD_RESET: &str = "PASSWORD_RESET";
