@@ -4,6 +4,7 @@ import type { AuthTokenResponse } from "@/lib/auth/types";
 
 type ApiFetchOptions = RequestInit & {
   auth?: boolean;
+  baseUrl?: string;
   retryOnUnauthorized?: boolean;
 };
 
@@ -23,8 +24,8 @@ export async function apiFetch<TResponse>(
   path: string,
   options: ApiFetchOptions = {},
 ): Promise<TResponse> {
-  const { auth = true, retryOnUnauthorized = true, headers, ...requestOptions } = options;
-  const response = await fetch(buildApiUrl(path), {
+  const { auth = true, baseUrl = AUTH_SERVICE_URL, retryOnUnauthorized = true, headers, ...requestOptions } = options;
+  const response = await fetch(buildApiUrl(path, baseUrl), {
     ...requestOptions,
     credentials: "include",
     headers: buildHeaders(headers, auth),
@@ -36,6 +37,7 @@ export async function apiFetch<TResponse>(
     if (refreshedToken) {
       return apiFetch<TResponse>(path, {
         ...options,
+        baseUrl,
         retryOnUnauthorized: false,
       });
     }
@@ -69,8 +71,8 @@ async function refreshAccessToken() {
   }
 }
 
-function buildApiUrl(path: string) {
-  return `${AUTH_SERVICE_URL}${path}`;
+function buildApiUrl(path: string, baseUrl = AUTH_SERVICE_URL) {
+  return `${baseUrl}${path}`;
 }
 
 function buildHeaders(headers: HeadersInit | undefined, auth: boolean) {
