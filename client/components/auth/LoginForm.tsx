@@ -29,7 +29,7 @@ export function LoginForm() {
       });
 
       setSession(session.access_token);
-      router.push("/profile");
+      router.push("/");
     } catch (caughtError) {
       setError(getFormError(caughtError));
     } finally {
@@ -68,7 +68,10 @@ export function LoginForm() {
       </form>
 
       <div className="mt-4 flex items-center justify-between gap-4 text-sm">
-        <Link href="/reset-password" className="text-secondary transition hover:text-accent">
+        <Link
+          href="/reset-password"
+          className="text-secondary transition hover:text-accent"
+        >
           Reset password
         </Link>
         <Link href="/signup" className="font-semibold text-accent">

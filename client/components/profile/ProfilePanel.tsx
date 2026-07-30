@@ -312,12 +312,7 @@ export function ProfilePanel() {
   }
 
   if (!isAuthenticated) {
-    return (
-      <ProfileShell
-        title="Log in required"
-        description="You need an active session to view your profile."
-      />
-    );
+    router.push("/");
   }
 
   return (
