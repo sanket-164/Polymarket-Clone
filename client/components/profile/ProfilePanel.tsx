@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { logout } from "@/lib/auth/auth-api";
 import { ApiError } from "@/lib/api/http";
@@ -37,7 +37,9 @@ export function ProfilePanel() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
-  const [transactionQuery, setTransactionQuery] = useState(DEFAULT_TRANSACTION_QUERY);
+  const [transactionQuery, setTransactionQuery] = useState(
+    DEFAULT_TRANSACTION_QUERY
+  );
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
@@ -61,7 +63,9 @@ export function ProfilePanel() {
         })
         .catch((caughtError: unknown) => {
           if (isCurrent) {
-            setError(getPanelError(caughtError, "Unable to load your profile."));
+            setError(
+              getPanelError(caughtError, "Unable to load your profile.")
+            );
           }
         })
         .finally(() => {
@@ -88,7 +92,9 @@ export function ProfilePanel() {
         })
         .catch((caughtError: unknown) => {
           if (isCurrent) {
-            setError(getPanelError(caughtError, "Unable to load wallet transactions."));
+            setError(
+              getPanelError(caughtError, "Unable to load wallet transactions.")
+            );
           }
         })
         .finally(() => {
@@ -144,7 +150,9 @@ export function ProfilePanel() {
     }
   }
 
-  async function handlePictureChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePictureChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
     const file = event.target.files?.[0];
 
     if (!file) {
@@ -175,7 +183,9 @@ export function ProfilePanel() {
       setProfile(updatedProfile);
       setSuccess("Profile picture updated.");
     } catch (caughtError) {
-      setError(getPanelError(caughtError, "Unable to update your profile picture."));
+      setError(
+        getPanelError(caughtError, "Unable to update your profile picture.")
+      );
     } finally {
       setIsUploadingPicture(false);
       event.target.value = "";
@@ -184,7 +194,7 @@ export function ProfilePanel() {
 
   function handleTransactionFilterChange(
     key: keyof Required<WalletTransactionsQuery>,
-    value: string,
+    value: string
   ) {
     setIsTransactionsLoading(true);
     setTransactionQuery((currentQuery) => ({
@@ -210,16 +220,13 @@ export function ProfilePanel() {
     }));
   }
 
-  const availableBalance = useMemo(() => {
-    if (!balance) {
-      return null;
-    }
-
-    return Number(balance.balance) - Number(balance.locked_balance);
-  }, [balance]);
-
   if (isLoading) {
-    return <ProfileShell title="Loading profile" description="Checking your session..." />;
+    return (
+      <ProfileShell
+        title="Loading profile"
+        description="Checking your session..."
+      />
+    );
   }
 
   if (!isAuthenticated) {
@@ -294,8 +301,12 @@ export function ProfilePanel() {
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-text">Account details</h2>
-                  <p className="mt-1 text-sm text-secondary">Manage your public profile data.</p>
+                  <h2 className="text-lg font-semibold text-text">
+                    Account details
+                  </h2>
+                  <p className="mt-1 text-sm text-secondary">
+                    Manage your public profile data.
+                  </p>
                 </div>
                 <span className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-buy">
                   Active
@@ -341,34 +352,44 @@ export function ProfilePanel() {
                     onChange={handlePictureChange}
                     className="sr-only"
                   />
-                  <p className="mt-2 text-xs text-secondary">Maximum file size: 1 MB.</p>
+                  <p className="mt-2 text-xs text-secondary">
+                    Maximum file size: 1 MB.
+                  </p>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
-                <MetaItem label="User ID" value={profile?.id ?? "Unavailable"} />
-                <MetaItem label="Created" value={formatDateTime(profile?.created_at)} />
-              </div>
+                <MetaItem
+                  label="Created"
+                  value={formatDateTime(profile?.created_at)}
+                />
 
-              <button
-                type="submit"
-                disabled={isSavingProfile}
-                className="mt-5 h-11 w-full rounded-lg bg-accent px-4 text-sm font-semibold text-text transition hover:brightness-110 disabled:opacity-40 sm:w-auto"
-              >
-                {isSavingProfile ? "Saving..." : "Save changes"}
-              </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="h-11 w-full rounded-lg bg-accent px-4 text-sm font-semibold text-text transition hover:brightness-110 disabled:opacity-40 sm:w-auto"
+                >
+                  {isSavingProfile ? "Saving..." : "Save changes"}
+                </button>
+              </div>
             </form>
 
             <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-              <h2 className="text-lg font-semibold text-text">Wallet balance</h2>
+              <h2 className="text-lg font-semibold text-text">
+                Wallet balance
+              </h2>
               <dl className="mt-5 grid gap-4">
-                <BalanceItem label="Total balance" value={formatCurrency(balance?.balance)} />
-                <BalanceItem label="Locked balance" value={formatCurrency(balance?.locked_balance)} tone="sell" />
-                <BalanceItem label="Available balance" value={formatCurrency(availableBalance)} tone="buy" />
+                <BalanceItem
+                  label="Available balance"
+                  value={formatCurrency(balance?.balance)}
+                  tone="buy"
+                />
+                <BalanceItem
+                  label="Locked balance"
+                  value={formatCurrency(balance?.locked_balance)}
+                  tone="sell"
+                />
               </dl>
-              <div className="mt-5 border-t border-border pt-4">
-                <MetaItem label="Wallet ID" value={balance?.id ?? "Unavailable"} />
-              </div>
             </div>
           </div>
         )}
@@ -376,15 +397,21 @@ export function ProfilePanel() {
         <div className="mt-4 rounded-xl border border-border bg-card p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-text">Wallet transactions</h2>
-              <p className="mt-1 text-sm text-secondary">Review recent balance movements.</p>
+              <h2 className="text-lg font-semibold text-text">
+                Wallet transactions
+              </h2>
+              <p className="mt-1 text-sm text-secondary">
+                Review recent balance movements.
+              </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-3 lg:w-[520px]">
               <SelectField
                 id="transaction-type"
                 label="Type"
                 value={transactionQuery.transaction_type}
-                onChange={(value) => handleTransactionFilterChange("transaction_type", value)}
+                onChange={(value) =>
+                  handleTransactionFilterChange("transaction_type", value)
+                }
                 options={[
                   { label: "All", value: "" },
                   { label: "Buy", value: "BUY" },
@@ -397,7 +424,9 @@ export function ProfilePanel() {
                 id="transaction-order"
                 label="Order"
                 value={transactionQuery.order_by}
-                onChange={(value) => handleTransactionFilterChange("order_by", value)}
+                onChange={(value) =>
+                  handleTransactionFilterChange("order_by", value)
+                }
                 options={[
                   { label: "Newest", value: "DESC" },
                   { label: "Oldest", value: "ASC" },
@@ -407,11 +436,13 @@ export function ProfilePanel() {
                 id="transaction-limit"
                 label="Limit"
                 value={String(transactionQuery.limit)}
-                onChange={(value) => handleTransactionFilterChange("limit", value)}
+                onChange={(value) =>
+                  handleTransactionFilterChange("limit", value)
+                }
                 options={[
+                  { label: "5", value: "5" },
                   { label: "10", value: "10" },
-                  { label: "25", value: "25" },
-                  { label: "50", value: "50" },
+                  { label: "15", value: "15" },
                 ]}
               />
             </div>
@@ -421,22 +452,36 @@ export function ProfilePanel() {
             <table className="w-full min-w-[640px] border-collapse text-left text-sm">
               <thead className="bg-surface text-xs uppercase text-secondary">
                 <tr>
-                  <th className="border-b border-border px-3 py-3 font-medium">Type</th>
-                  <th className="border-b border-border px-3 py-3 font-medium">Amount</th>
-                  <th className="border-b border-border px-3 py-3 font-medium">Created</th>
-                  <th className="border-b border-border px-3 py-3 font-medium">Transaction ID</th>
+                  <th className="border-b border-border px-3 py-3 font-medium">
+                    Type
+                  </th>
+                  <th className="border-b border-border px-3 py-3 font-medium">
+                    Amount
+                  </th>
+                  <th className="border-b border-border px-3 py-3 font-medium">
+                    Created
+                  </th>
+                  <th className="border-b border-border px-3 py-3 font-medium">
+                    Transaction ID
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {isTransactionsLoading ? (
                   <tr>
-                    <td colSpan={4} className="px-3 py-6 text-center text-secondary">
+                    <td
+                      colSpan={4}
+                      className="px-3 py-6 text-center text-secondary"
+                    >
                       Loading transactions...
                     </td>
                   </tr>
                 ) : transactions.length > 0 ? (
                   transactions.map((transaction) => (
-                    <tr key={transaction.id} className="transition hover:bg-surface">
+                    <tr
+                      key={transaction.id}
+                      className="transition hover:bg-surface"
+                    >
                       <td className="border-b border-border px-3 py-3">
                         <TransactionTypeBadge type={transaction.type} />
                       </td>
@@ -453,7 +498,10 @@ export function ProfilePanel() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="px-3 py-6 text-center text-secondary">
+                    <td
+                      colSpan={4}
+                      className="px-3 py-6 text-center text-secondary"
+                    >
                       No transactions found.
                     </td>
                   </tr>
@@ -473,7 +521,10 @@ export function ProfilePanel() {
             </button>
             <button
               type="button"
-              disabled={transactions.length < transactionQuery.limit || isTransactionsLoading}
+              disabled={
+                transactions.length < transactionQuery.limit ||
+                isTransactionsLoading
+              }
               onClick={handleNextTransactions}
               className="h-10 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-text transition hover:border-accent disabled:opacity-40"
             >
@@ -481,19 +532,6 @@ export function ProfilePanel() {
             </button>
           </div>
         </div>
-
-        <dl className="mt-4 grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs uppercase text-secondary">User ID</dt>
-            <dd className="mt-1 break-all font-mono text-sm text-text">
-              {profile?.id ?? "Unavailable"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase text-secondary">Session</dt>
-            <dd className="mt-1 text-sm font-semibold text-buy">Active</dd>
-          </div>
-        </dl>
       </div>
     </section>
   );
@@ -539,10 +577,18 @@ type SelectFieldProps = {
   onChange: (value: string) => void;
 };
 
-function SelectField({ id, label, value, options, onChange }: SelectFieldProps) {
+function SelectField({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+}: SelectFieldProps) {
   return (
     <label htmlFor={id} className="block">
-      <span className="text-xs font-medium uppercase text-secondary">{label}</span>
+      <span className="text-xs font-medium uppercase text-secondary">
+        {label}
+      </span>
       <select
         id={id}
         value={value}
@@ -577,12 +623,17 @@ function BalanceItem({
   value: string;
   tone?: "buy" | "sell";
 }) {
-  const toneClassName = tone === "buy" ? "text-buy" : tone === "sell" ? "text-sell" : "text-text";
+  const toneClassName =
+    tone === "buy" ? "text-buy" : tone === "sell" ? "text-sell" : "text-text";
 
   return (
     <div className="rounded-lg border border-border bg-surface p-4">
       <dt className="text-xs uppercase text-secondary">{label}</dt>
-      <dd className={`mt-2 font-mono text-2xl font-bold tabular-nums ${toneClassName}`}>{value}</dd>
+      <dd
+        className={`mt-2 font-mono text-2xl font-bold tabular-nums ${toneClassName}`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -597,13 +648,21 @@ function TransactionTypeBadge({ type }: { type: string }) {
         : "border-border bg-surface text-secondary";
 
   return (
-    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}>
+    <span
+      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}
+    >
       {type}
     </span>
   );
 }
 
-function ProfileShell({ title, description }: { title: string; description: string }) {
+function ProfileShell({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="rounded-2xl border border-border bg-surface p-6">
@@ -626,7 +685,8 @@ function fileToBase64(file: File) {
     const reader = new FileReader();
 
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Unable to read the selected image."));
+    reader.onerror = () =>
+      reject(new Error("Unable to read the selected image."));
     reader.readAsDataURL(file);
   });
 }

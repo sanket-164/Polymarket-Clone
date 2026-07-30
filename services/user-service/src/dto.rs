@@ -17,7 +17,6 @@ pub struct UpdateUserDTO {
     )]
     pub email: String,
 
-    #[serde(rename = "mobileNo")]
     pub mobile_no: Option<String>,
 }
 
