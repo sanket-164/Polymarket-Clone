@@ -48,7 +48,11 @@ pub async fn start_consumer(
         };
 
         match message {
-            TradeMessage::UpdateOrders { buy, sell } => {
+            TradeMessage::UpdateOrders {
+                buy,
+                sell,
+                timestamp,
+            } => {
                 let trade = match pg_client.trade(buy.clone(), sell.clone()).await {
                     Ok(trade) => trade,
                     Err(e) => {
@@ -107,7 +111,7 @@ pub async fn start_consumer(
 
                 if let Err(e) = redis::cmd("SET")
                     .arg(&format!("orderbook:{}:timestamp", trade.market_id))
-                    .arg(trade.created_at.timestamp_millis())
+                    .arg(timestamp)
                     .query_async::<()>(&mut *redis)
                     .await
                 {

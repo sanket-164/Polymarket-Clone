@@ -221,5 +221,9 @@ pub enum FeedMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum TradeMessage {
-    UpdateOrders { buy: Order, sell: Order },
+    UpdateOrders {
+        buy: Order,
+        sell: Order,
+        timestamp: i64,
+    },
 }

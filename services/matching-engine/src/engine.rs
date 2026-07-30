@@ -125,6 +125,7 @@ impl Engine {
         let filled = buy.remaining_shares.min(sell.remaining_shares);
         println!("Trade: {} shares for {}", filled, sell.price);
 
+        let timestamp = Utc::now().timestamp_millis();
         for order in [buy.clone(), sell.clone()] {
             let feed_message = FeedMessage::OrderFeed {
                 feed: OrderFeed {
@@ -132,8 +133,8 @@ impl Engine {
                     outcome_id: order.outcome_id,
                     side: order.side,
                     quantity: -filled, // negative to signal reduction to feed subscribers
-                    price: order.price,
-                    timestamp: Utc::now().timestamp_millis(),
+                    price: order.price.normalize(),
+                    timestamp,
                 },
             };
 
@@ -143,7 +144,11 @@ impl Engine {
         }
 
         if let Err(e) = nats_handler
-            .trade_update_order(TradeMessage::UpdateOrders { buy, sell })
+            .trade_update_order(TradeMessage::UpdateOrders {
+                buy,
+                sell,
+                timestamp,
+            })
             .await
         {
             eprintln!("Failed to publish trade UpdateOrder message: {:?}", e);

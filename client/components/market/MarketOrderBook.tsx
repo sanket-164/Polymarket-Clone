@@ -136,7 +136,9 @@ function OrderBookView({
           <span className="text-xs uppercase tracking-wider text-secondary">
             Current Price
           </span>
-          <div className="mt-1 text-xl font-bold text-text">{displayPrice}</div>
+          <div className="mt-1 text-xl font-bold text-text">
+            {Number(displayPrice)}
+          </div>
         </div>
 
         {/* Bids (Buy Orders) */}

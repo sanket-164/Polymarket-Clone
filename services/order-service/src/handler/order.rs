@@ -215,7 +215,7 @@ async fn place_order(
             outcome_id: market_outcome.id,
             side: body.side,
             quantity: body.shares,
-            price: body.price,
+            price: body.price.normalize(),
             timestamp: order_timestamp,
         },
     };
