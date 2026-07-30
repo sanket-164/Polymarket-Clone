@@ -20,7 +20,7 @@ const MARKET_STATUSES: Array<MarketStatus> = [
 ];
 
 export function MarketsHome() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   const [markets, setMarkets] = useState<Market[]>([]);
   const [status, setStatus] = useState<MarketStatus>("ACTIVE");
   const [category, setCategory] = useState("");
@@ -32,13 +32,8 @@ export function MarketsHome() {
       return;
     }
 
-    if (!isAuthenticated) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsMarketsLoading(false);
-      return;
-    }
-
     let isCurrent = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMarketsLoading(true);
     setError(null);
 
@@ -67,7 +62,7 @@ export function MarketsHome() {
     return () => {
       isCurrent = false;
     };
-  }, [category, isAuthenticated, isLoading, status]);
+  }, [category, isLoading, status]);
 
   const categories = useMemo(() => {
     return Array.from(new Set(markets.map((market) => market.category))).sort();
@@ -76,17 +71,6 @@ export function MarketsHome() {
   if (isLoading || isMarketsLoading) {
     return (
       <MarketsShell title="Markets" description="Loading market data..." />
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <MarketsShell
-        title="Log in required"
-        description="Markets require an authenticated session."
-        actionHref="/login"
-        actionLabel="Log in"
-      />
     );
   }
 

@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { placeOrder } from "@/lib/order/order-api";
 import type { OrderSide } from "@/lib/order/types";
 import type { Outcome } from "@/lib/market/types";
@@ -29,15 +31,17 @@ export function LimitOrderForm({
   currentPrices,
   onSuccess,
 }: LimitOrderFormProps) {
+  const { isAuthenticated, isLoading } = useAuth();
   const [formState, setFormState] = useState<FormState>({
     side: "BUY",
     outcomeId: firstOutcome.id,
-    shares: 0,
-    price: "",
+    shares: 100,
+    price: firstOutcome.current_price.slice(0, 4), // Default to first outcome's price
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false);
 
   // Get real-time prices from WebSocket, fallback to initial market price
   const liveFirstPrice =
@@ -97,6 +101,15 @@ export function LimitOrderForm({
   };
 
   const handleSubmit = async () => {
+    if (isLoading) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      setIsLoginPromptOpen(true);
+      return;
+    }
+
     if (formState.shares <= 0) {
       setError("Shares must be greater than 0");
       return;
@@ -142,7 +155,7 @@ export function LimitOrderForm({
   };
 
   return (
-    <div className="rounded-2xl bg-surface p-6">
+    <div className="rounded-2xl p-6">
       <h2 className="text-lg font-semibold text-text mb-4">Place Order</h2>
 
       {/* Buy/Sell Toggle */}
@@ -203,7 +216,7 @@ export function LimitOrderForm({
       <div className="mb-4">
         <div className="flex justify-between items-center mb-2">
           <label className="block text-sm font-medium text-secondary">
-            Limit price
+            Price
           </label>
           <button
             type="button"
@@ -284,22 +297,7 @@ export function LimitOrderForm({
           <span className="font-mono text-text">{totalCost.toFixed(2)}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-secondary flex items-center gap-1">
-            To win
-            <svg
-              className="w-3 h-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </span>
+          <span className="text-secondary flex items-center gap-1">Win</span>
           <span className="font-mono text-green-500">
             {potentialWin.toFixed(2)}
           </span>
@@ -327,6 +325,56 @@ export function LimitOrderForm({
       >
         {isSubmitting ? "Placing..." : "Trade"}
       </button>
+
+      {isLoginPromptOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 backdrop-blur-sm"
+          onClick={() => setIsLoginPromptOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl shadow-background/60"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-secondary">
+                  Trading requires an account
+                </p>
+                <h3 className="mt-1 text-xl font-semibold text-text">
+                  Log in to place this order
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLoginPromptOpen(false)}
+                className="rounded-lg border border-border bg-card px-3 py-1 text-sm text-secondary transition hover:text-text"
+              >
+                Close
+              </button>
+            </div>
+
+            <p className="mt-4 text-sm leading-6 text-secondary">
+              Sign in to submit limit orders, track positions, and manage your
+              trades.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Link
+                href="/login"
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-accent px-4 text-sm font-semibold text-text transition hover:brightness-110"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-semibold text-text transition hover:border-accent"
+              >
+                Sign up
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

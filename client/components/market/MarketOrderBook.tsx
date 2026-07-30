@@ -11,7 +11,7 @@ type MarketOrderBookProps = {
   snapshot: MarketSnapshot;
   firstOutcome: MarketDetails["first_outcome"];
   secondOutcome: MarketDetails["second_outcome"];
-  currentPrices?: Record<string, string>; // Added real-time prices prop
+  currentPrices?: Record<string, string>;
 };
 
 export function MarketOrderBook({
@@ -28,7 +28,6 @@ export function MarketOrderBook({
     (o) => o.outcome_id === selectedOutcomeId
   );
 
-  // Use the real-time price from WebSocket if available, otherwise fallback to initial static price
   const realTimePrice = currentPrices[selectedOutcomeId];
   const staticPrice =
     selectedOutcomeId === firstOutcome.id
@@ -44,7 +43,6 @@ export function MarketOrderBook({
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-text">Order Book</h2>
-          <p className="text-sm text-secondary">Live market depth</p>
         </div>
 
         {/* Outcome Toggle Tabs */}
@@ -53,9 +51,9 @@ export function MarketOrderBook({
             <button
               key={outcome.outcome_id}
               onClick={() => setSelectedOutcomeId(outcome.outcome_id)}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition w-full ${
                 selectedOutcomeId === outcome.outcome_id
-                  ? "bg-surface text-text shadow-sm"
+                  ? "text-text shadow-sm bg-blue-600"
                   : "text-secondary hover:text-text"
               }`}
             >
@@ -77,15 +75,17 @@ function OrderBookView({
   snapshot: OutcomeSnapshot;
   currentPrice: string;
 }) {
-  // Sort asks (sell) descending: highest price at top, lowest at bottom (closest to spread)
-  const asks = [...snapshot.sell].sort(
-    (a, b) => Number(b.price) - Number(a.price)
-  );
+  // Sort asks ascending (lowest price first = closest to spread), take top 5,
+  // then reverse so the highest of those 5 is at the top and lowest is at the bottom.
+  const asks = [...snapshot.sell]
+    .sort((a, b) => Number(a.price) - Number(b.price))
+    .slice(0, 5)
+    .reverse();
 
-  // Sort bids (buy) descending: highest price at top (closest to spread), lowest at bottom
-  const bids = [...snapshot.buy].sort(
-    (a, b) => Number(b.price) - Number(a.price)
-  );
+  // Sort bids descending (highest price first = closest to spread), take top 5.
+  const bids = [...snapshot.buy]
+    .sort((a, b) => Number(b.price) - Number(a.price))
+    .slice(0, 5);
 
   const maxQty = Math.max(
     1,
@@ -95,13 +95,17 @@ function OrderBookView({
 
   const displayPrice = currentPrice ?? "--";
 
-  if (asks.length === 0 && bids.length === 0) {
-    return (
-      <div className="rounded-xl border border-border bg-card p-12 text-center text-secondary">
-        No orderbook data available for this outcome.
-      </div>
-    );
-  }
+  // Pad asks at the BEGINNING so actual asks sit at the bottom (closest to spread/current price)
+  const displayAsks: ((typeof asks)[0] | null)[] = [
+    ...Array(5 - asks.length).fill(null),
+    ...asks,
+  ];
+
+  // Pad bids at the END so actual bids sit at the top (closest to spread/current price)
+  const displayBids: ((typeof bids)[0] | null)[] = [
+    ...bids,
+    ...Array(5 - bids.length).fill(null),
+  ];
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -111,58 +115,71 @@ function OrderBookView({
         <div className="text-right">Qty</div>
       </div>
 
-      <div className="max-h-[400px] overflow-y-auto">
-        {/* Asks (Sell Orders) */}
-        <div className="divide-y divide-border/50">
-          {asks.map((ask, i) => (
-            <div
-              key={`ask-${i}`}
-              className="relative grid grid-cols-2 px-4 py-2 text-sm font-mono transition-colors hover:bg-surface/50"
-            >
-              <div
-                className="absolute right-0 top-0 bottom-0 bg-sell/10 transition-all"
-                style={{ width: `${(ask.qty / maxQty) * 100}%` }}
-              />
-              <div className="relative z-10 text-sell">
-                {Number(ask.price).toFixed(2)}
-              </div>
-              <div className="relative z-10 text-right text-text">
-                {ask.qty}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Current Price / Spread Indicator */}
-        <div className="border-y border-border bg-surface/50 px-4 py-3 text-center">
-          <span className="text-xs uppercase tracking-wider text-secondary">
-            Current Price
-          </span>
-          <div className="mt-1 text-xl font-bold text-text">
-            {Number(displayPrice).toFixed(2)}
+      {/* Asks (Sell Orders) */}
+      <div className="divide-y divide-border/50">
+        {displayAsks.map((ask, i) => (
+          <div
+            key={ask ? `ask-${ask.price}-${ask.qty}-${i}` : `ask-empty-${i}`}
+            className="relative grid grid-cols-2 px-4 py-2 text-sm font-mono transition-colors hover:bg-surface/50"
+          >
+            {ask ? (
+              <>
+                <div
+                  className="absolute right-0 top-0 bottom-0 bg-sell/10 transition-all"
+                  style={{ width: `${(ask.qty / maxQty) * 100}%` }}
+                />
+                <div className="relative z-10 text-sell">
+                  {Number(ask.price).toFixed(2)}
+                </div>
+                <div className="relative z-10 text-right text-text">
+                  {ask.qty}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="relative z-10 text-sell/20">--</div>
+                <div className="relative z-10 text-right text-text/20">--</div>
+              </>
+            )}
           </div>
-        </div>
+        ))}
+      </div>
 
-        {/* Bids (Buy Orders) */}
-        <div className="divide-y divide-border/50">
-          {bids.map((bid, i) => (
-            <div
-              key={`bid-${i}`}
-              className="relative grid grid-cols-2 px-4 py-2 text-sm font-mono transition-colors hover:bg-surface/50"
-            >
-              <div
-                className="absolute right-0 top-0 bottom-0 bg-buy/10 transition-all"
-                style={{ width: `${(bid.qty / maxQty) * 100}%` }}
-              />
-              <div className="relative z-10 text-buy">
-                {Number(bid.price).toFixed(2)}
-              </div>
-              <div className="relative z-10 text-right text-text">
-                {bid.qty}
-              </div>
-            </div>
-          ))}
+      {/* Current Price / Spread Indicator */}
+      <div className="border-y border-border bg-surface/50 px-4 py-3 text-center">
+        <div className="mt-1 text-xl font-bold text-text">
+          {displayPrice === "--" ? "--" : Number(displayPrice).toFixed(2)}
         </div>
+      </div>
+
+      {/* Bids (Buy Orders) */}
+      <div className="divide-y divide-border/50">
+        {displayBids.map((bid, i) => (
+          <div
+            key={bid ? `bid-${bid.price}-${bid.qty}-${i}` : `bid-empty-${i}`}
+            className="relative grid grid-cols-2 px-4 py-2 text-sm font-mono transition-colors hover:bg-surface/50"
+          >
+            {bid ? (
+              <>
+                <div
+                  className="absolute right-0 top-0 bottom-0 bg-buy/10 transition-all"
+                  style={{ width: `${(bid.qty / maxQty) * 100}%` }}
+                />
+                <div className="relative z-10 text-buy">
+                  {Number(bid.price).toFixed(2)}
+                </div>
+                <div className="relative z-10 text-right text-text">
+                  {bid.qty}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="relative z-10 text-buy/20">--</div>
+                <div className="relative z-10 text-right text-text/20">--</div>
+              </>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

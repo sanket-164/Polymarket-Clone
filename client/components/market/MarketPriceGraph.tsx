@@ -33,19 +33,22 @@ export function MarketPriceGraph({
   secondOutcome,
   priceHistory,
 }: MarketPriceGraphProps) {
+  // Keep only the last 20 trade points to prevent clutter and focus on recent activity
+  const recentHistory = useMemo(() => priceHistory.slice(-20), [priceHistory]);
+
   const currentFirstPrice =
-    priceHistory.length > 0
-      ? priceHistory[priceHistory.length - 1].first
+    recentHistory.length > 0
+      ? recentHistory[recentHistory.length - 1].first
       : Number(firstOutcome.current_price);
 
   const currentSecondPrice =
-    priceHistory.length > 0
-      ? priceHistory[priceHistory.length - 1].second
+    recentHistory.length > 0
+      ? recentHistory[recentHistory.length - 1].second
       : Number(secondOutcome.current_price);
 
   // Ensure the chart data always has at least two points to span the full width
   const chartData = useMemo(() => {
-    if (priceHistory.length === 0) {
+    if (recentHistory.length === 0) {
       const firstPrice = Number(
         firstOutcome.start_price ?? firstOutcome.current_price
       );
@@ -59,15 +62,15 @@ export function MarketPriceGraph({
     }
 
     // Edge case: if there's only 1 point in history, duplicate it to span the width
-    if (priceHistory.length === 1) {
+    if (recentHistory.length === 1) {
       return [
-        { ...priceHistory[0], time: "Start" },
-        { ...priceHistory[0], time: "Now" },
+        { ...recentHistory[0], time: "Start" },
+        { ...recentHistory[0], time: "Now" },
       ];
     }
 
-    return priceHistory;
-  }, [priceHistory, firstOutcome, secondOutcome]);
+    return recentHistory;
+  }, [recentHistory, firstOutcome, secondOutcome]);
 
   return (
     <div className="rounded-2xl bg-surface">
@@ -135,6 +138,7 @@ export function MarketPriceGraph({
               stroke={BUY_COLOR}
               strokeWidth={2}
               dot={false}
+              isAnimationActive={false}
               activeDot={{
                 r: 5,
                 fill: BUY_COLOR,
@@ -149,6 +153,7 @@ export function MarketPriceGraph({
               stroke={SELL_COLOR}
               strokeWidth={2}
               dot={false}
+              isAnimationActive={false}
               activeDot={{
                 r: 5,
                 fill: SELL_COLOR,

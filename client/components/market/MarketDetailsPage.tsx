@@ -17,21 +17,16 @@ import { LimitOrderForm } from "@/components/order/LimitOrderForm";
 import { useOrderbookWebSocket } from "@/hooks/useOrderbookWebSocket";
 
 export function MarketDetailsPage({ marketId }: { marketId: string }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   const [market, setMarket] = useState<MarketDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMarketLoading, setIsMarketLoading] = useState(true);
 
-  // Fetch market details only
   useEffect(() => {
     if (isLoading) return;
-    if (!isAuthenticated) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsMarketLoading(false);
-      return;
-    }
 
     let isCurrent = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMarketLoading(true);
     setError(null);
 
@@ -53,13 +48,12 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
     return () => {
       isCurrent = false;
     };
-  }, [isAuthenticated, isLoading, marketId]);
+  }, [isLoading, marketId]);
 
-  // Use WebSocket hook for orderbook synchronization
   const { snapshots, currentPrices } = useOrderbookWebSocket(
     marketId,
     () => getMarketSnapshot(marketId),
-    isAuthenticated && !isLoading && !!market
+    !isLoading && !!market
   );
 
   // Maintain price history for the real-time graph
@@ -118,17 +112,6 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
   if (isLoading || isMarketLoading) {
     return (
       <MarketShell title="Market" description="Loading market details..." />
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <MarketShell
-        title="Log in required"
-        description="Market details require an authenticated session."
-        actionHref="/login"
-        actionLabel="Log in"
-      />
     );
   }
 
@@ -246,7 +229,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
         </div>
 
         {/* Right Column: Limit Order Form & Market Details */}
-        <div className="space-y-6 border border-border lg:col-span-1">
+        <div className="border border-border bg-surface rounded-2xl lg:col-span-1">
           {/* Limit Order Form */}
           <LimitOrderForm
             marketId={marketId}
