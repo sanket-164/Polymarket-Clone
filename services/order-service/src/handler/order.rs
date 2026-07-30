@@ -110,6 +110,12 @@ async fn place_order(
             ErrorMessage::OutcomeNotFound.to_string(),
         ))?;
 
+    if body.shares > market_outcome.total_shares {
+        return Err(HttpError::bad_request(
+            ErrorMessage::ExceedAvailableShares.to_string(),
+        ));
+    }
+
     let order;
 
     match body.side {
