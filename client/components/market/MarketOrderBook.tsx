@@ -123,7 +123,9 @@ function OrderBookView({
                 className="absolute right-0 top-0 bottom-0 bg-sell/10 transition-all"
                 style={{ width: `${(ask.qty / maxQty) * 100}%` }}
               />
-              <div className="relative z-10 text-sell">{ask.price}</div>
+              <div className="relative z-10 text-sell">
+                {Number(ask.price).toFixed(2)}
+              </div>
               <div className="relative z-10 text-right text-text">
                 {ask.qty}
               </div>
@@ -137,7 +139,7 @@ function OrderBookView({
             Current Price
           </span>
           <div className="mt-1 text-xl font-bold text-text">
-            {Number(displayPrice)}
+            {Number(displayPrice).toFixed(2)}
           </div>
         </div>
 
@@ -152,7 +154,9 @@ function OrderBookView({
                 className="absolute right-0 top-0 bottom-0 bg-buy/10 transition-all"
                 style={{ width: `${(bid.qty / maxQty) * 100}%` }}
               />
-              <div className="relative z-10 text-buy">{bid.price}</div>
+              <div className="relative z-10 text-buy">
+                {Number(bid.price).toFixed(2)}
+              </div>
               <div className="relative z-10 text-right text-text">
                 {bid.qty}
               </div>

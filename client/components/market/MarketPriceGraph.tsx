@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -24,8 +25,6 @@ type MarketPriceGraphProps = {
   priceHistory: PriceHistoryPoint[];
 };
 
-// Note: Replace these hex codes with the actual hex values of your 'buy' and 'sell'
-// Tailwind colors if they differ, to ensure perfect visual consistency with your theme.
 const BUY_COLOR = "#10b981"; // emerald-500
 const SELL_COLOR = "#ef4444"; // rose-500
 
@@ -44,67 +43,65 @@ export function MarketPriceGraph({
       ? priceHistory[priceHistory.length - 1].second
       : Number(secondOutcome.current_price);
 
-  const chartData =
-    priceHistory.length > 0
-      ? priceHistory
-      : [
-          {
-            time: "Start",
-            first: Number(firstOutcome.start_price),
-            second: Number(secondOutcome.start_price),
-          },
-        ];
+  // Ensure the chart data always has at least two points to span the full width
+  const chartData = useMemo(() => {
+    if (priceHistory.length === 0) {
+      const firstPrice = Number(
+        firstOutcome.start_price ?? firstOutcome.current_price
+      );
+      const secondPrice = Number(
+        secondOutcome.start_price ?? secondOutcome.current_price
+      );
+      return [
+        { time: "Start", first: firstPrice, second: secondPrice },
+        { time: "Now", first: firstPrice, second: secondPrice },
+      ];
+    }
+
+    // Edge case: if there's only 1 point in history, duplicate it to span the width
+    if (priceHistory.length === 1) {
+      return [
+        { ...priceHistory[0], time: "Start" },
+        { ...priceHistory[0], time: "Now" },
+      ];
+    }
+
+    return priceHistory;
+  }, [priceHistory, firstOutcome, secondOutcome]);
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-text">Price History</h2>
-          <p className="text-sm text-secondary">
-            Outcome probability over time
-          </p>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          <LegendDot
-            tone="buy"
-            label={firstOutcome.label}
-            value={formatProbability(currentFirstPrice.toString())}
-          />
-          <LegendDot
-            tone="sell"
-            label={secondOutcome.label}
-            value={formatProbability(currentSecondPrice.toString())}
-          />
-        </div>
-      </div>
-
-      <div className="mt-6 h-72 w-full rounded-xl border border-border bg-card p-4">
+    <div className="rounded-2xl bg-surface">
+      <div className="h-72 w-full rounded-xl border border-border bg-card">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
-            margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+            margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="hsl(var(--border))"
               vertical={false}
             />
+
             <XAxis
               dataKey="time"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               tick={{ fill: "hsl(var(--secondary))" }}
+              padding={{ left: 0, right: 0 }}
             />
+
             <YAxis
               domain={[0, 1]}
               tickFormatter={(value) => `${Math.round(value * 100)}%`}
               fontSize={12}
               tickLine={false}
               axisLine={false}
-              width={35}
+              width={30}
               tick={{ fill: "hsl(var(--secondary))" }}
             />
+
             <Tooltip
               contentStyle={{
                 backgroundColor: "hsl(var(--card))",
@@ -115,9 +112,8 @@ export function MarketPriceGraph({
               itemStyle={{ color: "hsl(var(--text))" }}
               labelStyle={{
                 color: "hsl(var(--secondary))",
-                marginBottom: "4px",
               }}
-              formatter={(value, _name) => {
+              formatter={(value, name) => {
                 const numericValue =
                   typeof value === "number" ? value : Number(value);
 
@@ -127,11 +123,12 @@ export function MarketPriceGraph({
 
                 return [
                   `${(numericValue * 100).toFixed(1)}%`,
-                  _name === "first" ? firstOutcome.label : secondOutcome.label,
+                  name === "first" ? firstOutcome.label : secondOutcome.label,
                 ];
               }}
               labelFormatter={(label) => `Time: ${label}`}
             />
+
             <Line
               type="monotone"
               dataKey="first"
@@ -144,8 +141,8 @@ export function MarketPriceGraph({
                 stroke: "hsl(var(--card))",
                 strokeWidth: 2,
               }}
-              animationDuration={300}
             />
+
             <Line
               type="monotone"
               dataKey="second"
@@ -158,14 +155,27 @@ export function MarketPriceGraph({
                 stroke: "hsl(var(--card))",
                 strokeWidth: 2,
               }}
-              animationDuration={300}
             />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-4 flex items-center justify-center text-xs text-secondary">
-        <span>Updated: {new Date().toLocaleTimeString()}</span>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <LegendDot
+          tone="buy"
+          label={firstOutcome.label}
+          value={formatProbability(currentFirstPrice.toString())}
+        />
+
+        <div className="text-xs text-secondary">
+          Updated: {new Date().toLocaleTimeString()}
+        </div>
+
+        <LegendDot
+          tone="sell"
+          label={secondOutcome.label}
+          value={formatProbability(currentSecondPrice.toString())}
+        />
       </div>
     </div>
   );
@@ -181,13 +191,17 @@ function LegendDot({
   value: string;
 }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5">
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2 py-1">
       <span
-        className={`size-2.5 rounded-full ${tone === "buy" ? "bg-buy" : "bg-sell"}`}
+        className={`size-2 rounded-full ${
+          tone === "buy" ? "bg-buy" : "bg-sell"
+        }`}
       />
-      <span className="font-medium text-text">{label}</span>
+      <span className="text-sm font-medium text-text">{label}</span>
       <span
-        className={`font-semibold tabular-nums ${tone === "buy" ? "text-buy" : "text-sell"}`}
+        className={`text-sm font-semibold tabular-nums ${
+          tone === "buy" ? "text-buy" : "text-sell"
+        }`}
       >
         {value}
       </span>

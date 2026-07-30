@@ -13,6 +13,7 @@ import { getMarketDetails, getMarketSnapshot } from "@/lib/market/market-api";
 import type { MarketDetails, MarketSnapshot } from "@/lib/market/types";
 import { MarketOrderBook } from "@/components/market/MarketOrderBook";
 import { MarketPriceGraph } from "@/components/market/MarketPriceGraph";
+import { LimitOrderForm } from "@/components/order/LimitOrderForm";
 import { useOrderbookWebSocket } from "@/hooks/useOrderbookWebSocket";
 
 export function MarketDetailsPage({ marketId }: { marketId: string }) {
@@ -180,93 +181,94 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm font-medium text-secondary transition hover:text-text"
-          >
-            <svg
-              className="size-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Back to markets
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">
-            {market.title}
-          </h1>
-          <p className="max-w-3xl text-base text-secondary">
-            {market.description}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-secondary">
-            {market.category}
-          </span>
-          <span
-            className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClassName(market.status)}`}
-          >
-            {market.status}
-          </span>
-        </div>
-      </div>
-
       {/* Main Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column: Chart, Outcomes & Order Book */}
+        {/* Left Column: Chart & Order Book */}
         <div className="space-y-6 lg:col-span-2">
-          <MarketPriceGraph
-            firstOutcome={market.first_outcome}
-            secondOutcome={market.second_outcome}
-            priceHistory={priceHistory}
-          />
+          <div className="rounded-2xl border border-border bg-surface p-6">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-2">
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-secondary transition hover:text-text"
+                >
+                  <svg
+                    className="size-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                  Back to markets
+                </Link>
+                <h1 className="text-2xl font-bold tracking-tight text-text sm:text-3xl">
+                  {market.title}
+                </h1>
+                <p className="max-w-3xl text-sm text-secondary">
+                  {market.description}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-secondary">
+                  {market.category}
+                </span>
+                <span
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClassName(market.status)}`}
+                >
+                  {market.status}
+                </span>
+              </div>
+            </div>
 
-          {/* Order Book below graph and outcomes */}
+            {/* Price Graph */}
+            <MarketPriceGraph
+              firstOutcome={market.first_outcome}
+              secondOutcome={market.second_outcome}
+              priceHistory={priceHistory}
+            />
+          </div>
+
+          {/* Order Book */}
           {currentSnapshot && (
             <MarketOrderBook
               snapshot={currentSnapshot}
               firstOutcome={market.first_outcome}
               secondOutcome={market.second_outcome}
-              currentPrices={currentPrices} // <-- Added this line
+              currentPrices={currentPrices}
             />
           )}
         </div>
 
-        {/* Right Column: Market Details */}
-        <div className="space-y-6 lg:col-span-1">
-          <div className="rounded-2xl border border-border bg-surface p-6">
-            <h2 className="text-lg font-semibold text-text">Market Details</h2>
-            <div className="mt-4 space-y-3">
-              <DetailRow
-                label="Starts"
-                value={formatDateTime(market.start_at)}
-              />
-              <DetailRow
-                label="Closes"
-                value={formatDateTime(market.close_at)}
-              />
-              <DetailRow
-                label="Created"
-                value={formatDateTime(market.created_at)}
-              />
-              <DetailRow
-                label="Total Shares"
-                value={formatShares(
-                  Number(market.first_outcome.total_shares) +
-                    Number(market.second_outcome.total_shares)
-                )}
-              />
-            </div>
+        {/* Right Column: Limit Order Form & Market Details */}
+        <div className="space-y-6 border border-border lg:col-span-1">
+          {/* Limit Order Form */}
+          <LimitOrderForm
+            marketId={marketId}
+            firstOutcome={market.first_outcome}
+            secondOutcome={market.second_outcome}
+            currentPrices={currentPrices}
+            onSuccess={() => {
+              // Optionally refresh orderbook or show notification
+            }}
+          />
+
+          <div className="space-y-3 p-6">
+            <DetailRow
+              label={`Available ${market.first_outcome.label} Shares`}
+              value={formatShares(Number(market.first_outcome.total_shares))}
+            />
+            <DetailRow
+              label={`Available ${market.second_outcome.label} Shares`}
+              value={formatShares(Number(market.second_outcome.total_shares))}
+            />
+            <DetailRow label="Starts" value={formatDateTime(market.start_at)} />
+            <DetailRow label="Closes" value={formatDateTime(market.close_at)} />
           </div>
         </div>
       </div>
