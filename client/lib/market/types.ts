@@ -47,12 +47,10 @@ export type MarketSnapshot = {
 };
 
 export type MarketsQuery = {
-  order_field?: "created_at" | "updated_at" | "start_at" | "close_at" | "title" | "category" | "status";
+  order_field?: "start_at" | "close_at";
   order_by?: "ASC" | "DESC";
-  category?: string;
-  start_before?: string;
-  start_after?: string;
   close_after?: string;
   close_before?: string;
-  status?: MarketStatus | "";
+  limit?: number;
+  skip?: number;
 };

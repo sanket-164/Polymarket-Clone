@@ -638,11 +638,7 @@ function formatCurrency(value: string | number) {
     return "--";
   }
 
-  return new Intl.NumberFormat("en", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(numericValue);
+  return numericValue.toFixed(2);
 }
 
 function MarketShell({
