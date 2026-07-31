@@ -39,6 +39,7 @@ const DEFAULT_TRANSACTION_QUERY: Required<WalletTransactionsQuery> = {
 };
 
 const DEFAULT_ORDER_QUERY: Required<OrdersQuery> = {
+  market_id: "",
   order_by: "DESC",
   order_field: "created_at",
   side: "",
@@ -556,10 +557,10 @@ export function ProfilePanel() {
                       Amount
                     </th>
                     <th className="border-b border-border px-3 py-3 font-medium">
-                      Created
+                      Transaction ID
                     </th>
                     <th className="border-b border-border px-3 py-3 font-medium">
-                      Transaction ID
+                      Created
                     </th>
                   </tr>
                 </thead>
@@ -585,11 +586,11 @@ export function ProfilePanel() {
                         <td className="border-b border-border px-3 py-3 font-mono text-text">
                           {formatCurrency(transaction.amount)}
                         </td>
-                        <td className="border-b border-border px-3 py-3 text-secondary">
-                          {formatDateTime(transaction.created_at)}
-                        </td>
                         <td className="border-b border-border px-3 py-3 font-mono text-xs text-secondary">
                           {transaction.id}
+                        </td>
+                        <td className="border-b border-border px-3 py-3 text-secondary">
+                          {formatDateTime(transaction.created_at)}
                         </td>
                       </tr>
                     ))
@@ -724,10 +725,13 @@ export function ProfilePanel() {
                       Status
                     </th>
                     <th className="border-b border-border px-3 py-3 font-medium">
-                      Created
+                      Market
                     </th>
                     <th className="border-b border-border px-3 py-3 font-medium">
                       Order ID
+                    </th>
+                    <th className="border-b border-border px-3 py-3 font-medium">
+                      Created
                     </th>
                   </tr>
                 </thead>
@@ -762,11 +766,19 @@ export function ProfilePanel() {
                         <td className="border-b border-border px-3 py-3">
                           <OrderStatusBadge status={order.status} />
                         </td>
-                        <td className="border-b border-border px-3 py-3 text-secondary">
-                          {formatDateTime(order.created_at)}
+                        <td className="border-b border-border px-3 py-3">
+                          <Link
+                            href={`/markets/${order.market_id}`}
+                            className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-text transition hover:border-accent"
+                          >
+                            Open market
+                          </Link>
                         </td>
                         <td className="border-b border-border px-3 py-3 font-mono text-xs text-secondary">
                           {order.id}
+                        </td>
+                        <td className="border-b border-border px-3 py-3 text-secondary">
+                          {formatDateTime(order.created_at)}
                         </td>
                       </tr>
                     ))

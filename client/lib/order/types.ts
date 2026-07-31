@@ -35,6 +35,7 @@ export interface OrderFormData {
 export type OrderSortField = "shares" | "price" | "created_at";
 
 export type OrdersQuery = {
+  market_id?: string;
   side?: OrderSide | "";
   status?: OrderStatus | "";
   order_field?: OrderSortField;
