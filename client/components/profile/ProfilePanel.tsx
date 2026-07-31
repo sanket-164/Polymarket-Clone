@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { logout } from "@/lib/auth/auth-api";
 import { ApiError } from "@/lib/api/http";
 import {
   getProfile,
@@ -33,7 +32,13 @@ const DEFAULT_TRANSACTION_QUERY: Required<WalletTransactionsQuery> = {
 
 export function ProfilePanel() {
   const router = useRouter();
-  const { clearSession, isAuthenticated, isLoading } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading,
+    isProfileLoading: isAuthProfileLoading,
+    profile: cachedProfile,
+    setProfileCache,
+  } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -44,42 +49,62 @@ export function ProfilePanel() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(true);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      let isCurrent = true;
-
-      Promise.all([getProfile(), getWalletBalance()])
-        .then(([profileResponse, balanceResponse]) => {
-          if (!isCurrent) {
-            return;
-          }
-
-          setProfile(profileResponse);
-          setBalance(balanceResponse);
-        })
-        .catch((caughtError: unknown) => {
-          if (isCurrent) {
-            setError(
-              getPanelError(caughtError, "Unable to load your profile.")
-            );
-          }
-        })
-        .finally(() => {
-          if (isCurrent) {
-            setIsProfileLoading(false);
-          }
-        });
-
-      return () => {
-        isCurrent = false;
-      };
+    if (
+      isLoading ||
+      !isAuthenticated ||
+      isAuthProfileLoading ||
+      hasLoadedInitialData
+    ) {
+      return;
     }
-  }, [isAuthenticated, isLoading]);
+
+    let isCurrent = true;
+
+    Promise.all([
+      cachedProfile ? Promise.resolve(cachedProfile) : getProfile(),
+      getWalletBalance(),
+    ])
+      .then(([profileResponse, balanceResponse]) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setProfile(profileResponse);
+        setBalance(balanceResponse);
+
+        if (!cachedProfile) {
+          setProfileCache(profileResponse);
+        }
+      })
+      .catch((caughtError: unknown) => {
+        if (isCurrent) {
+          setError(getPanelError(caughtError, "Unable to load your profile."));
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsProfileLoading(false);
+          setHasLoadedInitialData(true);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [
+    cachedProfile,
+    hasLoadedInitialData,
+    isAuthenticated,
+    isAuthProfileLoading,
+    isLoading,
+    setProfileCache,
+  ]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && showTransactions) {
@@ -112,17 +137,6 @@ export function ProfilePanel() {
     }
   }, [isAuthenticated, isLoading, showTransactions, transactionQuery]);
 
-  async function handleLogout() {
-    setIsLoggingOut(true);
-
-    try {
-      await logout();
-    } finally {
-      clearSession();
-      router.push("/login");
-    }
-  }
-
   async function handleProfileSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -145,6 +159,7 @@ export function ProfilePanel() {
       });
 
       setProfile(updatedProfile);
+      setProfileCache(updatedProfile);
       setSuccess("Profile updated.");
     } catch (caughtError) {
       setError(getPanelError(caughtError, "Unable to update your profile."));
@@ -184,6 +199,7 @@ export function ProfilePanel() {
       const updatedProfile = await updateProfilePicture({ picture });
 
       setProfile(updatedProfile);
+      setProfileCache(updatedProfile);
       setSuccess("Profile picture updated.");
     } catch (caughtError) {
       setError(
@@ -223,6 +239,12 @@ export function ProfilePanel() {
     }));
   }
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
   if (isLoading) {
     return (
       <ProfileShell
@@ -233,7 +255,7 @@ export function ProfilePanel() {
   }
 
   if (!isAuthenticated) {
-    router.push("/");
+    return null;
   }
 
   return (
@@ -257,21 +279,13 @@ export function ProfilePanel() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col sm:flex-row">
             <Link
               href="/reset-password"
               className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-semibold text-text transition hover:border-accent"
             >
               Reset password
             </Link>
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="h-11 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-text transition hover:border-sell disabled:opacity-40"
-            >
-              {isLoggingOut ? "Logging out..." : "Log out"}
-            </button>
           </div>
         </div>
 
@@ -292,6 +306,7 @@ export function ProfilePanel() {
         ) : (
           <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
             <form
+              key={profile?.updated_at ?? profile?.id ?? "profile"}
               className="rounded-xl border border-border bg-card p-4 sm:p-5"
               onSubmit={handleProfileSubmit}
             >

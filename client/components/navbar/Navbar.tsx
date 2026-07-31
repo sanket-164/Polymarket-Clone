@@ -2,10 +2,33 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { logout } from "@/lib/auth/auth-api";
+import type { Profile } from "@/lib/profile/types";
 
 export function Navbar() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading,
+    isProfileLoading,
+    profile,
+    clearSession,
+  } = useAuth();
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+
+    try {
+      await logout();
+    } finally {
+      clearSession();
+      router.push("/login");
+    }
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-surface">
@@ -30,6 +53,10 @@ export function Navbar() {
             <NavbarActions
               isAuthenticated={isAuthenticated}
               isLoading={isLoading}
+              isProfileLoading={isProfileLoading}
+              profile={profile}
+              isLoggingOut={isLoggingOut}
+              onLogout={handleLogout}
             />
           </div>
         </div>
@@ -51,6 +78,10 @@ export function Navbar() {
           <NavbarActions
             isAuthenticated={isAuthenticated}
             isLoading={isLoading}
+            isProfileLoading={isProfileLoading}
+            profile={profile}
+            isLoggingOut={isLoggingOut}
+            onLogout={handleLogout}
           />
         </div>
       </nav>
@@ -61,9 +92,20 @@ export function Navbar() {
 type NavbarActionsProps = {
   isAuthenticated: boolean;
   isLoading: boolean;
+  isProfileLoading: boolean;
+  profile: Profile | null;
+  isLoggingOut: boolean;
+  onLogout: () => Promise<void>;
 };
 
-function NavbarActions({ isAuthenticated, isLoading }: NavbarActionsProps) {
+function NavbarActions({
+  isAuthenticated,
+  isLoading,
+  isProfileLoading,
+  profile,
+  isLoggingOut,
+  onLogout,
+}: NavbarActionsProps) {
   if (isLoading) {
     return (
       <div className="h-10 w-24 rounded-lg border border-border bg-card" />
@@ -85,19 +127,12 @@ function NavbarActions({ isAuthenticated, isLoading }: NavbarActionsProps) {
         >
           Orders
         </Link>
-        <Link
-          href="/profile"
-          className="rounded-full border border-border bg-card p-1 transition hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
-          aria-label="Open profile"
-        >
-          <Image
-            src="/default-profile.svg"
-            alt="Profile"
-            width={36}
-            height={36}
-            className="size-9 rounded-full object-cover"
-          />
-        </Link>
+        <ProfileMenu
+          profile={profile}
+          isProfileLoading={isProfileLoading}
+          isLoggingOut={isLoggingOut}
+          onLogout={onLogout}
+        />
       </div>
     );
   }
@@ -117,5 +152,109 @@ function NavbarActions({ isAuthenticated, isLoading }: NavbarActionsProps) {
         Sign up
       </Link>
     </>
+  );
+}
+
+type ProfileMenuProps = {
+  profile: Profile | null;
+  isProfileLoading: boolean;
+  isLoggingOut: boolean;
+  onLogout: () => Promise<void>;
+};
+
+function ProfileMenu({
+  profile,
+  isProfileLoading,
+  isLoggingOut,
+  onLogout,
+}: ProfileMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  const avatarSrc = profile?.picture || "/default-profile.svg";
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className="rounded-full border border-border bg-card p-1 transition hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+        aria-label="Open profile menu"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+      >
+        <Image
+          src={avatarSrc}
+          alt={profile?.name ? `${profile.name} profile` : "Profile"}
+          width={36}
+          height={36}
+          unoptimized={Boolean(profile?.picture)}
+          className="size-9 rounded-full object-cover"
+        />
+      </button>
+
+      {isOpen ? (
+        <div
+          role="menu"
+          aria-label="Profile actions"
+          className="absolute right-0 top-full z-50 mt-3 w-56 rounded-xl border border-border bg-card p-2"
+        >
+          <div className="px-3 py-2">
+            <p className="text-sm font-semibold text-text">
+              {profile?.name ?? "Your account"}
+            </p>
+            <p className="mt-1 text-xs text-secondary">
+              {isProfileLoading
+                ? "Loading profile..."
+                : (profile?.email ?? "Profile settings")}
+            </p>
+          </div>
+
+          <Link
+            href="/profile"
+            role="menuitem"
+            onClick={() => setIsOpen(false)}
+            className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-semibold text-text transition hover:bg-surface focus:outline-none focus:bg-surface"
+          >
+            View profile
+          </Link>
+
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setIsOpen(false);
+              void onLogout();
+            }}
+            disabled={isLoggingOut}
+            className="mt-1 flex w-full items-center rounded-lg px-3 py-2 text-sm font-semibold text-sell transition hover:bg-surface disabled:opacity-40"
+          >
+            {isLoggingOut ? "Logging out..." : "Log out"}
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
