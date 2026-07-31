@@ -37,6 +37,22 @@ export async function getWalletBalance() {
   });
 }
 
+export async function depositWallet(balance: number) {
+  return apiFetch<WalletBalance>("/api/wallet/deposit", {
+    baseUrl: USER_SERVICE_URL,
+    method: "POST",
+    body: JSON.stringify({ balance }),
+  });
+}
+
+export async function withdrawWallet(balance: number) {
+  return apiFetch<WalletBalance>("/api/wallet/withdraw", {
+    baseUrl: USER_SERVICE_URL,
+    method: "POST",
+    body: JSON.stringify({ balance }),
+  });
+}
+
 export async function getWalletTransactions(query: WalletTransactionsQuery = {}) {
   const searchParams = new URLSearchParams();
 

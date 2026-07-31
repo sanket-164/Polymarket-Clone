@@ -7,11 +7,13 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ApiError } from "@/lib/api/http";
 import {
+  depositWallet,
   getProfile,
   getWalletBalance,
   getWalletTransactions,
   updateProfile,
   updateProfilePicture,
+  withdrawWallet,
 } from "@/lib/profile/profile-api";
 import type {
   Profile,
@@ -46,6 +48,10 @@ export function ProfilePanel() {
     DEFAULT_TRANSACTION_QUERY
   );
   const [showTransactions, setShowTransactions] = useState(false);
+  const [walletAction, setWalletAction] = useState<
+    "deposit" | "withdraw" | null
+  >(null);
+  const [walletAmount, setWalletAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
@@ -53,6 +59,7 @@ export function ProfilePanel() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(true);
+  const [isWalletActionLoading, setIsWalletActionLoading] = useState(false);
 
   useEffect(() => {
     if (
@@ -208,6 +215,86 @@ export function ProfilePanel() {
     } finally {
       setIsUploadingPicture(false);
       event.target.value = "";
+    }
+  }
+
+  function openWalletActionModal(action: "deposit" | "withdraw") {
+    setError(null);
+    setSuccess(null);
+    setWalletAction(action);
+    setWalletAmount("");
+  }
+
+  function closeWalletActionModal() {
+    if (isWalletActionLoading) {
+      return;
+    }
+
+    setWalletAction(null);
+    setWalletAmount("");
+  }
+
+  async function handleWalletActionSubmit(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (!walletAction) {
+      return;
+    }
+
+    const amount = Number(walletAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Enter a valid amount greater than zero.");
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+    setIsWalletActionLoading(true);
+
+    try {
+      const updatedBalance =
+        walletAction === "deposit"
+          ? await depositWallet(amount)
+          : await withdrawWallet(amount);
+
+      setBalance(updatedBalance);
+      setSuccess(
+        walletAction === "deposit"
+          ? "Deposit completed."
+          : "Withdraw completed."
+      );
+      setWalletAction(null);
+      setWalletAmount("");
+
+      if (showTransactions) {
+        setIsTransactionsLoading(true);
+        try {
+          const transactionResponse =
+            await getWalletTransactions(transactionQuery);
+
+          setTransactions(transactionResponse);
+        } catch (caughtError) {
+          setError(
+            getPanelError(caughtError, "Unable to load wallet transactions.")
+          );
+        } finally {
+          setIsTransactionsLoading(false);
+        }
+      }
+    } catch (caughtError) {
+      setError(
+        getPanelError(
+          caughtError,
+          walletAction === "deposit"
+            ? "Unable to deposit funds."
+            : "Unable to withdraw funds."
+        )
+      );
+    } finally {
+      setIsWalletActionLoading(false);
     }
   }
 
@@ -402,6 +489,23 @@ export function ProfilePanel() {
                 />
               </dl>
 
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => openWalletActionModal("deposit")}
+                  className="h-11 rounded-lg bg-buy px-4 text-sm font-semibold text-text transition hover:brightness-110"
+                >
+                  Deposit balance
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openWalletActionModal("withdraw")}
+                  className="h-11 rounded-lg bg-sell px-4 text-sm font-semibold text-text transition hover:brightness-110"
+                >
+                  Withdraw balance
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={() => setShowTransactions((current) => !current)}
@@ -543,6 +647,78 @@ export function ProfilePanel() {
             </div>
           </div>
         )}
+
+        {walletAction ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 py-6 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl shadow-background/40">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm text-secondary">
+                    {walletAction === "deposit"
+                      ? "Deposit funds"
+                      : "Withdraw funds"}
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold text-text">
+                    {walletAction === "deposit"
+                      ? "Add money to your wallet"
+                      : "Remove money from your wallet"}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeWalletActionModal}
+                  disabled={isWalletActionLoading}
+                  className="rounded-full border border-border bg-surface px-3 py-1 text-sm font-semibold text-text transition hover:border-accent disabled:opacity-40"
+                >
+                  Close
+                </button>
+              </div>
+
+              <form
+                className="mt-5 space-y-4"
+                onSubmit={handleWalletActionSubmit}
+              >
+                <label className="block">
+                  <span className="text-sm font-medium text-text">Amount</span>
+                  <input
+                    autoFocus
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={walletAmount}
+                    onChange={(event) => setWalletAmount(event.target.value)}
+                    placeholder="Enter amount"
+                    className="mt-2 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none transition placeholder:text-secondary focus:border-accent focus:ring-2 focus:ring-accent/25"
+                  />
+                </label>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={closeWalletActionModal}
+                    disabled={isWalletActionLoading}
+                    className="h-11 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-text transition hover:border-accent disabled:opacity-40"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isWalletActionLoading}
+                    className={`h-11 rounded-lg px-4 text-sm font-semibold text-text transition hover:brightness-110 disabled:opacity-40 ${
+                      walletAction === "deposit" ? "bg-buy" : "bg-sell"
+                    }`}
+                  >
+                    {isWalletActionLoading
+                      ? "Processing..."
+                      : walletAction === "deposit"
+                        ? "Confirm deposit"
+                        : "Confirm withdraw"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );
