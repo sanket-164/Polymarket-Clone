@@ -210,9 +210,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
   }
 
   if (isLoading || isMarketLoading) {
-    return (
-      <MarketShell title="Market" description="Loading market details..." />
-    );
+    return <MarketDetailsSkeleton />;
   }
 
   if (error) {
@@ -479,14 +477,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                   </thead>
                   <tbody>
                     {isMarketOrdersLoading ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-3 py-6 text-center text-secondary"
-                        >
-                          Loading orders...
-                        </td>
-                      </tr>
+                      <SkeletonMarketOrderRows />
                     ) : marketOrders.length > 0 ? (
                       marketOrders.map((order) => (
                         <tr
@@ -686,4 +677,119 @@ function MarketShell({
 function getMarketError(error: unknown, fallback: string) {
   if (error instanceof ApiError) return error.message;
   return fallback;
+}
+
+function MarketDetailsSkeleton() {
+  return (
+    <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <div className="rounded-2xl border border-border bg-surface p-6">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-3">
+                <div className="h-4 w-28 rounded bg-card animate-pulse" />
+                <div className="h-8 w-3/4 rounded bg-card animate-pulse" />
+                <div className="h-4 w-full max-w-3xl rounded bg-card animate-pulse" />
+                <div className="h-4 w-5/6 rounded bg-card animate-pulse" />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="h-7 w-24 rounded-full bg-card animate-pulse" />
+                <div className="h-7 w-20 rounded-full bg-card animate-pulse" />
+              </div>
+            </div>
+
+            <div className="h-[280px] rounded-xl border border-border bg-card animate-pulse sm:h-[320px]" />
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="mb-4 h-6 w-36 rounded bg-surface animate-pulse" />
+            <div className="overflow-hidden rounded-xl border border-border bg-surface">
+              <div className="grid grid-cols-2 gap-4 border-b border-border px-4 py-3 sm:grid-cols-4">
+                <div className="h-3 w-16 rounded bg-card animate-pulse" />
+                <div className="h-3 w-16 rounded bg-card animate-pulse" />
+                <div className="h-3 w-16 rounded bg-card animate-pulse" />
+                <div className="h-3 w-16 rounded bg-card animate-pulse" />
+              </div>
+              <div className="space-y-3 p-4">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-2 gap-4 sm:grid-cols-4"
+                  >
+                    <div className="h-4 w-20 rounded bg-card animate-pulse" />
+                    <div className="h-4 w-24 rounded bg-card animate-pulse" />
+                    <div className="h-4 w-24 rounded bg-card animate-pulse" />
+                    <div className="h-4 w-24 rounded bg-card animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6 lg:col-span-1">
+          <div className="rounded-2xl border border-border bg-surface p-6">
+            <div className="h-6 w-40 rounded bg-card animate-pulse" />
+
+            <div className="mt-6 space-y-4">
+              <div className="h-11 rounded-lg bg-card animate-pulse" />
+              <div className="h-11 rounded-lg bg-card animate-pulse" />
+              <div className="h-11 rounded-lg bg-card animate-pulse" />
+            </div>
+
+            <div className="mt-6 space-y-3 border-t border-border pt-4">
+              <div className="space-y-2">
+                <div className="h-3 w-28 rounded bg-card animate-pulse" />
+                <div className="h-4 w-32 rounded bg-card animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-24 rounded bg-card animate-pulse" />
+                <div className="h-4 w-28 rounded bg-card animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-16 rounded bg-card animate-pulse" />
+                <div className="h-4 w-24 rounded bg-card animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-16 rounded bg-card animate-pulse" />
+                <div className="h-4 w-24 rounded bg-card animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SkeletonMarketOrderRows() {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <tr key={index} className="animate-pulse">
+          <td className="border-b border-border px-3 py-3">
+            <div className="h-6 w-14 rounded-full bg-surface" />
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <div className="space-y-2">
+              <div className="h-4 w-20 rounded bg-surface" />
+              <div className="h-3 w-28 rounded bg-surface" />
+            </div>
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <div className="h-4 w-16 rounded bg-surface" />
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <div className="h-6 w-20 rounded-full bg-surface" />
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <div className="h-3 w-28 rounded bg-surface" />
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <div className="h-3 w-24 rounded bg-surface" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
 }

@@ -27,7 +27,10 @@ export function Navbar() {
           </Link>
 
           <div className="flex shrink-0 items-center gap-2 lg:hidden">
-            <NavbarActions isAuthenticated={isAuthenticated} isLoading={isLoading} />
+            <NavbarActions
+              isAuthenticated={isAuthenticated}
+              isLoading={isLoading}
+            />
           </div>
         </div>
 
@@ -45,7 +48,10 @@ export function Navbar() {
         </form>
 
         <div className="hidden shrink-0 items-center gap-2 lg:flex">
-          <NavbarActions isAuthenticated={isAuthenticated} isLoading={isLoading} />
+          <NavbarActions
+            isAuthenticated={isAuthenticated}
+            isLoading={isLoading}
+          />
         </div>
       </nav>
     </header>
@@ -59,24 +65,40 @@ type NavbarActionsProps = {
 
 function NavbarActions({ isAuthenticated, isLoading }: NavbarActionsProps) {
   if (isLoading) {
-    return <div className="h-10 w-24 rounded-lg border border-border bg-card" />;
+    return (
+      <div className="h-10 w-24 rounded-lg border border-border bg-card" />
+    );
   }
 
   if (isAuthenticated) {
     return (
-      <Link
-        href="/profile"
-        className="rounded-full border border-border bg-card p-1 transition hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
-        aria-label="Open profile"
-      >
-        <Image
-          src="/default-profile.svg"
-          alt="Profile"
-          width={36}
-          height={36}
-          className="size-9 rounded-full object-cover"
-        />
-      </Link>
+      <div className="flex items-center gap-2">
+        <Link
+          href="/holdings"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-text transition hover:bg-card focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+        >
+          Holdings
+        </Link>
+        <Link
+          href="/orders"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-text transition hover:bg-card focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+        >
+          Orders
+        </Link>
+        <Link
+          href="/profile"
+          className="rounded-full border border-border bg-card p-1 transition hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+          aria-label="Open profile"
+        >
+          <Image
+            src="/default-profile.svg"
+            alt="Profile"
+            width={36}
+            height={36}
+            className="size-9 rounded-full object-cover"
+          />
+        </Link>
+      </div>
     );
   }
 
