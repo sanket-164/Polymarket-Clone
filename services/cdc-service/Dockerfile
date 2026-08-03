@@ -1,6 +1,6 @@
-FROM rust:1.93-slim AS chef
+FROM rust:1.93-slim-bookworm AS chef
 WORKDIR /app
-RUN apt-get update && apt-get install -y pkg-config libssl-dev cmake && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y pkg-config libssl-dev cmake g++ libcurl4-openssl-dev && rm -rf /var/lib/apt/lists/*
 RUN cargo install cargo-chef
 
 FROM chef AS planner

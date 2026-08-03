@@ -1,8 +1,10 @@
-version: "3.9"
+version: "4.0"
 
 services:
   postgres:
-    image: postgres:latest
+    build:
+      context: .
+      dockerfile: postgres/Dockerfile
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: password
@@ -10,11 +12,15 @@ services:
     command:
       - "postgres"
       - "-c"
-      - "wal_level=logical" # critical for CDC
+      - "wal_level=logical"
       - "-c"
       - "max_replication_slots=5"
       - "-c"
       - "max_wal_senders=5"
+      - "-c"
+      - "shared_preload_libraries=pg_cron"
+      - "-c"
+      - "cron.database_name=polymarket"
     volumes:
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
