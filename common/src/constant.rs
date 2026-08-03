@@ -33,6 +33,7 @@ pub const MARKET: &str = "/market";
 pub const MARKET_ID: &str = "/:market_id";
 pub const RESOLVE: &str = "/resolve";
 pub const OUTCOME_ID: &str = "/:outcome_id";
+pub const CANCEL: &str = "/cancel";
 
 // Holding
 pub const HOLDING: &str = "/holding";
@@ -60,9 +61,9 @@ pub const ADMIN_PORT: u16 = 3005;
 pub const MARKET_PORT: u16 = 3006;
 
 // Redis
-pub const MARKET_CACHE_TTL: u64 = 1800; // 30 min
+pub const MARKET_CACHE_TTL: u64 = 60; // 1 min
 pub const USER_CACHE_TTL: u64 = 3600; // 60 min
-pub const OTP_CACHE_TTL: u64 = 60; // 1 min
+pub const OTP_CACHE_TTL: u64 = 600; // 10 min
 
 // Redpanda
 pub const AUTO_OFFSET_RESET: &str = "earliest";

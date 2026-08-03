@@ -4,10 +4,10 @@ use common::{
     database::client::PGClient,
     model::{Admin, Market, MarketStatus, MarketWithOutcomes, Order, OrderSide, Outcome, Wallet},
 };
-use sqlx::{Row, postgres::PgRow};
+use sqlx::{Postgres, QueryBuilder, Row, postgres::PgRow};
 use uuid::Uuid;
 
-use crate::dto::CreateMarketDTO;
+use crate::dto::{CreateMarketDTO, UpdateMarketDTO};
 
 #[async_trait]
 pub trait AccountExt {
@@ -48,6 +48,12 @@ pub trait MarketExt {
         market_id: Uuid,
         outcome_id: Uuid,
     ) -> Result<Option<Outcome>, sqlx::Error>;
+    async fn update_market(
+        &self,
+        market_id: Uuid,
+        update: UpdateMarketDTO,
+    ) -> Result<Market, sqlx::Error>;
+    async fn cancel_market(&self, admin_id: Uuid, market_id: Uuid) -> Result<(), sqlx::Error>;
     async fn resolve_market(
         &self,
         admin_id: Uuid,
@@ -348,6 +354,99 @@ impl MarketExt for PGClient {
             .await?;
 
         Ok(outcome)
+    }
+
+    async fn update_market(
+        &self,
+        market_id: Uuid,
+        update: UpdateMarketDTO,
+    ) -> Result<Market, sqlx::Error> {
+        let mut qb: QueryBuilder<Postgres> =
+            QueryBuilder::new("UPDATE market SET updated_at = CURRENT_TIMESTAMP");
+
+        if let Some(title) = update.title {
+            qb.push(", title = ").push_bind(title);
+        }
+        if let Some(desciption) = update.desciption {
+            qb.push(", description = ").push_bind(desciption);
+        }
+        if let Some(category) = update.category {
+            qb.push(", category = ").push_bind(category);
+        }
+        if let Some(start_at) = update.start_at {
+            qb.push(", start_at = ").push_bind(start_at);
+        }
+        if let Some(close_at) = update.close_at {
+            qb.push(", close_at = ").push_bind(close_at);
+        }
+
+        qb.push(" WHERE id = ").push_bind(market_id);
+        qb.push(
+        " RETURNING id, title, description, category, start_at, close_at, status, created_at, updated_at",
+    );
+
+        let updated_market: Market = qb.build_query_as::<Market>().fetch_one(&self.pool).await?;
+
+        Ok(updated_market)
+    }
+
+    async fn cancel_market(&self, admin_id: Uuid, market_id: Uuid) -> Result<(), sqlx::Error> {
+        let query = r#"
+            UPDATE market
+            SET status = 'CANCELLED', updated_at = NOW()
+            WHERE id = $1 AND status = 'PENDING'
+        "#;
+
+        sqlx::query(query)
+            .bind(market_id)
+            .execute(&self.pool)
+            .await?;
+
+        let query = r#"
+            UPDATE wallets
+            SET balance = balance + pending_orders.total,
+                updated_at = NOW()
+            FROM (
+                SELECT user_id, SUM(remaining_shares * price) AS total
+                FROM orders
+                WHERE market_id = $1
+                AND user_id   = $2
+                AND side      = 'SELL'
+                AND status    = 'PENDING'
+                GROUP BY user_id
+            ) AS pending_orders
+            WHERE wallets.user_id = pending_orders.user_id
+        "#;
+
+        sqlx::query(query)
+            .bind(market_id)
+            .bind(admin_id)
+            .execute(&self.pool)
+            .await?;
+
+        let query = r#"
+            UPDATE holdings
+            SET shares = shares + locked_shares, locked_shares = 0, updated_at = NOW()
+            WHERE market_id = $1
+        "#;
+
+        sqlx::query(query)
+            .bind(market_id)
+            .execute(&self.pool)
+            .await?;
+
+        let query = r#"
+            UPDATE orders
+            SET status = 'CANCELLED', updated_at = NOW()
+            WHERE market_id = $1 AND status IN ('PENDING', 'PARTIAL')
+        "#;
+
+        sqlx::query(query)
+            .bind(market_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 
     async fn resolve_market(

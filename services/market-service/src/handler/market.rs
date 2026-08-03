@@ -5,11 +5,11 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post, put},
+    routing::{get, patch, post, put},
 };
 use chrono::Utc;
 use common::{
-    constant::{ID, MARKET_CACHE_TTL, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT},
+    constant::{CANCEL, ID, MARKET_CACHE_TTL, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT},
     error::{ErrorMessage, HttpError},
     model::{FeedMessage, MarketOutcomes, MarketStatus, MarketWithOutcomes, MatcherMessage},
 };
@@ -21,21 +21,25 @@ use validator::Validate;
 use crate::{
     AppState,
     db::{MarketExt, WalletExt},
-    dto::{CreateMarketDTO, MarketQueryDTO},
+    dto::{CreateMarketDTO, MarketQueryDTO, UpdateMarketDTO},
 };
 
 pub fn market_handler() -> Router<Arc<AppState>> {
-    Router::new().route(ROOT, post(create_market)).route(
-        &format!("{MARKET_ID}{RESOLVE}{OUTCOME_ID}"),
-        put(resolve_market),
-    )
+    Router::new()
+        .route(ROOT, post(create_market))
+        .route(
+            &format!("{MARKET_ID}{RESOLVE}{OUTCOME_ID}"),
+            put(resolve_market),
+        )
+        .route(&format!("{CANCEL}{MARKET_ID}"), patch(cancel_market))
+        .route(MARKET_ID, patch(update_market))
 }
 
 pub fn public_market_handler() -> Router<Arc<AppState>> {
     Router::new()
         .route(&format!("{SNAPSHOT}{ID}"), get(market_snapshot))
         .route(ROOT, get(get_markets))
-        .route(ID, get(get_market_details))
+        .route(MARKET_ID, get(get_market_details))
 }
 
 async fn create_market(
@@ -163,6 +167,80 @@ async fn create_market(
     Ok((StatusCode::CREATED, Json(market)))
 }
 
+async fn update_market(
+    State(app_state): State<Arc<AppState>>,
+    Extension(_admin_id): Extension<Uuid>,
+    Path(market_id): Path<Uuid>,
+    Json(body): Json<UpdateMarketDTO>,
+) -> Result<impl IntoResponse, HttpError> {
+    body.validate()
+        .map_err(|e| HttpError::bad_request(e.to_string()))?;
+
+    let market = app_state
+        .pg_client
+        .get_market_details(market_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?
+        .ok_or(HttpError::not_found(
+            ErrorMessage::MarketNotFound.to_string(),
+        ))?;
+
+    if market.market.status != MarketStatus::PENDING || market.market.start_at < Utc::now() {
+        return Err(HttpError::bad_request(
+            ErrorMessage::MarketIsNotPending.to_string(),
+        ));
+    }
+
+    let updated_market = app_state
+        .pg_client
+        .update_market(market_id, body)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok((StatusCode::OK, Json(updated_market)))
+}
+
+async fn cancel_market(
+    State(app_state): State<Arc<AppState>>,
+    Extension(admin_id): Extension<Uuid>,
+    Path(market_id): Path<Uuid>,
+) -> Result<impl IntoResponse, HttpError> {
+    let market = app_state
+        .pg_client
+        .get_market_by_id(market_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?
+        .ok_or(HttpError::not_found(
+            ErrorMessage::MarketNotFound.to_string(),
+        ))?;
+
+    if market.status != MarketStatus::PENDING || market.start_at < Utc::now() {
+        return Err(HttpError::bad_request(
+            ErrorMessage::MarketIsNotPending.to_string(),
+        ));
+    }
+
+    app_state
+        .pg_client
+        .cancel_market(admin_id, market_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    app_state
+        .publisher
+        .matcher_remove_market(MatcherMessage::RemoveMarket { market_id })
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    app_state
+        .publisher
+        .feed_remove_market(FeedMessage::RemoveMarket { market_id })
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok(StatusCode::OK)
+}
+
 async fn resolve_market(
     State(app_state): State<Arc<AppState>>,
     Extension(admin_id): Extension<Uuid>,
@@ -266,10 +344,10 @@ async fn get_markets(
 }
 
 async fn get_market_details(
-    Path(id): Path<Uuid>,
+    Path(market_id): Path<Uuid>,
     State(app_state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, HttpError> {
-    let cache_key = format!("market:{}", id);
+    let cache_key = format!("market:{}", market_id);
 
     let mut redis = app_state
         .redis_pool
@@ -291,7 +369,7 @@ async fn get_market_details(
 
     let market = app_state
         .pg_client
-        .get_market_details(id)
+        .get_market_details(market_id)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?
         .ok_or(HttpError::not_found(

@@ -105,20 +105,8 @@
       .form-grid .full {
         grid-column: span 2;
       }
-      .form-grid-3 {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-      }
-      .form-grid-4 {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-      }
       @media (max-width: 720px) {
-        .form-grid,
-        .form-grid-3,
-        .form-grid-4 {
+        .form-grid {
           grid-template-columns: 1fr;
         }
         .form-grid .full {
@@ -269,7 +257,6 @@
         color: var(--text);
       }
 
-      /* Filter panel */
       .filter-panel {
         background: var(--surface-2);
         border: 1px solid var(--border);
@@ -303,7 +290,6 @@
         letter-spacing: 0.03em;
       }
 
-      /* Market list */
       .market-item {
         display: flex;
         justify-content: space-between;
@@ -364,7 +350,6 @@
         color: #374151;
       }
 
-      /* Pagination */
       .pagination {
         display: flex;
         justify-content: space-between;
@@ -382,7 +367,6 @@
         gap: 8px;
       }
 
-      /* Modal */
       .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -528,6 +512,13 @@
         grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         gap: 12px;
       }
+
+      .actions-col {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
     </style>
   </head>
   <body>
@@ -638,7 +629,20 @@
                     required
                   />
                 </div>
-                <div></div>
+                <div>
+                  <label for="total_shares">Total Shares</label>
+                  <input
+                    type="number"
+                    step="2"
+                    min="2"
+                    id="total_shares"
+                    placeholder="20000"
+                    required
+                  />
+                  <div class="hint">
+                    Must be an even number. Divided equally between outcomes.
+                  </div>
+                </div>
                 <div>
                   <label for="start_at">Start At (UTC)</label>
                   <input type="datetime-local" id="start_at" required />
@@ -652,77 +656,27 @@
               <div class="form-grid" style="margin-top: 20px">
                 <div class="fieldset full">
                   <h3>First Outcome</h3>
-                  <div class="form-grid">
-                    <div class="full">
-                      <label for="first_label">Label</label>
-                      <input
-                        type="text"
-                        id="first_label"
-                        value="Yes"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label for="first_price">Start Price</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="1"
-                        id="first_price"
-                        value="0.5"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label for="first_shares">Total Shares</label>
-                      <input
-                        type="number"
-                        step="1"
-                        min="1"
-                        id="first_shares"
-                        value="1000"
-                        required
-                      />
-                    </div>
+                  <div>
+                    <label for="first_label">Label</label>
+                    <input
+                      type="text"
+                      id="first_label"
+                      placeholder="Yes"
+                      required
+                    />
                   </div>
                 </div>
 
                 <div class="fieldset full">
                   <h3>Second Outcome</h3>
-                  <div class="form-grid">
-                    <div class="full">
-                      <label for="second_label">Label</label>
-                      <input
-                        type="text"
-                        id="second_label"
-                        value="No"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label for="second_price">Start Price</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="1"
-                        id="second_price"
-                        value="0.5"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label for="second_shares">Total Shares</label>
-                      <input
-                        type="number"
-                        step="1"
-                        min="1"
-                        id="second_shares"
-                        value="1000"
-                        required
-                      />
-                    </div>
+                  <div>
+                    <label for="second_label">Label</label>
+                    <input
+                      type="text"
+                      id="second_label"
+                      placeholder="No"
+                      required
+                    />
                   </div>
                 </div>
               </div>
@@ -751,7 +705,7 @@
               <div>
                 <h2>Browse Markets</h2>
                 <p class="lead" style="margin-bottom: 0">
-                  Filter, sort, and resolve markets.
+                  Filter, sort, and manage markets.
                 </p>
               </div>
             </div>
@@ -778,7 +732,7 @@
                       <option value="ALL">All</option>
                       <option value="PENDING">Pending</option>
                       <option value="ACTIVE">Active</option>
-                      <option value="CLOSED" selected>Closed</option>
+                      <option value="CLOSED">Closed</option>
                       <option value="RESOLVED">Resolved</option>
                       <option value="CANCELLED">Cancelled</option>
                     </select>
@@ -801,8 +755,8 @@
                     <label for="f_order_field">Order Field</label>
                     <select id="f_order_field">
                       <option value="">—</option>
-                      <option value="start_at" selected>Start Date</option>
-                      <option value="close_at">Close Date</option>
+                      <option value="start_at">Start Date</option>
+                      <option value="close_at" selected>Close Date</option>
                     </select>
                   </div>
                   <div>
@@ -876,14 +830,81 @@
       </main>
     </div>
 
+    <!-- VIEW MODAL -->
+    <div class="modal-backdrop" id="viewModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 id="viewModalTitle">Market Details</h2>
+          <button class="close-x" onclick="closeViewModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="viewModalBody"></div>
+      </div>
+    </div>
+
+    <!-- EDIT MODAL -->
+    <div class="modal-backdrop" id="editModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 id="editModalTitle">Edit Market</h2>
+          <button class="close-x" onclick="closeEditModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="editMarketForm">
+            <input type="hidden" id="edit_market_id" />
+            <div style="margin-bottom: 12px">
+              <label for="edit_title">Title</label>
+              <input type="text" id="edit_title" required />
+            </div>
+            <div style="margin-bottom: 12px">
+              <label for="edit_description">Description</label>
+              <textarea id="edit_description" required></textarea>
+            </div>
+            <div style="margin-bottom: 12px">
+              <label for="edit_category">Category</label>
+              <input type="text" id="edit_category" required />
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+                margin-bottom: 12px;
+              "
+            >
+              <div>
+                <label for="edit_start_at">Start At (UTC)</label>
+                <input type="datetime-local" id="edit_start_at" required />
+              </div>
+              <div>
+                <label for="edit_close_at">Close At (UTC)</label>
+                <input type="datetime-local" id="edit_close_at" required />
+              </div>
+            </div>
+            <div class="btn-row">
+              <button type="submit" class="btn btn-primary" id="saveEditBtn">
+                Save Changes
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost"
+                onclick="closeEditModal()"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- RESOLVE MODAL -->
     <div class="modal-backdrop" id="resolveModal">
       <div class="modal">
         <div class="modal-header">
-          <h2 id="modalTitle">Resolve Market</h2>
-          <button class="close-x" onclick="closeModal()">&times;</button>
+          <h2 id="resolveModalTitle">Resolve Market</h2>
+          <button class="close-x" onclick="closeResolveModal()">&times;</button>
         </div>
-        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-body" id="resolveModalBody"></div>
       </div>
     </div>
 
@@ -908,7 +929,7 @@
       const ORDER_DIRECTIONS = Object.freeze(["ASC", "DESC"]);
 
       const DEFAULT_FILTERS = Object.freeze({
-        status: MARKET_STATUSES.CLOSED,
+        status: "ALL",
         order_field: "close_at",
         order_by: "DESC",
         limit: 20,
@@ -923,6 +944,7 @@
         marketUrl: localStorage.getItem("market_url") || BASE_URLS.MARKET,
         filters: { ...DEFAULT_FILTERS, skip: 0 },
         lastResultCount: 0,
+        lastMarkets: [],
       };
 
       /* =================== HELPERS =================== */
@@ -1000,6 +1022,17 @@
         return d.toISOString();
       }
 
+      function isoToLocalDatetime(iso) {
+        if (!iso) return "";
+        const d = new Date(iso);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const hours = String(d.getHours()).padStart(2, "0");
+        const mins = String(d.getMinutes()).padStart(2, "0");
+        return `${year}-${month}-${day}T${hours}:${mins}`;
+      }
+
       function escapeHtml(s) {
         return String(s || "").replace(
           /[&<>"']/g,
@@ -1018,31 +1051,20 @@
       function buildMarketsQuery(filters) {
         const params = new URLSearchParams();
 
-        if (filters.status && filters.status !== "ALL") {
+        if (filters.status && filters.status !== "ALL")
           params.set("status", filters.status);
-        }
-        if (filters.order_field && ORDER_FIELDS.includes(filters.order_field)) {
+        if (filters.order_field && ORDER_FIELDS.includes(filters.order_field))
           params.set("order_field", filters.order_field);
-        }
-        if (filters.order_by && ORDER_DIRECTIONS.includes(filters.order_by)) {
+        if (filters.order_by && ORDER_DIRECTIONS.includes(filters.order_by))
           params.set("order_by", filters.order_by);
-        }
         if (filters.close_after)
-          params.set(
-            "close_after",
-            filters.close_after ? `${filters.close_after}T00:00:00Z` : ""
-          );
+          params.set("close_after", `${filters.close_after}T00:00:00Z`);
         if (filters.close_before)
-          params.set(
-            "close_before",
-            filters.close_before ? `${filters.close_before}T00:00:00Z` : ""
-          );
-        if (filters.limit && Number(filters.limit) > 0) {
+          params.set("close_before", `${filters.close_before}T00:00:00Z`);
+        if (filters.limit && Number(filters.limit) > 0)
           params.set("limit", String(filters.limit));
-        }
-        if (filters.skip && Number(filters.skip) > 0) {
+        if (filters.skip && Number(filters.skip) > 0)
           params.set("skip", String(filters.skip));
-        }
 
         const qs = params.toString();
         return qs ? `/api/market?${qs}` : "/api/market";
@@ -1056,7 +1078,6 @@
           close_after: $("#f_close_after").value,
           close_before: $("#f_close_before").value,
           limit: Number($("#f_limit").value) || DEFAULT_FILTERS.limit,
-          // skip is handled internally, not read from UI
         };
       }
 
@@ -1070,7 +1091,6 @@
       }
 
       /* =================== AUTH =================== */
-      // Pre-fill URL fields with constants (once per page load, unless localStorage override exists)
       if (!$("#authUrl").value) $("#authUrl").value = BASE_URLS.AUTH;
       if (!$("#marketUrl").value) $("#marketUrl").value = BASE_URLS.MARKET;
 
@@ -1138,22 +1158,32 @@
       /* =================== CREATE MARKET =================== */
       $("#createMarketForm").addEventListener("submit", async (e) => {
         e.preventDefault();
+        const totalShares = Number($("#total_shares").value);
+        if (totalShares % 2 !== 0) {
+          toast(
+            "Total shares must be an even number (divisible by 2)",
+            "error"
+          );
+          return;
+        }
+        const halfShares = String(totalShares / 2);
+
         const body = {
           title: $("#title").value.trim(),
-          desciption: $("#description").value.trim(), // matches API typo
+          desciption: $("#description").value.trim(),
           description: $("#description").value.trim(),
           category: $("#category").value.trim(),
           start_at: localDatetimeToISO($("#start_at").value),
           close_at: localDatetimeToISO($("#close_at").value),
           first_outcome: {
             label: $("#first_label").value.trim(),
-            start_price: $("#first_price").value,
-            total_shares: $("#first_shares").value,
+            start_price: "0.50",
+            total_shares: halfShares,
           },
           second_outcome: {
             label: $("#second_label").value.trim(),
-            start_price: $("#second_price").value,
-            total_shares: $("#second_shares").value,
+            start_price: "0.50",
+            total_shares: halfShares,
           },
         };
 
@@ -1166,6 +1196,9 @@
           });
           toast("Market created: " + res.title, "success");
           $("#createMarketForm").reset();
+          $("#total_shares").value = 20000;
+          $("#first_label").value = "Yes";
+          $("#second_label").value = "No";
         } catch (err) {
           toast("Create failed: " + err.message, "error");
         } finally {
@@ -1175,7 +1208,6 @@
 
       /* =================== LOAD MARKETS =================== */
       async function loadMarkets() {
-        // Read UI filters, then merge with internally-managed skip
         const uiFilters = readFiltersFromUI();
         state.filters = { ...uiFilters, skip: state.filters.skip };
 
@@ -1189,7 +1221,6 @@
           const markets = await apiRequest(path);
 
           if (!Array.isArray(markets) || markets.length === 0) {
-            // If we got no results and we're on a non-zero page, fall back to first page
             if (state.filters.skip > 0) {
               state.filters.skip = 0;
               toast("No more results — jumped back to page 1", "info");
@@ -1200,15 +1231,32 @@
               '<p style="color:var(--text-muted); text-align:center; padding:24px;">No markets match the current filters.</p>';
             pagination.style.display = "none";
             state.lastResultCount = 0;
+            state.lastMarkets = [];
             return;
           }
 
           state.lastResultCount = markets.length;
+          state.lastMarkets = markets;
           list.innerHTML = "";
           markets.forEach((m) => {
             const el = document.createElement("div");
             el.className = "market-item";
             const statusLower = (m.status || "").toLowerCase();
+
+            const isPending = m.status === MARKET_STATUSES.PENDING;
+            const isClosed = m.status === MARKET_STATUSES.CLOSED;
+
+            let actionsHtml = `<button class="btn btn-ghost btn-sm" data-action="view" data-id="${m.id}">View</button>`;
+            if (isPending) {
+              actionsHtml += `
+                <button class="btn btn-primary btn-sm" data-action="edit" data-id="${m.id}">Edit</button>
+                <button class="btn btn-danger btn-sm" data-action="cancel" data-id="${m.id}">Cancel</button>
+              `;
+            }
+            if (isClosed) {
+              actionsHtml += `<button class="btn btn-success btn-sm" data-action="resolve" data-id="${m.id}">Resolve</button>`;
+            }
+
             el.innerHTML = `
               <div class="market-info">
                 <h4>${escapeHtml(m.title)}</h4>
@@ -1220,17 +1268,13 @@
                   <span style="font-size:12px; color:var(--text-muted);">Close: ${fmtDate(m.close_at)}</span>
                 </div>
               </div>
-              <div style="display:flex; gap:8px;">
-                <button class="btn btn-primary btn-sm" data-id="${m.id}">Resolve →</button>
+              <div class="actions-col">
+                ${actionsHtml}
               </div>
             `;
-            el.querySelector("button").addEventListener("click", () =>
-              openResolveModal(m.id, m.title)
-            );
             list.appendChild(el);
           });
 
-          // Pagination info
           const skip = Number(state.filters.skip || 0);
           const limit = Number(state.filters.limit || DEFAULT_FILTERS.limit);
           const showing = markets.length;
@@ -1238,7 +1282,6 @@
           const last = skip + showing;
           $("#paginationInfo").textContent = `Showing ${first}–${last}`;
           $("#prevPageBtn").disabled = skip <= 0;
-          // Enable "Next" only if we got a full page (heuristic for "more results exist")
           $("#nextPageBtn").disabled = showing < limit;
           pagination.style.display = "flex";
         } catch (err) {
@@ -1247,8 +1290,23 @@
         }
       }
 
+      /* =================== LIST ACTIONS (EVENT DELEGATION) =================== */
+      $("#marketList").addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-action]");
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+        const market = state.lastMarkets.find((m) => m.id === id);
+
+        if (action === "view") openViewModal(id);
+        else if (action === "edit" && market) openEditModal(market);
+        else if (action === "cancel") cancelMarket(id);
+        else if (action === "resolve" && market)
+          openResolveModal(id, market.title);
+      });
+
       $("#applyFiltersBtn").addEventListener("click", () => {
-        // Reset pagination when filters change
         state.filters.skip = 0;
         loadMarkets();
       });
@@ -1274,10 +1332,126 @@
         loadMarkets();
       });
 
+      /* =================== VIEW MODAL =================== */
+      async function openViewModal(marketId) {
+        $("#viewModalTitle").textContent = "Market Details";
+        $("#viewModalBody").innerHTML =
+          '<p style="text-align:center; color:var(--text-muted); padding:16px;">Loading...</p>';
+        $("#viewModal").classList.add("show");
+
+        try {
+          const m = await apiRequest(`/api/market/${marketId}`);
+          const statusLower = (m.status || "").toLowerCase();
+
+          $("#viewModalBody").innerHTML = `
+            <div style="margin-bottom: 16px;">
+              <span class="badge ${statusLower}">${escapeHtml(m.status)}</span>
+              <span style="margin-left: 8px; font-size: 12px; color: var(--text-muted);">ID: ${escapeHtml(m.id)}</span>
+            </div>
+            <h3 style="font-size: 18px; margin-bottom: 8px;">${escapeHtml(m.title)}</h3>
+            <p style="margin-bottom: 16px; color: var(--text-muted);">${escapeHtml(m.description)}</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; font-size: 14px;">
+              <div><strong>Category:</strong> ${escapeHtml(m.category)}</div>
+              <div><strong>Status:</strong> ${escapeHtml(m.status)}</div>
+              <div><strong>Starts:</strong> ${fmtDate(m.start_at)}</div>
+              <div><strong>Closes:</strong> ${fmtDate(m.close_at)}</div>
+            </div>
+            
+            <h4 style="font-size: 14px; margin-bottom: 12px; border-top: 1px solid var(--border); padding-top: 12px;">Outcomes</h4>
+            <div class="outcome-card">
+              <div>
+                <h5>${escapeHtml(m.first_outcome.label)}</h5>
+                <p>Price: $${m.first_outcome.current_price} · Shares: ${m.first_outcome.total_shares}</p>
+              </div>
+            </div>
+            <div class="outcome-card">
+              <div>
+                <h5>${escapeHtml(m.second_outcome.label)}</h5>
+                <p>Price: $${m.second_outcome.current_price} · Shares: ${m.second_outcome.total_shares}</p>
+              </div>
+            </div>
+          `;
+        } catch (err) {
+          $("#viewModalBody").innerHTML =
+            `<p style="color:var(--danger);">Failed to load: ${escapeHtml(err.message)}</p>`;
+        }
+      }
+
+      function closeViewModal() {
+        $("#viewModal").classList.remove("show");
+      }
+      $("#viewModal").addEventListener("click", (e) => {
+        if (e.target.id === "viewModal") closeViewModal();
+      });
+
+      /* =================== EDIT MODAL =================== */
+      function openEditModal(market) {
+        $("#edit_market_id").value = market.id;
+        $("#edit_title").value = market.title;
+        $("#edit_description").value = market.description;
+        $("#edit_category").value = market.category;
+        $("#edit_start_at").value = isoToLocalDatetime(market.start_at);
+        $("#edit_close_at").value = isoToLocalDatetime(market.close_at);
+        $("#editModal").classList.add("show");
+      }
+
+      function closeEditModal() {
+        $("#editModal").classList.remove("show");
+      }
+      $("#editModal").addEventListener("click", (e) => {
+        if (e.target.id === "editModal") closeEditModal();
+      });
+
+      $("#editMarketForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = $("#edit_market_id").value;
+        const body = {
+          title: $("#edit_title").value.trim(),
+          description: $("#edit_description").value.trim(),
+          category: $("#edit_category").value.trim(),
+          start_at: localDatetimeToISO($("#edit_start_at").value),
+          close_at: localDatetimeToISO($("#edit_close_at").value),
+        };
+
+        const btn = $("#saveEditBtn");
+        setLoading(btn, true);
+        try {
+          await apiRequest(`/api/market/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify(body),
+          });
+          toast("Market updated successfully", "success");
+          closeEditModal();
+          loadMarkets();
+        } catch (err) {
+          toast("Update failed: " + err.message, "error");
+        } finally {
+          setLoading(btn, false);
+        }
+      });
+
+      /* =================== CANCEL MARKET =================== */
+      async function cancelMarket(id) {
+        if (
+          !confirm(
+            "Are you sure you want to cancel this market? This action cannot be undone."
+          )
+        )
+          return;
+        try {
+          await apiRequest(`/api/market/cancel/${id}`, { method: "PATCH" });
+          toast("Market cancelled successfully", "success");
+          loadMarkets();
+        } catch (err) {
+          toast("Cancel failed: " + err.message, "error");
+        }
+      }
+
       /* =================== RESOLVE MODAL =================== */
       async function openResolveModal(marketId, title) {
-        $("#modalTitle").textContent = "Resolve: " + title;
-        $("#modalBody").innerHTML =
+        $("#resolveModalTitle").textContent = "Resolve: " + title;
+        $("#resolveModalBody").innerHTML =
           '<p style="color:var(--text-muted); text-align:center; padding:16px;">Loading market details...</p>';
         $("#resolveModal").classList.add("show");
 
@@ -1287,7 +1461,7 @@
           const s = market.second_outcome;
           const alreadyResolved = market.status === MARKET_STATUSES.RESOLVED;
 
-          $("#modalBody").innerHTML = `
+          $("#resolveModalBody").innerHTML = `
             <p class="lead">Status: <span class="badge ${(market.status || "").toLowerCase()}">${escapeHtml(market.status)}</span></p>
             <p style="margin-bottom: 16px; color: var(--text-muted); font-size:13px;">Select the winning outcome. This action cannot be undone.</p>
 
@@ -1319,7 +1493,7 @@
             doResolve(marketId, s.id, $("#resolveSecond"))
           );
         } catch (err) {
-          $("#modalBody").innerHTML =
+          $("#resolveModalBody").innerHTML =
             `<p style="color:var(--danger);">Failed to load market: ${escapeHtml(err.message)}</p>`;
         }
       }
@@ -1337,7 +1511,7 @@
             method: "PUT",
           });
           toast("Market resolved successfully", "success");
-          closeModal();
+          closeResolveModal();
           loadMarkets();
         } catch (err) {
           toast("Resolve failed: " + err.message, "error");
@@ -1346,11 +1520,11 @@
         }
       }
 
-      function closeModal() {
+      function closeResolveModal() {
         $("#resolveModal").classList.remove("show");
       }
       $("#resolveModal").addEventListener("click", (e) => {
-        if (e.target.id === "resolveModal") closeModal();
+        if (e.target.id === "resolveModal") closeResolveModal();
       });
 
       /* =================== INIT =================== */
@@ -1364,7 +1538,6 @@
         $("#start_at").value = isoLocal;
         $("#close_at").value = isoLater;
 
-        // Initialize filter UI from defaults (skip is not in UI)
         writeFiltersToUI(state.filters);
       })();
     </script>

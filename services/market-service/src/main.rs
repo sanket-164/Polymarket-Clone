@@ -37,7 +37,13 @@ async fn main() {
         .allow_origin(AllowOrigin::mirror_request())
         .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE])
         .allow_credentials(true)
-        .allow_methods([Method::GET, Method::POST, Method::PUT]);
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::OPTIONS,
+        ]);
 
     match ServerConfig::init().environment.as_str() {
         "production" => {

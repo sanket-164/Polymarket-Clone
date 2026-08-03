@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use validator::{Validate, ValidationError};
 
 use common::model::MarketStatus;
@@ -46,48 +45,37 @@ pub struct MarketQueryDTO {
     pub skip: Option<i64>,
 }
 
-trait MarketDates {
-    fn start_at(&self) -> Option<DateTime<Utc>>;
-    fn close_at(&self) -> Option<DateTime<Utc>>;
-}
-
-impl MarketDates for &&CreateMarketDTO {
-    fn start_at(&self) -> Option<DateTime<Utc>> {
-        self.start_at
-    }
-    fn close_at(&self) -> Option<DateTime<Utc>> {
-        self.close_at
-    }
-}
-
-impl MarketDates for &&UpdateMarketDTO {
-    fn start_at(&self) -> Option<DateTime<Utc>> {
-        self.start_at
-    }
-    fn close_at(&self) -> Option<DateTime<Utc>> {
-        self.close_at
-    }
-}
-
-fn validate_market_dates(dto: impl MarketDates) -> Result<(), ValidationError> {
+fn validate_market_dates_create(dto: &CreateMarketDTO) -> Result<(), ValidationError> {
     let now = Utc::now();
 
-    let start_at = dto
-        .start_at()
-        .ok_or_else(|| ValidationError::new("start_at is required"))?;
-
-    let close_at = dto
-        .close_at()
-        .ok_or_else(|| ValidationError::new("close_at is required"))?;
-
-    if start_at <= now {
+    if dto.start_at <= now {
         return Err(ValidationError::new(
             "start_at must be greater than the current time",
         ));
     }
 
-    if start_at >= close_at {
+    if dto.start_at >= dto.close_at {
         return Err(ValidationError::new("start_at must be less than close_at"));
+    }
+
+    Ok(())
+}
+
+fn validate_market_dates_update(dto: &UpdateMarketDTO) -> Result<(), ValidationError> {
+    let now = Utc::now();
+
+    if let Some(start_at) = dto.start_at {
+        if start_at <= now {
+            return Err(ValidationError::new(
+                "start_at must be greater than the current time",
+            ));
+        }
+    }
+
+    if let (Some(start_at), Some(close_at)) = (dto.start_at, dto.close_at) {
+        if start_at >= close_at {
+            return Err(ValidationError::new("start_at must be less than close_at"));
+        }
     }
 
     Ok(())
@@ -128,7 +116,7 @@ pub struct CreateOutcomeDTO {
 }
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-#[validate(schema(function = "validate_market_dates"))]
+#[validate(schema(function = "validate_market_dates_create"))]
 pub struct CreateMarketDTO {
     #[validate(length(min = 1, message = "Title is required"))]
     pub title: String,
@@ -139,8 +127,8 @@ pub struct CreateMarketDTO {
     #[validate(length(min = 1, message = "Category is required"))]
     pub category: String,
 
-    pub start_at: Option<DateTime<Utc>>,
-    pub close_at: Option<DateTime<Utc>>,
+    pub start_at: DateTime<Utc>,
+    pub close_at: DateTime<Utc>,
 
     #[validate(nested)]
     pub first_outcome: CreateOutcomeDTO,
@@ -150,43 +138,17 @@ pub struct CreateMarketDTO {
 }
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateOutcomeDTO {
-    pub outcome_id: Uuid,
-    #[validate(length(min = 1, message = "Label is required"))]
-    pub label: String,
-
-    #[validate(custom(
-        function = "validate_start_price",
-        message = "Start price must be between 0 and 1"
-    ))]
-    pub start_price: Decimal,
-
-    #[validate(custom(
-        function = "validate_total_shares",
-        message = "Total Shares must be greater than 100"
-    ))]
-    pub total_shares: Decimal,
-}
-
-#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-#[validate(schema(function = "validate_market_dates"))]
+#[validate(schema(function = "validate_market_dates_update"))]
 pub struct UpdateMarketDTO {
-    pub market_id: Uuid,
     #[validate(length(min = 1, message = "Title is required"))]
-    pub title: String,
+    pub title: Option<String>,
 
     #[validate(length(min = 1, message = "Description is required"))]
-    pub desciption: String,
+    pub desciption: Option<String>,
 
     #[validate(length(min = 1, message = "Category is required"))]
-    pub category: String,
+    pub category: Option<String>,
 
     pub start_at: Option<DateTime<Utc>>,
     pub close_at: Option<DateTime<Utc>>,
-
-    #[validate(nested)]
-    pub first_outcome: UpdateOutcomeDTO,
-
-    #[validate(nested)]
-    pub second_outcome: UpdateOutcomeDTO,
 }

@@ -42,7 +42,7 @@ pub struct UpdateBalanceDTO {
     pub balance: Decimal,
 }
 
-fn validate_order_field(value: &str) -> Result<(), ValidationError> {
+fn validate_transaction_order_field(value: &str) -> Result<(), ValidationError> {
     match value {
         "amount" | "created_at" => Ok(()),
         _ => Err(ValidationError::new(
@@ -53,7 +53,7 @@ fn validate_order_field(value: &str) -> Result<(), ValidationError> {
 
 fn validate_holding_order_field(value: &str) -> Result<(), ValidationError> {
     match value {
-        "shares" | "close_at" | "created_at" => Ok(()),
+        "shares" | "created_at" => Ok(()),
         _ => Err(ValidationError::new(
             "Invalid order field. Must be 'shares' or 'created_at'",
         )),
@@ -71,7 +71,7 @@ fn validate_order_by(value: &str) -> Result<(), ValidationError> {
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionsQueryDTO {
-    #[validate(custom(function = "validate_order_field"))]
+    #[validate(custom(function = "validate_transaction_order_field"))]
     pub order_field: Option<String>,
 
     #[validate(custom(function = "validate_order_by"))]
