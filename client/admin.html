@@ -1,0 +1,1372 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Polymarket Admin Console</title>
+    <style>
+      :root {
+        --bg: #f7f7f8;
+        --surface: #ffffff;
+        --surface-2: #fafafa;
+        --border: #e5e7eb;
+        --text: #0a0a0a;
+        --text-muted: #6b7280;
+        --primary: #4f46e5;
+        --primary-hover: #4338ca;
+        --danger: #dc2626;
+        --danger-hover: #b91c1c;
+        --success: #059669;
+        --warning: #d97706;
+        --radius: 10px;
+        --radius-sm: 6px;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+        --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+        min-height: 100vh;
+      }
+      header {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 16px 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 17px;
+      }
+      .brand-mark {
+        width: 28px;
+        height: 28px;
+        background: var(--primary);
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: white;
+        font-weight: 800;
+      }
+      .brand small {
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 32px 24px 64px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        box-shadow: var(--shadow);
+      }
+      h1 {
+        font-size: 22px;
+        margin-bottom: 4px;
+      }
+      h2 {
+        font-size: 17px;
+        margin-bottom: 16px;
+        font-weight: 600;
+      }
+      p.lead {
+        color: var(--text-muted);
+        font-size: 14px;
+        margin-bottom: 20px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      .form-grid .full {
+        grid-column: span 2;
+      }
+      .form-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+      .form-grid-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      @media (max-width: 720px) {
+        .form-grid,
+        .form-grid-3,
+        .form-grid-4 {
+          grid-template-columns: 1fr;
+        }
+        .form-grid .full {
+          grid-column: span 1;
+        }
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 6px;
+        color: var(--text);
+      }
+      input,
+      textarea,
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        font-family: inherit;
+        background: var(--surface-2);
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+        background: var(--surface);
+      }
+      textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      .fieldset {
+        border: 1px dashed var(--border);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        margin-top: 8px;
+        background: var(--surface-2);
+      }
+      .fieldset h3 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+        font-weight: 600;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 16px;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          transform 0.05s;
+        text-decoration: none;
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: white;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--primary-hover);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--text);
+        border-color: var(--border);
+      }
+      .btn-ghost:hover {
+        background: var(--surface-2);
+      }
+      .btn-danger {
+        background: var(--danger);
+        color: white;
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: var(--danger-hover);
+      }
+      .btn-success {
+        background: var(--success);
+        color: white;
+      }
+      .btn-success:hover:not(:disabled) {
+        filter: brightness(0.92);
+      }
+      .btn-sm {
+        padding: 6px 10px;
+        font-size: 13px;
+      }
+      .btn-row {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 4px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 24px;
+      }
+      .tab {
+        padding: 10px 16px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-muted);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        font-family: inherit;
+      }
+      .tab.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+      }
+      .tab:hover {
+        color: var(--text);
+      }
+
+      /* Filter panel */
+      .filter-panel {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .filter-panel h3 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .filter-panel .filter-section {
+        margin-bottom: 12px;
+      }
+      .filter-panel .filter-section:last-of-type {
+        margin-bottom: 0;
+      }
+      .filter-section-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+
+      /* Market list */
+      .market-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        margin-bottom: 10px;
+        background: var(--surface-2);
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .market-info {
+        flex: 1;
+        min-width: 260px;
+      }
+      .market-info h4 {
+        font-size: 15px;
+        margin-bottom: 4px;
+      }
+      .market-info p {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+      .market-info .meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #e0e7ff;
+        color: #3730a3;
+      }
+      .badge.pending {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .badge.active {
+        background: #dbeafe;
+        color: #1e40af;
+      }
+      .badge.closed {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .badge.resolved {
+        background: #d1fae5;
+        color: #065f46;
+      }
+      .badge.cancelled {
+        background: #e5e7eb;
+        color: #374151;
+      }
+
+      /* Pagination */
+      .pagination {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+        color: var(--text-muted);
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .pagination .controls {
+        display: flex;
+        gap: 8px;
+      }
+
+      /* Modal */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 16px;
+      }
+      .modal-backdrop.show {
+        display: flex;
+      }
+      .modal {
+        background: var(--surface);
+        border-radius: var(--radius);
+        width: 100%;
+        max-width: 560px;
+        box-shadow: var(--shadow-lg);
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+      .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-body {
+        padding: 24px;
+      }
+      .close-x {
+        background: none;
+        border: none;
+        font-size: 22px;
+        cursor: pointer;
+        color: var(--text-muted);
+        line-height: 1;
+      }
+      .outcome-card {
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .outcome-card h5 {
+        font-size: 16px;
+        margin-bottom: 4px;
+      }
+      .outcome-card p {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .toast-wrap {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 200;
+      }
+      .toast {
+        background: var(--text);
+        color: white;
+        padding: 12px 16px;
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        box-shadow: var(--shadow-lg);
+        max-width: 340px;
+        animation: slideIn 0.2s ease-out;
+      }
+      .toast.success {
+        background: var(--success);
+      }
+      .toast.error {
+        background: var(--danger);
+      }
+      @keyframes slideIn {
+        from {
+          transform: translateX(20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      .login-wrap {
+        display: grid;
+        place-items: center;
+        min-height: calc(100vh - 60px);
+        padding: 32px 16px;
+      }
+      .login-card {
+        width: 100%;
+        max-width: 420px;
+      }
+      .config-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      .btn-ghost .spinner {
+        border-color: rgba(0, 0, 0, 0.2);
+        border-top-color: var(--text);
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .filter-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+      }
+      .filter-row-3 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- AUTH SCREEN -->
+    <div id="authScreen" class="login-wrap">
+      <div class="card login-card">
+        <div class="brand" style="margin-bottom: 20px">
+          <div class="brand-mark">P</div>
+          <div>Polymarket <small>Admin</small></div>
+        </div>
+        <h1>Welcome back</h1>
+        <p class="lead">Sign in to access the admin console.</p>
+
+        <form id="loginForm">
+          <div style="margin-bottom: 14px">
+            <label for="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              value="admin@polymarketclone.com"
+              required
+            />
+          </div>
+          <div>
+            <label for="password">Password</label>
+            <input type="password" id="password" value="12345678" required />
+          </div>
+
+          <details class="config-section">
+            <summary
+              style="cursor: pointer; font-size: 13px; color: var(--text-muted)"
+            >
+              Service URLs (configure if different)
+            </summary>
+            <div style="margin-top: 12px">
+              <label for="authUrl">Auth Service Base URL</label>
+              <input type="url" id="authUrl" />
+            </div>
+            <div style="margin-top: 12px">
+              <label for="marketUrl">Market Service Base URL</label>
+              <input type="url" id="marketUrl" />
+            </div>
+          </details>
+
+          <div class="btn-row">
+            <button
+              type="submit"
+              class="btn btn-primary"
+              style="flex: 1; justify-content: center"
+              id="loginBtn"
+            >
+              Sign In
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app" class="hidden">
+      <header>
+        <div class="brand">
+          <div class="brand-mark">P</div>
+          <div>Polymarket <small>Admin</small></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="logoutBtn">Logout</button>
+      </header>
+
+      <main>
+        <div class="tabs">
+          <button class="tab active" data-tab="create">Create Market</button>
+          <button class="tab" data-tab="list">Browse Markets</button>
+        </div>
+
+        <!-- CREATE TAB -->
+        <div id="tab-create">
+          <div class="card">
+            <h2>Create a new market</h2>
+            <p class="lead">
+              Define prediction market details and two possible outcomes.
+            </p>
+
+            <form id="createMarketForm">
+              <div class="form-grid">
+                <div class="full">
+                  <label for="title">Title</label>
+                  <input
+                    type="text"
+                    id="title"
+                    placeholder="Will Bitcoin reach $100k by end of 2025?"
+                    required
+                  />
+                </div>
+                <div class="full">
+                  <label for="description">Description</label>
+                  <textarea
+                    id="description"
+                    placeholder="Briefly describe the resolution criteria..."
+                    required
+                  ></textarea>
+                </div>
+                <div>
+                  <label for="category">Category</label>
+                  <input
+                    type="text"
+                    id="category"
+                    placeholder="Crypto, Politics, Sports..."
+                    required
+                  />
+                </div>
+                <div></div>
+                <div>
+                  <label for="start_at">Start At (UTC)</label>
+                  <input type="datetime-local" id="start_at" required />
+                </div>
+                <div>
+                  <label for="close_at">Close At (UTC)</label>
+                  <input type="datetime-local" id="close_at" required />
+                </div>
+              </div>
+
+              <div class="form-grid" style="margin-top: 20px">
+                <div class="fieldset full">
+                  <h3>First Outcome</h3>
+                  <div class="form-grid">
+                    <div class="full">
+                      <label for="first_label">Label</label>
+                      <input
+                        type="text"
+                        id="first_label"
+                        value="Yes"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label for="first_price">Start Price</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        id="first_price"
+                        value="0.5"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label for="first_shares">Total Shares</label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="1"
+                        id="first_shares"
+                        value="1000"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="fieldset full">
+                  <h3>Second Outcome</h3>
+                  <div class="form-grid">
+                    <div class="full">
+                      <label for="second_label">Label</label>
+                      <input
+                        type="text"
+                        id="second_label"
+                        value="No"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label for="second_price">Start Price</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        id="second_price"
+                        value="0.5"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label for="second_shares">Total Shares</label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="1"
+                        id="second_shares"
+                        value="1000"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="btn-row">
+                <button type="submit" class="btn btn-primary" id="createBtn">
+                  Create Market
+                </button>
+                <button type="reset" class="btn btn-ghost">Reset</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- LIST TAB -->
+        <div id="tab-list" class="hidden">
+          <div class="card">
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 16px;
+              "
+            >
+              <div>
+                <h2>Browse Markets</h2>
+                <p class="lead" style="margin-bottom: 0">
+                  Filter, sort, and resolve markets.
+                </p>
+              </div>
+            </div>
+
+            <!-- FILTER PANEL -->
+            <div class="filter-panel">
+              <h3>
+                <span>Filters & Sort</span>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  id="resetFiltersBtn"
+                >
+                  Reset
+                </button>
+              </h3>
+
+              <div class="filter-section">
+                <div class="filter-section-title">Filter</div>
+                <div class="filter-row">
+                  <div>
+                    <label for="f_status">Status</label>
+                    <select id="f_status">
+                      <option value="ALL">All</option>
+                      <option value="PENDING">Pending</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="CLOSED" selected>Closed</option>
+                      <option value="RESOLVED">Resolved</option>
+                      <option value="CANCELLED">Cancelled</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="f_close_after">Close After</label>
+                    <input type="date" id="f_close_after" />
+                  </div>
+                  <div>
+                    <label for="f_close_before">Close Before</label>
+                    <input type="date" id="f_close_before" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="filter-section">
+                <div class="filter-section-title">Sort & Pagination</div>
+                <div class="filter-row-3">
+                  <div>
+                    <label for="f_order_field">Order Field</label>
+                    <select id="f_order_field">
+                      <option value="">—</option>
+                      <option value="start_at" selected>Start Date</option>
+                      <option value="close_at">Close Date</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="f_order_by">Direction</label>
+                    <select id="f_order_by">
+                      <option value="ASC">Ascending</option>
+                      <option value="DESC" selected>Descending</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="f_limit">Page Size</label>
+                    <input
+                      type="number"
+                      id="f_limit"
+                      min="1"
+                      max="100"
+                      value="20"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="btn-row">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  id="applyFiltersBtn"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+
+            <!-- MARKET LIST -->
+            <div id="marketList">
+              <p
+                style="
+                  color: var(--text-muted);
+                  text-align: center;
+                  padding: 24px;
+                "
+              >
+                Click "Apply Filters" to load markets.
+              </p>
+            </div>
+
+            <!-- PAGINATION -->
+            <div class="pagination" id="pagination" style="display: none">
+              <div id="paginationInfo">Showing 0 markets</div>
+              <div class="controls">
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  id="prevPageBtn"
+                  disabled
+                >
+                  ← Previous
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  id="nextPageBtn"
+                  disabled
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- RESOLVE MODAL -->
+    <div class="modal-backdrop" id="resolveModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2 id="modalTitle">Resolve Market</h2>
+          <button class="close-x" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+      </div>
+    </div>
+
+    <div class="toast-wrap" id="toastWrap"></div>
+
+    <script>
+      /* =================== CONSTANTS =================== */
+      const BASE_URLS = Object.freeze({
+        AUTH: "http://localhost:3001",
+        MARKET: "http://localhost:3006",
+      });
+
+      const MARKET_STATUSES = Object.freeze({
+        PENDING: "PENDING",
+        ACTIVE: "ACTIVE",
+        CLOSED: "CLOSED",
+        RESOLVED: "RESOLVED",
+        CANCELLED: "CANCELLED",
+      });
+
+      const ORDER_FIELDS = Object.freeze(["start_at", "close_at"]);
+      const ORDER_DIRECTIONS = Object.freeze(["ASC", "DESC"]);
+
+      const DEFAULT_FILTERS = Object.freeze({
+        status: MARKET_STATUSES.CLOSED,
+        order_field: "close_at",
+        order_by: "DESC",
+        limit: 20,
+        close_after: "",
+        close_before: "",
+      });
+
+      /* =================== STATE =================== */
+      const state = {
+        token: localStorage.getItem("admin_token") || "",
+        authUrl: localStorage.getItem("auth_url") || BASE_URLS.AUTH,
+        marketUrl: localStorage.getItem("market_url") || BASE_URLS.MARKET,
+        filters: { ...DEFAULT_FILTERS, skip: 0 },
+        lastResultCount: 0,
+      };
+
+      /* =================== HELPERS =================== */
+      const $ = (sel) => document.querySelector(sel);
+      const $$ = (sel) => document.querySelectorAll(sel);
+
+      function toast(msg, type = "info") {
+        const wrap = $("#toastWrap");
+        const t = document.createElement("div");
+        t.className = "toast " + type;
+        t.textContent = msg;
+        wrap.appendChild(t);
+        setTimeout(() => {
+          t.style.opacity = "0";
+          t.style.transform = "translateX(20px)";
+          t.style.transition = "all .2s";
+        }, 3000);
+        setTimeout(() => t.remove(), 3300);
+      }
+
+      async function apiRequest(path, options = {}) {
+        const isMarket =
+          path.startsWith("/api/market") || path.includes("/market");
+        const base = isMarket ? state.marketUrl : state.authUrl;
+        const url = base.replace(/\/$/, "") + path;
+
+        const headers = {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        };
+        if (state.token) headers["Authorization"] = "Bearer " + state.token;
+
+        try {
+          const res = await fetch(url, { ...options, headers });
+          const text = await res.text();
+          let data;
+          try {
+            data = text ? JSON.parse(text) : {};
+          } catch {
+            data = text;
+          }
+          if (!res.ok) {
+            throw new Error(
+              data?.message || data?.error || `HTTP ${res.status}`
+            );
+          }
+          return data;
+        } catch (err) {
+          if (err.message === "Failed to fetch")
+            throw new Error("Network error — check service URLs");
+          throw err;
+        }
+      }
+
+      function setLoading(btn, loading) {
+        if (!btn) return;
+        if (loading) {
+          btn.dataset.origHtml = btn.innerHTML;
+          btn.innerHTML = '<span class="spinner"></span> Working...';
+          btn.disabled = true;
+        } else {
+          btn.innerHTML = btn.dataset.origHtml || "Done";
+          btn.disabled = false;
+        }
+      }
+
+      function fmtDate(iso) {
+        if (!iso) return "—";
+        const d = new Date(iso);
+        return d.toLocaleString();
+      }
+
+      function localDatetimeToISO(val) {
+        const d = new Date(val);
+        return d.toISOString();
+      }
+
+      function escapeHtml(s) {
+        return String(s || "").replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c]
+        );
+      }
+
+      /* =================== QUERY BUILDER =================== */
+      function buildMarketsQuery(filters) {
+        const params = new URLSearchParams();
+
+        if (filters.status && filters.status !== "ALL") {
+          params.set("status", filters.status);
+        }
+        if (filters.order_field && ORDER_FIELDS.includes(filters.order_field)) {
+          params.set("order_field", filters.order_field);
+        }
+        if (filters.order_by && ORDER_DIRECTIONS.includes(filters.order_by)) {
+          params.set("order_by", filters.order_by);
+        }
+        if (filters.close_after)
+          params.set(
+            "close_after",
+            filters.close_after ? `${filters.close_after}T00:00:00Z` : ""
+          );
+        if (filters.close_before)
+          params.set(
+            "close_before",
+            filters.close_before ? `${filters.close_before}T00:00:00Z` : ""
+          );
+        if (filters.limit && Number(filters.limit) > 0) {
+          params.set("limit", String(filters.limit));
+        }
+        if (filters.skip && Number(filters.skip) > 0) {
+          params.set("skip", String(filters.skip));
+        }
+
+        const qs = params.toString();
+        return qs ? `/api/market?${qs}` : "/api/market";
+      }
+
+      function readFiltersFromUI() {
+        return {
+          status: $("#f_status").value,
+          order_field: $("#f_order_field").value,
+          order_by: $("#f_order_by").value,
+          close_after: $("#f_close_after").value,
+          close_before: $("#f_close_before").value,
+          limit: Number($("#f_limit").value) || DEFAULT_FILTERS.limit,
+          // skip is handled internally, not read from UI
+        };
+      }
+
+      function writeFiltersToUI(filters) {
+        $("#f_status").value = filters.status || "ALL";
+        $("#f_order_field").value = filters.order_field || "";
+        $("#f_order_by").value = filters.order_by || "ASC";
+        $("#f_close_after").value = filters.close_after || "";
+        $("#f_close_before").value = filters.close_before || "";
+        $("#f_limit").value = filters.limit || DEFAULT_FILTERS.limit;
+      }
+
+      /* =================== AUTH =================== */
+      // Pre-fill URL fields with constants (once per page load, unless localStorage override exists)
+      if (!$("#authUrl").value) $("#authUrl").value = BASE_URLS.AUTH;
+      if (!$("#marketUrl").value) $("#marketUrl").value = BASE_URLS.MARKET;
+
+      $("#loginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = $("#email").value.trim();
+        const password = $("#password").value;
+        const authUrl = $("#authUrl").value.trim() || BASE_URLS.AUTH;
+        const marketUrl = $("#marketUrl").value.trim() || BASE_URLS.MARKET;
+
+        state.authUrl = authUrl;
+        state.marketUrl = marketUrl;
+
+        const btn = $("#loginBtn");
+        setLoading(btn, true);
+        try {
+          const res = await apiRequest("/api/admin/signin", {
+            method: "POST",
+            body: JSON.stringify({ email, password }),
+          });
+          const token = res["admin-token"];
+          if (!token) throw new Error("Invalid response from server");
+          state.token = token;
+          localStorage.setItem("admin_token", token);
+          localStorage.setItem("auth_url", state.authUrl);
+          localStorage.setItem("market_url", state.marketUrl);
+          showApp();
+          toast("Signed in successfully", "success");
+        } catch (err) {
+          toast("Login failed: " + err.message, "error");
+        } finally {
+          setLoading(btn, false);
+        }
+      });
+
+      $("#logoutBtn").addEventListener("click", () => {
+        state.token = "";
+        localStorage.removeItem("admin_token");
+        $("#app").classList.add("hidden");
+        $("#authScreen").classList.remove("hidden");
+      });
+
+      function showApp() {
+        $("#authScreen").classList.add("hidden");
+        $("#app").classList.remove("hidden");
+      }
+
+      if (state.token) showApp();
+
+      /* =================== TABS =================== */
+      $$(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          $$(".tab").forEach((t) => t.classList.remove("active"));
+          tab.classList.add("active");
+          $("#tab-create").classList.add("hidden");
+          $("#tab-list").classList.add("hidden");
+          $("#tab-" + tab.dataset.tab).classList.remove("hidden");
+          if (tab.dataset.tab === "list") {
+            state.filters.skip = 0;
+            loadMarkets();
+          }
+        });
+      });
+
+      /* =================== CREATE MARKET =================== */
+      $("#createMarketForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const body = {
+          title: $("#title").value.trim(),
+          desciption: $("#description").value.trim(), // matches API typo
+          description: $("#description").value.trim(),
+          category: $("#category").value.trim(),
+          start_at: localDatetimeToISO($("#start_at").value),
+          close_at: localDatetimeToISO($("#close_at").value),
+          first_outcome: {
+            label: $("#first_label").value.trim(),
+            start_price: $("#first_price").value,
+            total_shares: $("#first_shares").value,
+          },
+          second_outcome: {
+            label: $("#second_label").value.trim(),
+            start_price: $("#second_price").value,
+            total_shares: $("#second_shares").value,
+          },
+        };
+
+        const btn = $("#createBtn");
+        setLoading(btn, true);
+        try {
+          const res = await apiRequest("/api/market", {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
+          toast("Market created: " + res.title, "success");
+          $("#createMarketForm").reset();
+        } catch (err) {
+          toast("Create failed: " + err.message, "error");
+        } finally {
+          setLoading(btn, false);
+        }
+      });
+
+      /* =================== LOAD MARKETS =================== */
+      async function loadMarkets() {
+        // Read UI filters, then merge with internally-managed skip
+        const uiFilters = readFiltersFromUI();
+        state.filters = { ...uiFilters, skip: state.filters.skip };
+
+        const list = $("#marketList");
+        const pagination = $("#pagination");
+        list.innerHTML =
+          '<p style="color:var(--text-muted); text-align:center; padding:24px;">Loading...</p>';
+
+        try {
+          const path = buildMarketsQuery(state.filters);
+          const markets = await apiRequest(path);
+
+          if (!Array.isArray(markets) || markets.length === 0) {
+            // If we got no results and we're on a non-zero page, fall back to first page
+            if (state.filters.skip > 0) {
+              state.filters.skip = 0;
+              toast("No more results — jumped back to page 1", "info");
+              loadMarkets();
+              return;
+            }
+            list.innerHTML =
+              '<p style="color:var(--text-muted); text-align:center; padding:24px;">No markets match the current filters.</p>';
+            pagination.style.display = "none";
+            state.lastResultCount = 0;
+            return;
+          }
+
+          state.lastResultCount = markets.length;
+          list.innerHTML = "";
+          markets.forEach((m) => {
+            const el = document.createElement("div");
+            el.className = "market-item";
+            const statusLower = (m.status || "").toLowerCase();
+            el.innerHTML = `
+              <div class="market-info">
+                <h4>${escapeHtml(m.title)}</h4>
+                <p>${escapeHtml(m.description || "")}</p>
+                <div class="meta">
+                  <span class="badge ${statusLower}">${escapeHtml(m.status || "—")}</span>
+                  <span style="font-size:12px; color:var(--text-muted);">Category: ${escapeHtml(m.category || "—")}</span>
+                  <span style="font-size:12px; color:var(--text-muted);">Start: ${fmtDate(m.start_at)}</span>
+                  <span style="font-size:12px; color:var(--text-muted);">Close: ${fmtDate(m.close_at)}</span>
+                </div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-primary btn-sm" data-id="${m.id}">Resolve →</button>
+              </div>
+            `;
+            el.querySelector("button").addEventListener("click", () =>
+              openResolveModal(m.id, m.title)
+            );
+            list.appendChild(el);
+          });
+
+          // Pagination info
+          const skip = Number(state.filters.skip || 0);
+          const limit = Number(state.filters.limit || DEFAULT_FILTERS.limit);
+          const showing = markets.length;
+          const first = skip + 1;
+          const last = skip + showing;
+          $("#paginationInfo").textContent = `Showing ${first}–${last}`;
+          $("#prevPageBtn").disabled = skip <= 0;
+          // Enable "Next" only if we got a full page (heuristic for "more results exist")
+          $("#nextPageBtn").disabled = showing < limit;
+          pagination.style.display = "flex";
+        } catch (err) {
+          list.innerHTML = `<p style="color:var(--danger); text-align:center; padding:24px;">Failed to load: ${escapeHtml(err.message)}</p>`;
+          pagination.style.display = "none";
+        }
+      }
+
+      $("#applyFiltersBtn").addEventListener("click", () => {
+        // Reset pagination when filters change
+        state.filters.skip = 0;
+        loadMarkets();
+      });
+
+      $("#resetFiltersBtn").addEventListener("click", () => {
+        writeFiltersToUI(DEFAULT_FILTERS);
+        state.filters.skip = 0;
+        loadMarkets();
+      });
+
+      $("#prevPageBtn").addEventListener("click", () => {
+        const limit = Number($("#f_limit").value) || DEFAULT_FILTERS.limit;
+        const currentSkip = Number(state.filters.skip || 0);
+        const newSkip = Math.max(0, currentSkip - limit);
+        state.filters.skip = newSkip;
+        loadMarkets();
+      });
+
+      $("#nextPageBtn").addEventListener("click", () => {
+        const limit = Number($("#f_limit").value) || DEFAULT_FILTERS.limit;
+        const currentSkip = Number(state.filters.skip || 0);
+        state.filters.skip = currentSkip + limit;
+        loadMarkets();
+      });
+
+      /* =================== RESOLVE MODAL =================== */
+      async function openResolveModal(marketId, title) {
+        $("#modalTitle").textContent = "Resolve: " + title;
+        $("#modalBody").innerHTML =
+          '<p style="color:var(--text-muted); text-align:center; padding:16px;">Loading market details...</p>';
+        $("#resolveModal").classList.add("show");
+
+        try {
+          const market = await apiRequest(`/api/market/${marketId}`);
+          const f = market.first_outcome;
+          const s = market.second_outcome;
+          const alreadyResolved = market.status === MARKET_STATUSES.RESOLVED;
+
+          $("#modalBody").innerHTML = `
+            <p class="lead">Status: <span class="badge ${(market.status || "").toLowerCase()}">${escapeHtml(market.status)}</span></p>
+            <p style="margin-bottom: 16px; color: var(--text-muted); font-size:13px;">Select the winning outcome. This action cannot be undone.</p>
+
+            <div class="outcome-card">
+              <div>
+                <h5>${escapeHtml(f.label)}</h5>
+                <p>Start: $${f.start_price} · Shares: ${f.total_shares}</p>
+                <p style="font-family:monospace; font-size:11px; color:var(--text-muted);">ID: ${f.id}</p>
+              </div>
+              <button class="btn btn-success btn-sm" id="resolveFirst" ${alreadyResolved ? "disabled" : ""}>Resolve as Winner</button>
+            </div>
+
+            <div class="outcome-card">
+              <div>
+                <h5>${escapeHtml(s.label)}</h5>
+                <p>Start: $${s.start_price} · Shares: ${s.total_shares}</p>
+                <p style="font-family:monospace; font-size:11px; color:var(--text-muted);">ID: ${s.id}</p>
+              </div>
+              <button class="btn btn-success btn-sm" id="resolveSecond" ${alreadyResolved ? "disabled" : ""}>Resolve as Winner</button>
+            </div>
+
+            ${alreadyResolved ? '<p style="color: var(--success); text-align:center; margin-top:12px; font-size:13px;">✓ This market has already been resolved.</p>' : ""}
+          `;
+
+          $("#resolveFirst").addEventListener("click", () =>
+            doResolve(marketId, f.id, $("#resolveFirst"))
+          );
+          $("#resolveSecond").addEventListener("click", () =>
+            doResolve(marketId, s.id, $("#resolveSecond"))
+          );
+        } catch (err) {
+          $("#modalBody").innerHTML =
+            `<p style="color:var(--danger);">Failed to load market: ${escapeHtml(err.message)}</p>`;
+        }
+      }
+
+      async function doResolve(marketId, outcomeId, btn) {
+        if (
+          !confirm(
+            "Are you sure you want to resolve this market with the selected outcome as winner?"
+          )
+        )
+          return;
+        setLoading(btn, true);
+        try {
+          await apiRequest(`/api/market/${marketId}/resolve/${outcomeId}`, {
+            method: "PUT",
+          });
+          toast("Market resolved successfully", "success");
+          closeModal();
+          loadMarkets();
+        } catch (err) {
+          toast("Resolve failed: " + err.message, "error");
+        } finally {
+          setLoading(btn, false);
+        }
+      }
+
+      function closeModal() {
+        $("#resolveModal").classList.remove("show");
+      }
+      $("#resolveModal").addEventListener("click", (e) => {
+        if (e.target.id === "resolveModal") closeModal();
+      });
+
+      /* =================== INIT =================== */
+      (function setDefaults() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        const isoLocal = now.toISOString().slice(0, 16);
+        const later = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+        later.setMinutes(later.getMinutes() - later.getTimezoneOffset());
+        const isoLater = later.toISOString().slice(0, 16);
+        $("#start_at").value = isoLocal;
+        $("#close_at").value = isoLater;
+
+        // Initialize filter UI from defaults (skip is not in UI)
+        writeFiltersToUI(state.filters);
+      })();
+    </script>
+  </body>
+</html>
