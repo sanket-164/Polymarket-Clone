@@ -1,14 +1,191 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { placeOrder } from "@/lib/order/order-api";
 import type { OrderSide } from "@/lib/order/types";
 import type { Outcome } from "@/lib/market/types";
 
+/* ---------------------------------------------------------------------------
+ * Expiration dropdown
+ * ------------------------------------------------------------------------- */
+
+type ExpirationKey = "never" | "5m" | "1h" | "12h" | "24h" | "eod" | "custom";
+
+const EXPIRATION_OPTIONS: { key: ExpirationKey; label: string }[] = [
+  { key: "never", label: "Never" },
+  { key: "5m", label: "5m" },
+  { key: "1h", label: "1h" },
+  { key: "12h", label: "12h" },
+  { key: "24h", label: "24h" },
+  { key: "eod", label: "End of day" },
+  { key: "custom", label: "Custom" },
+];
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 3_600_000;
+
+function computeExpiresAt(
+  key: ExpirationKey,
+  customValue: string
+): string | null {
+  const now = new Date();
+
+  switch (key) {
+    case "5m":
+      return new Date(now.getTime() + 5 * MINUTE_MS).toISOString();
+    case "1h":
+      return new Date(now.getTime() + HOUR_MS).toISOString();
+    case "12h":
+      return new Date(now.getTime() + 12 * HOUR_MS).toISOString();
+    case "24h":
+      return new Date(now.getTime() + 24 * HOUR_MS).toISOString();
+    case "eod": {
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      return endOfDay.toISOString();
+    }
+    case "custom": {
+      const parsed = new Date(customValue);
+      return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    }
+    default:
+      return null; // "never"
+  }
+}
+
+function toLocalInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+interface ExpirationSelectProps {
+  value: ExpirationKey;
+  customValue: string;
+  onChange: (key: ExpirationKey) => void;
+  onCustomChange: (value: string) => void;
+}
+
+function ExpirationSelect({
+  value,
+  customValue,
+  onChange,
+  onCustomChange,
+}: ExpirationSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click or Escape
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const selectedLabel =
+    EXPIRATION_OPTIONS.find((option) => option.key === value)?.label ?? "Never";
+
+  return (
+    <div ref={rootRef} className="relative">
+      {/* Trigger row: "Expires" left, value + chevron right */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-secondary">Expires</span>
+
+        <button
+          type="button"
+          onClick={() => setIsOpen((open) => !open)}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          className="flex items-center gap-1.5 text-sm font-medium text-accent transition hover:text-accent/80"
+        >
+          {selectedLabel}
+          <svg
+            viewBox="0 0 12 12"
+            className={`h-3 w-3 transition-transform duration-200 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M2 4l4 4 4-4" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Floating menu (overlays content below, like the screenshot) */}
+      {isOpen && (
+        <ul
+          role="listbox"
+          aria-label="Order expiration"
+          className="absolute right-0 z-30 mt-2 w-44 rounded-xl border border-border bg-surface py-2 shadow-2xl shadow-background/60"
+        >
+          {EXPIRATION_OPTIONS.map((option) => (
+            <li key={option.key}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={option.key === value}
+                onClick={() => {
+                  onChange(option.key);
+                  setIsOpen(false);
+                }}
+                className={`block w-full px-4 py-2.5 text-left text-sm transition ${
+                  option.key === value
+                    ? "bg-card font-medium text-accent"
+                    : "text-text hover:bg-card"
+                }`}
+              >
+                {option.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Custom date/time picker */}
+      {value === "custom" && (
+        <div className="mt-3">
+          <input
+            type="datetime-local"
+            value={customValue}
+            min={toLocalInputValue(new Date())}
+            onChange={(event) => onCustomChange(event.target.value)}
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-text focus:border-accent focus:outline-none"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Limit order form
+ * ------------------------------------------------------------------------- */
+
 interface LimitOrderFormProps {
   marketId: string;
+  marketCloseAt: string;
   firstOutcome: Outcome;
   secondOutcome: Outcome;
   currentPrices: Record<string, string>;
@@ -26,6 +203,7 @@ const QUICK_SHARE_OPTIONS = [-100, -10, +10, +100, +200];
 
 export function LimitOrderForm({
   marketId,
+  marketCloseAt,
   firstOutcome,
   secondOutcome,
   currentPrices,
@@ -36,12 +214,20 @@ export function LimitOrderForm({
     side: "BUY",
     outcomeId: firstOutcome.id,
     shares: 100,
-    price: firstOutcome.current_price.slice(0, 4), // Default to first outcome's price
+    price: firstOutcome.current_price.slice(0, 4),
   });
+  const [expiration, setExpiration] = useState<ExpirationKey>("never");
+  const [customExpiration, setCustomExpiration] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false);
+
+  const expiresAt = useMemo(
+    () => computeExpiresAt(expiration, customExpiration),
+    [expiration, customExpiration]
+  );
+  const effectiveExpiresAt = expiresAt ?? marketCloseAt;
 
   // Get real-time prices from WebSocket, fallback to initial market price
   const liveFirstPrice =
@@ -52,6 +238,13 @@ export function LimitOrderForm({
   const selectedLivePrice =
     formState.outcomeId === firstOutcome.id ? liveFirstPrice : liveSecondPrice;
 
+  const getDefaultPriceForOutcome = (outcomeId: string) => {
+    const livePrice =
+      outcomeId === firstOutcome.id ? liveFirstPrice : liveSecondPrice;
+
+    return Number(livePrice).toFixed(2);
+  };
+
   // Calculate total cost and potential win
   const priceNum = parseFloat(formState.price) || 0;
   const totalCost = formState.shares * priceNum;
@@ -61,7 +254,11 @@ export function LimitOrderForm({
       : formState.shares * priceNum;
 
   const handleSideChange = (side: OrderSide) => {
-    setFormState((prev) => ({ ...prev, side }));
+    setFormState((prev) => ({
+      ...prev,
+      side,
+      price: getDefaultPriceForOutcome(prev.outcomeId),
+    }));
     setError(null);
     setSuccessMessage(null);
   };
@@ -70,24 +267,11 @@ export function LimitOrderForm({
     const newLivePrice =
       outcomeId === firstOutcome.id ? liveFirstPrice : liveSecondPrice;
 
-    setFormState((prev) => {
-      // Auto-set the price to the market price ONLY when switching outcomes
-      // or if the price field is currently empty. This prevents overwriting
-      // manual edits if the user accidentally clicks the same outcome again.
-      if (prev.outcomeId !== outcomeId || prev.price === "") {
-        return {
-          ...prev,
-          outcomeId,
-          price: Number(newLivePrice).toFixed(2),
-        };
-      }
-
-      // If clicking the same outcome and a price already exists, keep the existing price
-      return {
-        ...prev,
-        outcomeId,
-      };
-    });
+    setFormState((prev) => ({
+      ...prev,
+      outcomeId,
+      price: Number(newLivePrice).toFixed(2),
+    }));
 
     setError(null);
     setSuccessMessage(null);
@@ -98,6 +282,14 @@ export function LimitOrderForm({
       const newShares = Math.max(0, prev.shares + delta);
       return { ...prev, shares: newShares };
     });
+  };
+
+  const handleExpirationChange = (key: ExpirationKey) => {
+    setExpiration(key);
+    // Pre-fill the custom picker with now + 1h the first time it's opened
+    if (key === "custom" && !customExpiration) {
+      setCustomExpiration(toLocalInputValue(new Date(Date.now() + HOUR_MS)));
+    }
   };
 
   const handleSubmit = async () => {
@@ -118,6 +310,10 @@ export function LimitOrderForm({
       setError("Price must be between 0.01 and 1.00");
       return;
     }
+    if (expiration === "custom" && !expiresAt) {
+      setError("Please pick an expiration date and time");
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
@@ -130,10 +326,15 @@ export function LimitOrderForm({
         shares: formState.shares,
         price: priceNum,
         side: formState.side,
+        expires_at: effectiveExpiresAt,
       });
 
       setSuccessMessage("Order placed successfully!");
-      setFormState((prev) => ({ ...prev, shares: 0, price: "" }));
+      setFormState((prev) => ({
+        ...prev,
+        shares: 100,
+        price: getDefaultPriceForOutcome(prev.outcomeId),
+      }));
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to place order");
@@ -241,7 +442,6 @@ export function LimitOrderForm({
             value={formState.price}
             onChange={(e) => {
               const val = e.target.value;
-              // Allow empty string or valid floating point numbers while typing
               if (val === "" || /^\d*\.?\d*$/.test(val)) {
                 setFormState((prev) => ({ ...prev, price: val }));
               }
@@ -288,6 +488,16 @@ export function LimitOrderForm({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Expiration Dropdown */}
+      <div className="mb-4">
+        <ExpirationSelect
+          value={expiration}
+          customValue={customExpiration}
+          onChange={handleExpirationChange}
+          onCustomChange={setCustomExpiration}
+        />
       </div>
 
       {/* Summary (No currency signs) */}

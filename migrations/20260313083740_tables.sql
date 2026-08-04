@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS orders (
     remaining_shares DECIMAL(20, 8) NOT NULL,
     price DECIMAL(20, 8) NOT NULL,
     status order_status NOT NULL DEFAULT 'PENDING',
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -210,8 +211,8 @@ INSERT INTO wallets (id, user_id, balance, locked_balance) VALUES ('11111111-111
 ALTER TABLE orders REPLICA IDENTITY FULL;
 ALTER TABLE holdings REPLICA IDENTITY FULL;
 
--- Function to advance market statuses based on time
-CREATE OR REPLACE FUNCTION update_market_statuses()
+-- Function to advance statuses based on time
+CREATE OR REPLACE FUNCTION update_statuses()
 RETURNS void AS $$
 BEGIN
     -- PENDING -> ACTIVE once start_at has passed
@@ -228,18 +229,18 @@ BEGIN
     WHERE status = 'ACTIVE'
       AND close_at <= now();
 
-    -- PENDING or PARTIAL orders for CLOSED markets should be marked as EXPIRED
+    -- PENDING or PARTIAL orders should be marked as EXPIRED once expires_at has passed
     UPDATE orders
     SET status = 'EXPIRED',
         updated_at = CURRENT_TIMESTAMP
     WHERE status IN ('PENDING', 'PARTIAL')
-      AND market_id IN (SELECT id FROM market WHERE close_at <= now());
+        AND expires_at <= now();
 END;
 $$ LANGUAGE plpgsql;
 
--- Schedule update_market_statuses to run every minute
+-- Schedule update_statuses to run every minute
 SELECT cron.schedule(
-    'update-market-statuses',
+    'update-statuses',
     '* * * * *',
-    $$SELECT update_market_statuses();$$
+    $$SELECT update_statuses();$$
 );

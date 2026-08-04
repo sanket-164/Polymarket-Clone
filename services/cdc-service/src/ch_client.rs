@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS orders
         'EXPIRED' = 5
     ),
 
+    expires_at DateTime64(3),
     created_at DateTime64(3),
     updated_at DateTime64(3)
 )

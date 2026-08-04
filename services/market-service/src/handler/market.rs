@@ -100,13 +100,13 @@ async fn create_market(
 
     let first_outcome_order = app_state
         .pg_client
-        .insert_sell_order(first_outcome, admin_id)
+        .insert_sell_order(first_outcome, admin_id, market.market.close_at)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     let second_outcome_order = app_state
         .pg_client
-        .insert_sell_order(second_outcome, admin_id)
+        .insert_sell_order(second_outcome, admin_id, market.market.close_at)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

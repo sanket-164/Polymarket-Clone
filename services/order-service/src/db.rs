@@ -62,6 +62,7 @@ pub trait OrderExt {
         outcome_id: Uuid,
         shares: Decimal,
         price: Decimal,
+        expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error>;
     async fn sell_order(
         &self,
@@ -70,6 +71,7 @@ pub trait OrderExt {
         outcome_id: Uuid,
         shares: Decimal,
         price: Decimal,
+        expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error>;
     async fn trade(&self, buy_order: Order, sell_order: Order) -> Result<Trade, sqlx::Error>;
 }
@@ -179,7 +181,7 @@ impl OrderExt for PGClient {
         skip: i64,
     ) -> Result<Vec<Order>, sqlx::Error> {
         let mut query = String::from(
-            "SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, created_at, updated_at
+            "SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, expires_at, created_at, updated_at
             FROM orders
             WHERE user_id = $1"
         );
@@ -246,6 +248,7 @@ impl OrderExt for PGClient {
         outcome_id: Uuid,
         shares: Decimal,
         price: Decimal,
+        expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error> {
         let cost = price * shares;
         let mut tx = self.pool.begin().await?;
@@ -264,12 +267,12 @@ impl OrderExt for PGClient {
                ON CONFLICT (user_id, market_id, outcome_id) DO NOTHING
            )
            INSERT INTO orders
-               (user_id, market_id, outcome_id, side, shares, remaining_shares, price)
-           VALUES ($2, $3, $4, $5, $6, $6, $7)
+               (user_id, market_id, outcome_id, side, shares, remaining_shares, price, expires_at)
+           VALUES ($2, $3, $4, $5, $6, $6, $7, $8)
            RETURNING
                id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
-               created_at, updated_at"#,
+               expires_at, created_at, updated_at"#,
         )
         .bind(cost)
         .bind(user_id)
@@ -278,6 +281,7 @@ impl OrderExt for PGClient {
         .bind(OrderSide::BUY)
         .bind(shares) // (shares & remaining_shares)
         .bind(price)
+        .bind(expires_at)
         .fetch_one(&mut *tx)
         .await?;
 
@@ -292,6 +296,7 @@ impl OrderExt for PGClient {
         outcome_id: Uuid,
         shares: Decimal,
         price: Decimal,
+        expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
@@ -304,12 +309,12 @@ impl OrderExt for PGClient {
                WHERE  user_id = $2 AND market_id = $3 AND outcome_id = $4
            )
            INSERT INTO orders
-               (user_id, market_id, outcome_id, side, shares, remaining_shares, price)
-           VALUES ($2, $3, $4, $5, $1, $1, $6)
+               (user_id, market_id, outcome_id, side, shares, remaining_shares, price, expires_at)
+           VALUES ($2, $3, $4, $5, $1, $1, $6, $7)
            RETURNING
                id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
-               created_at, updated_at"#,
+               expires_at, created_at, updated_at"#,
         )
         .bind(shares) // (shares & remaining_shares)
         .bind(user_id)
@@ -317,6 +322,7 @@ impl OrderExt for PGClient {
         .bind(outcome_id)
         .bind(OrderSide::SELL)
         .bind(price)
+        .bind(expires_at)
         .fetch_one(&mut *tx)
         .await?;
 

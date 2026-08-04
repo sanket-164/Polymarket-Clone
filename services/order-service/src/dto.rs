@@ -13,6 +13,18 @@ fn validate_positive_decimal(value: &Decimal) -> Result<(), ValidationError> {
     Ok(())
 }
 
+fn validate_expires_at(expires_at: &DateTime<Utc>) -> Result<(), ValidationError> {
+    let now = Utc::now();
+
+    if expires_at.to_utc() <= now {
+        return Err(ValidationError::new(
+            "expires_at must be greater than the current time",
+        ));
+    }
+
+    Ok(())
+}
+
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct PlaceOrderDTO {
     pub market_id: Uuid,
@@ -28,6 +40,11 @@ pub struct PlaceOrderDTO {
     ))]
     pub price: Decimal,
     pub side: OrderSide,
+    #[validate(custom(
+        function = "validate_expires_at",
+        message = "expires_at must be greater than the current time"
+    ))]
+    pub expires_at: DateTime<Utc>,
 }
 
 fn validate_after(after: &DateTime<Utc>) -> Result<(), ValidationError> {

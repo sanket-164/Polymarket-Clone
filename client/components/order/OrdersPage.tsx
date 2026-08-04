@@ -197,7 +197,7 @@ export function OrdersPage() {
         ) : null}
 
         <div className="mt-6 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[800px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[920px] border-collapse text-left text-sm">
             <thead className="bg-surface text-xs uppercase text-secondary">
               <tr>
                 <th className="border-b border-border px-3 py-3 font-medium">
@@ -217,6 +217,9 @@ export function OrdersPage() {
                 </th>
                 <th className="border-b border-border px-3 py-3 font-medium">
                   Order ID
+                </th>
+                <th className="border-b border-border px-3 py-3 font-medium">
+                  Expires
                 </th>
                 <th className="border-b border-border px-3 py-3 font-medium">
                   Created
@@ -256,6 +259,9 @@ export function OrdersPage() {
                       {order.id}
                     </td>
                     <td className="border-b border-border px-3 py-3 text-secondary">
+                      {formatDateTime(order.expires_at)}
+                    </td>
+                    <td className="border-b border-border px-3 py-3 text-secondary">
                       {formatDateTime(order.created_at)}
                     </td>
                   </tr>
@@ -263,7 +269,7 @@ export function OrdersPage() {
               ) : (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-3 py-6 text-center text-secondary"
                   >
                     No orders found.
@@ -469,6 +475,9 @@ function SkeletonOrderRows() {
           </td>
           <td className="border-b border-border px-3 py-3">
             <div className="h-3 w-28 rounded bg-surface" />
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <div className="h-3 w-24 rounded bg-surface" />
           </td>
           <td className="border-b border-border px-3 py-3">
             <div className="h-3 w-24 rounded bg-surface" />

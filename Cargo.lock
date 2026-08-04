@@ -554,10 +554,14 @@ dependencies = [
 name = "cdc-service"
 version = "0.1.0"
 dependencies = [
+ "async-nats",
  "chrono",
  "clickhouse",
  "common",
+ "deadpool-redis",
+ "futures",
  "rdkafka",
+ "redis",
  "rust_decimal",
  "serde",
  "serde_json",

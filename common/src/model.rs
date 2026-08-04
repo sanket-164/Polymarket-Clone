@@ -97,6 +97,7 @@ pub struct Order {
     pub remaining_shares: Decimal,
     pub price: Decimal,
     pub status: OrderStatus,
+    pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

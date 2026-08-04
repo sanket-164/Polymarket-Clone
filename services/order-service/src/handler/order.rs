@@ -101,6 +101,12 @@ async fn place_order(
         ));
     }
 
+    if body.expires_at > market.close_at {
+        return Err(HttpError::bad_request(
+            ErrorMessage::ExceedCloseTime.to_string(),
+        ));
+    }
+
     let market_outcome = app_state
         .pg_client
         .get_market_outcome(body.outcome_id, body.market_id)
@@ -140,6 +146,7 @@ async fn place_order(
                     body.outcome_id,
                     body.shares,
                     body.price,
+                    body.expires_at,
                 )
                 .await
                 .map_err(|e| HttpError::server_error(e.to_string()))?;
@@ -168,6 +175,7 @@ async fn place_order(
                     body.outcome_id,
                     body.shares,
                     body.price,
+                    body.expires_at,
                 )
                 .await
                 .map_err(|e| HttpError::server_error(e.to_string()))?;

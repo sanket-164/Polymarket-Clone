@@ -151,6 +151,8 @@ pub struct OrderRow {
     pub price: Decimal,
     pub status: OrderStatus,
     #[serde(with = "datetime_rfc3339")]
+    pub expires_at: DateTime<Utc>,
+    #[serde(with = "datetime_rfc3339")]
     pub created_at: DateTime<Utc>,
     #[serde(with = "datetime_rfc3339")]
     pub updated_at: DateTime<Utc>,

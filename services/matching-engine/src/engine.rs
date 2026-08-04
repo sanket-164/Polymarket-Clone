@@ -11,7 +11,7 @@ struct BuyOrder(pub Order);
 #[derive(Debug, Eq, PartialEq)]
 struct SellOrder(pub Order);
 
-// Buy orders: min-heap, lowest price first
+// Sell orders: min-heap, lowest price first
 impl Ord for SellOrder {
     fn cmp(&self, other: &Self) -> Ordering {
         // Reverse price comparison
@@ -63,7 +63,7 @@ impl OrderBook {
         self.buy.push(BuyOrder(order));
     }
 
-    fn peek_buy(&mut self) -> Option<&Order> {
+    fn peek_buy(&self) -> Option<&Order> {
         self.buy.peek().map(|b| &b.0)
     }
 
@@ -165,9 +165,16 @@ impl Engine {
                 let mut new_buy = order;
 
                 loop {
+                    let now = Utc::now();
+
                     match book.peek_sell() {
                         Some(best_sell) if new_buy.price >= best_sell.price => {
                             let mut sell = book.pop_sell().unwrap();
+
+                            if sell.expires_at <= now {
+                                println!("Sell order expired: {:?}", sell);
+                                continue;
+                            }
 
                             Engine::publish_messages(nats_handler, new_buy.clone(), sell.clone())
                                 .await;
@@ -200,9 +207,16 @@ impl Engine {
                 let mut new_sell = order;
 
                 loop {
+                    let now = Utc::now();
+
                     match book.peek_buy() {
                         Some(best_buy) if new_sell.price <= best_buy.price => {
                             let mut buy = book.pop_buy().unwrap();
+
+                            if buy.expires_at <= now {
+                                println!("Buy order expired: {:?}", buy);
+                                continue;
+                            }
 
                             Engine::publish_messages(nats_handler, buy.clone(), new_sell.clone())
                                 .await;

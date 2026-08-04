@@ -25,6 +25,7 @@ pub trait MarketExt {
         &self,
         outcome: Outcome,
         admin_id: Uuid,
+        expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error>;
     async fn get_markets(
         &self,
@@ -159,12 +160,13 @@ impl MarketExt for PGClient {
         &self,
         outcome: Outcome,
         admin_id: Uuid,
+        expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
-        let insert_order_query = "INSERT INTO orders (user_id, market_id, outcome_id, side, shares, remaining_shares, price)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
-           RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, created_at, updated_at";
+        let insert_order_query = "INSERT INTO orders (user_id, market_id, outcome_id, side, shares, remaining_shares, price, expires_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, expires_at, created_at, updated_at";
 
         let order: Order = sqlx::query_as(insert_order_query)
             .bind(admin_id)
@@ -174,6 +176,7 @@ impl MarketExt for PGClient {
             .bind(outcome.total_shares)
             .bind(outcome.total_shares)
             .bind(outcome.start_price)
+            .bind(expires_at)
             .fetch_one(&mut *tx)
             .await?;
 

@@ -729,9 +729,8 @@
                   <div>
                     <label for="f_status">Status</label>
                     <select id="f_status">
-                      <option value="ALL">All</option>
-                      <option value="PENDING">Pending</option>
                       <option value="ACTIVE">Active</option>
+                      <option value="PENDING">Pending</option>
                       <option value="CLOSED">Closed</option>
                       <option value="RESOLVED">Resolved</option>
                       <option value="CANCELLED">Cancelled</option>
@@ -929,7 +928,7 @@
       const ORDER_DIRECTIONS = Object.freeze(["ASC", "DESC"]);
 
       const DEFAULT_FILTERS = Object.freeze({
-        status: "ALL",
+        status: "ACTIVE",
         order_field: "close_at",
         order_by: "DESC",
         limit: 20,

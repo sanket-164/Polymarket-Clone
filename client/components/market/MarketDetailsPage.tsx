@@ -331,6 +331,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
           {/* Limit Order Form */}
           <LimitOrderForm
             marketId={marketId}
+            marketCloseAt={market.close_at}
             firstOutcome={market.first_outcome}
             secondOutcome={market.second_outcome}
             currentPrices={currentPrices}
@@ -452,7 +453,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-border bg-card">
-                <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+                <table className="w-full min-w-[900px] border-collapse text-left text-sm">
                   <thead className="bg-surface text-xs uppercase text-secondary">
                     <tr>
                       <th className="border-b border-border px-3 py-3 font-medium">
@@ -469,6 +470,9 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                       </th>
                       <th className="border-b border-border px-3 py-3 font-medium">
                         Order ID
+                      </th>
+                      <th className="border-b border-border px-3 py-3 font-medium">
+                        Expires
                       </th>
                       <th className="border-b border-border px-3 py-3 font-medium">
                         Created
@@ -503,6 +507,9 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                             {order.id}
                           </td>
                           <td className="border-b border-border px-3 py-3 text-secondary">
+                            {formatDateTime(order.expires_at)}
+                          </td>
+                          <td className="border-b border-border px-3 py-3 text-secondary">
                             {formatDateTime(order.created_at)}
                           </td>
                         </tr>
@@ -510,7 +517,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                     ) : (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={7}
                           className="px-3 py-6 text-center text-secondary"
                         >
                           No orders found for this market.
@@ -780,6 +787,9 @@ function SkeletonMarketOrderRows() {
           </td>
           <td className="border-b border-border px-3 py-3">
             <div className="h-3 w-28 rounded bg-surface" />
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <div className="h-3 w-24 rounded bg-surface" />
           </td>
           <td className="border-b border-border px-3 py-3">
             <div className="h-3 w-24 rounded bg-surface" />

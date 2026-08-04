@@ -9,6 +9,7 @@ export interface OrderRequest {
   shares: number;
   price: number;
   side: OrderSide;
+  expires_at: string;
 }
 
 export interface Order {
@@ -23,6 +24,7 @@ export interface Order {
   status: OrderStatus;
   created_at: string;
   updated_at: string;
+  expires_at: string;
 }
 
 export interface OrderFormData {
