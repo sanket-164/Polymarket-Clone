@@ -64,10 +64,12 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
     };
   }, [isLoading, marketId]);
 
+  const isMarketActive = market?.status === "ACTIVE";
+
   const { snapshots, currentPrices } = useOrderbookWebSocket(
     marketId,
     () => getMarketSnapshot(marketId),
-    !isLoading && !!market
+    !isLoading && !!market && isMarketActive
   );
 
   // Maintain price history for the real-time graph
@@ -316,7 +318,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
           </div>
 
           {/* Order Book */}
-          {currentSnapshot && (
+          {isMarketActive && currentSnapshot && (
             <MarketOrderBook
               snapshot={currentSnapshot}
               firstOutcome={market.first_outcome}
@@ -329,16 +331,24 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
         {/* Right Column: Limit Order Form & Market Details */}
         <div className="border border-border bg-surface rounded-2xl lg:col-span-1">
           {/* Limit Order Form */}
-          <LimitOrderForm
-            marketId={marketId}
-            marketCloseAt={market.close_at}
-            firstOutcome={market.first_outcome}
-            secondOutcome={market.second_outcome}
-            currentPrices={currentPrices}
-            onSuccess={() => {
-              // Optionally refresh orderbook or show notification
-            }}
-          />
+          {isMarketActive ? (
+            <LimitOrderForm
+              marketId={marketId}
+              marketCloseAt={market.close_at}
+              firstOutcome={market.first_outcome}
+              secondOutcome={market.second_outcome}
+              currentPrices={currentPrices}
+              onSuccess={() => {
+                // Optionally refresh orderbook or show notification
+              }}
+            />
+          ) : (
+            <div className="border-b border-border p-6">
+              <p className="text-sm font-medium text-text">
+                Market is {market.status}
+              </p>
+            </div>
+          )}
 
           <div className="space-y-3 p-6">
             <DetailRow
