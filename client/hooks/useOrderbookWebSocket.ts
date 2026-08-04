@@ -40,7 +40,7 @@ export function useOrderbookWebSocket(
         setSnapshots([]);
         setCurrentPrices({});
 
-        const ws = new WebSocket(`ws://localhost:3004/ws`);
+        const ws = new WebSocket(process.env.NEXT_PUBLIC_FEED_SERVICE_URL || "");
         wsRef.current = ws;
 
         ws.onopen = () => {
