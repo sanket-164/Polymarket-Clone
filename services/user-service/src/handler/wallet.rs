@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
 };
 use common::{
-    constant::{BALANCE, DEPOSIT, TRANSACTIONS, WITHDRAW},
+    constant::{BALANCE, DEFAULT_LIMIT, DEPOSIT, TRANSACTIONS, WITHDRAW},
     error::{ErrorMessage, HttpError},
 };
 use rust_decimal::{Decimal, prelude::Zero};
@@ -107,7 +107,7 @@ async fn get_user_transactions(
 
     let limit = match query_params.limit {
         Some(l) => l,
-        _ => 10,
+        _ => DEFAULT_LIMIT,
     };
 
     let skip = match query_params.skip {

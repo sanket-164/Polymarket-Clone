@@ -84,3 +84,5 @@ pub const USER_TOKEN: &str = "user-token";
 pub const REFRESH_TOKEN: &str = "refresh-token";
 pub const REVOKE_REASON_LOGOUT: &str = "LOGOUT";
 pub const REVOKE_REASON_PASSWORD_RESET: &str = "PASSWORD_RESET";
+
+pub const DEFAULT_LIMIT: i64 = 10;

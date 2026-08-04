@@ -9,7 +9,7 @@ use axum::{
 };
 use chrono::Utc;
 use common::{
-    constant::ROOT,
+    constant::{DEFAULT_LIMIT, ROOT},
     error::{ErrorMessage, HttpError},
     model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderSide},
 };
@@ -48,7 +48,7 @@ async fn get_orders(
 
     let limit = match query_params.limit {
         Some(l) => l,
-        _ => 10,
+        _ => DEFAULT_LIMIT,
     };
 
     let skip = match query_params.skip {

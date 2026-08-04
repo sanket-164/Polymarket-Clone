@@ -7,7 +7,10 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use common::{constant::ROOT, error::HttpError};
+use common::{
+    constant::{DEFAULT_LIMIT, ROOT},
+    error::HttpError,
+};
 use uuid::Uuid;
 use validator::Validate;
 
@@ -32,7 +35,7 @@ async fn get_user_holdings(
 
     let limit = match query_params.limit {
         Some(l) => l,
-        _ => 10,
+        _ => DEFAULT_LIMIT,
     };
 
     let skip = match query_params.skip {

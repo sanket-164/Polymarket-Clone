@@ -9,7 +9,9 @@ use axum::{
 };
 use chrono::Utc;
 use common::{
-    constant::{CANCEL, ID, MARKET_CACHE_TTL, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT},
+    constant::{
+        CANCEL, DEFAULT_LIMIT, ID, MARKET_CACHE_TTL, MARKET_ID, OUTCOME_ID, RESOLVE, ROOT, SNAPSHOT,
+    },
     error::{ErrorMessage, HttpError},
     model::{FeedMessage, MarketOutcomes, MarketStatus, MarketWithOutcomes, MatcherMessage},
 };
@@ -308,7 +310,7 @@ async fn get_markets(
 
     let limit = match query_params.limit {
         Some(l) => l,
-        _ => 10,
+        _ => DEFAULT_LIMIT,
     };
 
     let skip = match query_params.skip {
