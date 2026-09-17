@@ -359,7 +359,15 @@ impl OrderExt for PGClient {
         let mut tx = self.pool.begin().await?;
 
         let trade_shares = min(sell_order.remaining_shares, buy_order.remaining_shares);
-        let total_cost = sell_order.price * trade_shares;
+
+        // Determine the trade price based on which order was created first
+        let trade_price = if sell_order.created_at > buy_order.created_at {
+            buy_order.price
+        } else {
+            sell_order.price
+        };
+
+        let total_cost = trade_price * trade_shares;
 
         let trade: Trade = sqlx::query_as(
             r#"
@@ -373,7 +381,7 @@ impl OrderExt for PGClient {
         .bind(buy_order.id)
         .bind(sell_order.id)
         .bind(trade_shares)
-        .bind(sell_order.price)
+        .bind(trade_price)
         .fetch_one(&mut *tx)
         .await?;
 
@@ -401,7 +409,7 @@ impl OrderExt for PGClient {
         }
 
         // Buyer
-        let remaining_price = (buy_order.price - sell_order.price) * trade_shares;
+        let remaining_price = (buy_order.price - trade_price) * trade_shares;
         sqlx::query(r#"UPDATE wallets SET locked_balance = locked_balance - $1, balance = balance + $2 WHERE user_id = $3"#)
         .bind(total_cost + remaining_price)
         .bind(remaining_price)
@@ -470,7 +478,7 @@ impl OrderExt for PGClient {
             .await?;
 
         sqlx::query(r#"UPDATE outcome SET current_price = $1 WHERE id = $2"#)
-            .bind(sell_order.price)
+            .bind(trade_price)
             .bind(sell_order.outcome_id)
             .execute(&mut *tx)
             .await?;

@@ -208,6 +208,7 @@ pub struct OrderFeed {
     pub side: OrderSide,
     pub quantity: Decimal,
     pub price: Decimal,
+    pub trade: Option<Decimal>,
     pub timestamp: i64,
 }
 

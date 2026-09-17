@@ -202,6 +202,7 @@ async fn handle_order_event(
                             },
                             quantity: -after.remaining_shares, // negative to signal reduction to feed subscribers
                             price: after.price.normalize(),
+                            trade: None,
                             timestamp: Utc::now().timestamp_millis(),
                         },
                     };
