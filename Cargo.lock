@@ -1895,6 +1895,7 @@ dependencies = [
  "chrono",
  "common",
  "futures",
+ "rust_decimal",
  "serde",
  "serde_json",
  "tokio",

@@ -34,6 +34,7 @@ pub const MARKET_ID: &str = "/:market_id";
 pub const RESOLVE: &str = "/resolve";
 pub const OUTCOME_ID: &str = "/:outcome_id";
 pub const CANCEL: &str = "/cancel";
+pub const ORDER_ID: &str = "/:order_id";
 
 // Holding
 pub const HOLDING: &str = "/holding";
@@ -50,7 +51,8 @@ pub const FEED_REMOVE_MARKET: &str = "feed.remove.market";
 pub const FEED_CREATE_MARKET: &str = "feed.create.market";
 pub const MAX_NATS_RECONNECTS: u8 = 5;
 pub const TRADE_STREAM: &str = "trade";
-pub const TRADE_UPDATE_ORDER: &str = "trade.update.orders";
+pub const TRADE_UPDATE_ORDER: &str = "trade.update.order";
+pub const TRADE_CANCEL_ORDER: &str = "trade.cancel.order";
 
 // Service Ports
 pub const AUTH_PORT: u16 = 3001;

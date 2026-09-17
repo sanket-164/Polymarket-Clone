@@ -2,16 +2,16 @@ use std::sync::Arc;
 
 use axum::{
     Extension, Json, Router,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use chrono::Utc;
 use common::{
-    constant::{DEFAULT_LIMIT, ROOT},
+    constant::{CANCEL, DEFAULT_LIMIT, ORDER_ID, ROOT},
     error::{ErrorMessage, HttpError},
-    model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderSide},
+    model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderSide, OrderStatus},
 };
 use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
@@ -27,6 +27,7 @@ pub fn order_handler() -> Router<Arc<AppState>> {
     Router::new()
         .route(ROOT, get(get_orders))
         .route(ROOT, post(place_order))
+        .route(&format!("{CANCEL}{ORDER_ID}"), put(cancel_order))
 }
 
 async fn get_orders(
@@ -251,4 +252,35 @@ async fn place_order(
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     Ok((StatusCode::CREATED, Json(order)))
+}
+
+async fn cancel_order(
+    State(app_state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    Path(order_id): Path<Uuid>,
+) -> Result<impl IntoResponse, HttpError> {
+    let order = app_state
+        .pg_client
+        .get_order_by_id(user_id, order_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?
+        .ok_or(HttpError::not_found(
+            ErrorMessage::OrderNotFound.to_string(),
+        ))?;
+
+    if !(order.status == OrderStatus::PENDING || order.status == OrderStatus::PARTIAL)
+        || order.expires_at <= Utc::now()
+    {
+        return Err(HttpError::bad_request(
+            ErrorMessage::OrderNotOpen.to_string(),
+        ));
+    }
+
+    app_state
+        .publisher
+        .matcher_cancel_order(MatcherMessage::CancelOrder { order })
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok(StatusCode::OK)
 }

@@ -57,8 +57,8 @@ async fn main() {
             MatcherMessage::RemoveMarket { market_id } => {
                 engine.remove_market(market_id);
             }
-            MatcherMessage::CancelOrder { order: _order } => {
-                // handle cancel order
+            MatcherMessage::CancelOrder { order } => {
+                engine.cancel_order(order, &nats_handler).await;
             }
         }
 

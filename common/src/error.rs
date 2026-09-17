@@ -39,6 +39,8 @@ pub enum ErrorMessage {
     CannotPublishOrder,
     ExceedAvailableShares,
     ExceedCloseTime,
+    OrderNotFound,
+    OrderNotOpen,
 }
 
 impl ErrorMessage {
@@ -64,6 +66,8 @@ impl ErrorMessage {
             ErrorMessage::CannotPublishOrder => "Failed to publish order".to_string(),
             ErrorMessage::ExceedAvailableShares => "Exceed outcome's available shares".to_string(),
             ErrorMessage::ExceedCloseTime => "Exceed market close time".to_string(),
+            ErrorMessage::OrderNotFound => "Order does not exist".to_string(),
+            ErrorMessage::OrderNotOpen => "Order is not open to be cancelled".to_string(),
         }
     }
 }

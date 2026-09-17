@@ -1,16 +1,15 @@
 use async_nats::{
-    Client, ConnectOptions,
+    ConnectOptions,
     jetstream::{self, consumer::pull::Stream},
 };
 use common::{
-    constant::{FEED_MARKET_ORDER, MATCHER_STREAM, MAX_NATS_RECONNECTS, TRADE_UPDATE_ORDER},
-    model::{FeedMessage, TradeMessage},
+    constant::{MATCHER_STREAM, MAX_NATS_RECONNECTS, TRADE_CANCEL_ORDER, TRADE_UPDATE_ORDER},
+    model::TradeMessage,
 };
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct NatsHandler {
-    pub client: Client,
     pub jetstream: jetstream::Context,
 }
 
@@ -35,7 +34,7 @@ impl NatsHandler {
 
         let jetstream = jetstream::new(client.clone());
 
-        Ok(Self { client, jetstream })
+        Ok(Self { jetstream })
     }
 
     pub async fn get_matcher_stream(&self) -> Result<Stream, async_nats::Error> {
@@ -61,20 +60,6 @@ impl NatsHandler {
         Ok(consumer.messages().await?)
     }
 
-    pub async fn feed_market_order(&self, message: FeedMessage) -> Result<(), async_nats::Error> {
-        let payload = serde_json::to_vec(&message).map_err(|e| {
-            async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
-        })?;
-
-        self.client
-            .publish(FEED_MARKET_ORDER, payload.into())
-            .await?;
-
-        self.client.flush().await?;
-
-        Ok(())
-    }
-
     pub async fn trade_update_order(&self, message: TradeMessage) -> Result<(), async_nats::Error> {
         let payload = serde_json::to_vec(&message).map_err(|e| {
             async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
@@ -82,6 +67,18 @@ impl NatsHandler {
 
         self.jetstream
             .publish(TRADE_UPDATE_ORDER, payload.into())
+            .await?
+            .await?;
+        Ok(())
+    }
+
+    pub async fn trade_cancel_order(&self, message: TradeMessage) -> Result<(), async_nats::Error> {
+        let payload = serde_json::to_vec(&message).map_err(|e| {
+            async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+        })?;
+
+        self.jetstream
+            .publish(TRADE_CANCEL_ORDER, payload.into())
             .await?
             .await?;
         Ok(())

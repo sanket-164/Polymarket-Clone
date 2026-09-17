@@ -43,6 +43,11 @@ pub trait HoldingExt {
 
 #[async_trait]
 pub trait OrderExt {
+    async fn get_order_by_id(
+        &self,
+        user_id: Uuid,
+        order_id: Uuid,
+    ) -> Result<Option<Order>, sqlx::Error>;
     async fn get_user_orders(
         &self,
         user_id: Uuid,
@@ -74,6 +79,7 @@ pub trait OrderExt {
         expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error>;
     async fn trade(&self, buy_order: Order, sell_order: Order) -> Result<Trade, sqlx::Error>;
+    async fn cancel_order(&self, order: Order) -> Result<Order, sqlx::Error>;
 }
 
 #[async_trait]
@@ -168,6 +174,25 @@ impl HoldingExt for PGClient {
 
 #[async_trait]
 impl OrderExt for PGClient {
+    async fn get_order_by_id(
+        &self,
+        user_id: Uuid,
+        order_id: Uuid,
+    ) -> Result<Option<Order>, sqlx::Error> {
+        let query = r#"
+            SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, expires_at, created_at, updated_at
+            FROM orders
+            WHERE id = $1 AND user_id = $2"#;
+
+        let order = sqlx::query_as::<_, Order>(query)
+            .bind(order_id)
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(order)
+    }
+
     async fn get_user_orders(
         &self,
         user_id: Uuid,
@@ -453,5 +478,62 @@ impl OrderExt for PGClient {
         tx.commit().await?;
 
         Ok(trade)
+    }
+
+    async fn cancel_order(&self, order: Order) -> Result<Order, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        // Update the order status to CANCELLED
+        let updated_order = sqlx::query_as::<_, Order>(
+            r#"
+            UPDATE orders
+            SET status = $1, updated_at = $2
+            WHERE id = $3
+            RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, expires_at, created_at, updated_at
+            "#,
+        )
+        .bind(OrderStatus::CANCELLED)
+        .bind(Utc::now())
+        .bind(order.id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // Unlock the shares or balance based on the order side
+        match order.side {
+            OrderSide::BUY => {
+                let total_cost = order.price * order.remaining_shares;
+                sqlx::query(
+                    r#"
+                    UPDATE wallets
+                    SET locked_balance = locked_balance - $1, balance = balance + $1, updated_at = $2
+                    WHERE user_id = $3
+                    "#,
+                )
+                .bind(total_cost)
+                .bind(Utc::now())
+                .bind(order.user_id)
+                .execute(&mut *tx)
+                .await?;
+            }
+            OrderSide::SELL => {
+                sqlx::query(
+                    r#"
+                    UPDATE holdings
+                    SET locked_shares = locked_shares - $1, shares = shares + $1, updated_at = $2
+                    WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
+                    "#,
+                )
+                .bind(order.remaining_shares)
+                .bind(Utc::now())
+                .bind(order.user_id)
+                .bind(order.market_id)
+                .bind(order.outcome_id)
+                .execute(&mut *tx)
+                .await?;
+            }
+        }
+
+        tx.commit().await?;
+        Ok(updated_order)
     }
 }

@@ -227,4 +227,8 @@ pub enum TradeMessage {
         sell: Order,
         timestamp: i64,
     },
+    CancelOrder {
+        order: Order,
+        timestamp: i64,
+    },
 }

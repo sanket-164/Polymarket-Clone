@@ -1,86 +1,120 @@
 use crate::nats_handler::NatsHandler;
-use chrono::Utc;
-use common::model::{FeedMessage, Order, OrderFeed, OrderSide, TradeMessage};
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use chrono::{DateTime, Utc};
+use common::model::{Order, OrderSide, TradeMessage};
+use rust_decimal::Decimal;
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use uuid::Uuid;
-
-#[derive(Debug, Eq, PartialEq)]
-struct BuyOrder(pub Order);
-
-#[derive(Debug, Eq, PartialEq)]
-struct SellOrder(pub Order);
-
-// Sell orders: min-heap, lowest price first
-impl Ord for SellOrder {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // Reverse price comparison
-        other
-            .0
-            .price
-            .cmp(&self.0.price)
-            .then_with(|| other.0.created_at.cmp(&self.0.created_at))
-    }
-}
-
-impl PartialOrd for SellOrder {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-// Buy orders: max-heap, highest price first
-impl Ord for BuyOrder {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.0
-            .price
-            .cmp(&other.0.price)
-            .then_with(|| other.0.created_at.cmp(&self.0.created_at))
-    }
-}
-
-impl PartialOrd for BuyOrder {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 #[derive(Debug)]
 struct OrderBook {
-    buy: BinaryHeap<BuyOrder>,
-    sell: BinaryHeap<SellOrder>,
+    // Buy orders:
+    // BTreeMap sorts ascending. We want highest price first.
+    // So we use Reverse<Decimal> for the price key.
+    buy: BTreeMap<Reverse<Decimal>, VecDeque<Order>>,
+
+    // Sell orders:
+    // BTreeMap sorts ascending. Lowest price first.
+    sell: BTreeMap<Decimal, VecDeque<Order>>,
+
+    // Fast lookup for cancellations!
+    index: HashMap<Uuid, (bool, Decimal)>, // (is_buy, price)
 }
 
 impl OrderBook {
     fn new() -> Self {
         Self {
-            buy: BinaryHeap::new(),
-            sell: BinaryHeap::new(),
+            buy: BTreeMap::new(),
+            sell: BTreeMap::new(),
+            index: HashMap::new(),
         }
     }
 
-    fn push_buy(&mut self, order: Order) {
-        self.buy.push(BuyOrder(order));
+    // Add a buy order at the end of the queue for a price level. If the price level doesn't exist, create it.
+    fn add_buy(&mut self, order: Order) {
+        self.index.insert(order.id, (true, order.price));
+        self.buy
+            .entry(Reverse(order.price))
+            .or_default()
+            .push_back(order);
+    }
+    // Add a sell order at the end of the queue for a price level. If the price level doesn't exist, create it.
+    fn add_sell(&mut self, order: Order) {
+        self.index.insert(order.id, (false, order.price));
+        self.sell.entry(order.price).or_default().push_back(order);
     }
 
-    fn peek_buy(&self) -> Option<&Order> {
-        self.buy.peek().map(|b| &b.0)
+    // Get the best buy order (highest price, earliest timestamp) without removing it from the book.
+    fn best_buy(&self) -> Option<&Order> {
+        self.buy
+            .iter()
+            .find(|(_, orders)| !orders.is_empty())
+            .and_then(|(_, orders)| orders.front())
     }
 
-    fn pop_buy(&mut self) -> Option<Order> {
-        self.buy.pop().map(|b| b.0)
+    // Get the best sell order (lowest price, earliest timestamp) without removing it from the book.
+    fn best_sell(&self) -> Option<&Order> {
+        self.sell
+            .iter()
+            .find(|(_, orders)| !orders.is_empty())
+            .and_then(|(_, orders)| orders.front())
     }
 
-    fn push_sell(&mut self, order: Order) {
-        self.sell.push(SellOrder(order));
+    // Allows in-place mutation to preserve queue priority
+    fn best_buy_mut(&mut self) -> Option<&mut Order> {
+        self.buy
+            .iter_mut()
+            .find(|(_, orders)| !orders.is_empty())
+            .and_then(|(_, orders)| orders.front_mut())
     }
 
-    fn peek_sell(&self) -> Option<&Order> {
-        self.sell.peek().map(|s| &s.0)
+    // Allows in-place mutation to preserve queue priority
+    fn best_sell_mut(&mut self) -> Option<&mut Order> {
+        self.sell
+            .iter_mut()
+            .find(|(_, orders)| !orders.is_empty())
+            .and_then(|(_, orders)| orders.front_mut())
     }
 
-    fn pop_sell(&mut self) -> Option<Order> {
-        self.sell.pop().map(|s| s.0)
+    // Remove the best buy order (highest price, earliest timestamp) from the book and return it.
+    fn remove_buy(&mut self) -> Option<Order> {
+        let (&Reverse(price), orders) = self.buy.iter_mut().find(|(_, o)| !o.is_empty())?;
+        let order = orders.pop_front()?;
+        if orders.is_empty() {
+            self.buy.remove(&Reverse(price));
+        }
+        self.index.remove(&order.id);
+        Some(order)
+    }
+
+    // Remove the best sell order (lowest price, earliest timestamp) from the book and return it.
+    fn remove_sell(&mut self) -> Option<Order> {
+        let (&price, orders) = self.sell.iter_mut().find(|(_, o)| !o.is_empty())?;
+        let order = orders.pop_front()?;
+        if orders.is_empty() {
+            self.sell.remove(&price);
+        }
+        self.index.remove(&order.id);
+        Some(order)
+    }
+
+    // Clean up expired orders cleanly
+    fn remove_expired_best_buy(&mut self, now: DateTime<Utc>) -> Option<Order> {
+        if let Some(best) = self.best_buy() {
+            if best.expires_at <= now {
+                return self.remove_buy();
+            }
+        }
+        None
+    }
+
+    fn remove_expired_best_sell(&mut self, now: DateTime<Utc>) -> Option<Order> {
+        if let Some(best) = self.best_sell() {
+            if best.expires_at <= now {
+                return self.remove_sell();
+            }
+        }
+        None
     }
 }
 
@@ -121,33 +155,15 @@ impl Engine {
         self.order_books.get_mut(market_id)?.get_mut(outcome_id)
     }
 
-    async fn publish_messages(nats_handler: &NatsHandler, buy: Order, sell: Order) {
+    async fn publish_trade_message(nats_handler: &NatsHandler, buy: Order, sell: Order) {
         let filled = buy.remaining_shares.min(sell.remaining_shares);
         println!("Trade: {} shares for {}", filled, sell.price);
-
-        let timestamp = Utc::now().timestamp_millis();
-        for order in [buy.clone(), sell.clone()] {
-            let feed_message = FeedMessage::OrderFeed {
-                feed: OrderFeed {
-                    market_id: order.market_id,
-                    outcome_id: order.outcome_id,
-                    side: order.side,
-                    quantity: -filled, // negative to signal reduction to feed subscribers
-                    price: order.price.normalize(),
-                    timestamp,
-                },
-            };
-
-            if let Err(e) = nats_handler.feed_market_order(feed_message).await {
-                eprintln!("Failed to publish feed update OrderFeed message: {:?}", e);
-            }
-        }
 
         if let Err(e) = nats_handler
             .trade_update_order(TradeMessage::UpdateOrders {
                 buy,
                 sell,
-                timestamp,
+                timestamp: Utc::now().timestamp_millis(),
             })
             .await
         {
@@ -167,38 +183,50 @@ impl Engine {
                 loop {
                     let now = Utc::now();
 
-                    match book.peek_sell() {
-                        Some(best_sell) if new_buy.price >= best_sell.price => {
-                            let mut sell = book.pop_sell().unwrap();
+                    // Clean up any expired best sell orders before attempting to match
+                    while let Some(expired) = book.remove_expired_best_sell(now) {
+                        println!("Sell order expired: {:?}", expired);
+                    }
 
-                            if sell.expires_at <= now {
-                                println!("Sell order expired: {:?}", sell);
-                                continue;
-                            }
+                    // Determine if we have a match. The immutable borrow ends at the semicolon.
+                    let is_match = book
+                        .best_sell()
+                        .map_or(false, |best| new_buy.price >= best.price);
 
-                            Engine::publish_messages(nats_handler, new_buy.clone(), sell.clone())
-                                .await;
+                    if is_match {
+                        // Clone the order for the trade message.
+                        // The immutable borrow of `book` ends immediately after this line.
+                        let matched_sell = book.best_sell().cloned().unwrap();
+                        let matched_buy = new_buy.clone();
 
-                            match new_buy.remaining_shares.cmp(&sell.remaining_shares) {
-                                Ordering::Greater => {
-                                    new_buy.remaining_shares -= sell.remaining_shares;
-                                }
-                                Ordering::Less => {
-                                    sell.remaining_shares -= new_buy.remaining_shares;
-                                    book.push_sell(sell.clone());
-                                    break;
-                                }
-                                Ordering::Equal => {
-                                    break;
-                                }
-                            }
-                        }
+                        Engine::publish_trade_message(
+                            nats_handler,
+                            matched_buy,
+                            matched_sell.clone(),
+                        )
+                        .await;
 
-                        // No match — unmatched remainder stays on book (already in Redis from place_order).
-                        _ => {
-                            book.push_buy(new_buy);
+                        // Handle fill scenarios using mutable borrows (now perfectly safe)
+                        if new_buy.remaining_shares > matched_sell.remaining_shares {
+                            // Full fill of resting order, incoming order still has shares
+                            let _ = book.remove_sell();
+                            new_buy.remaining_shares -= matched_sell.remaining_shares;
+                            // Loop continues to match against the next best sell
+                        } else if new_buy.remaining_shares == matched_sell.remaining_shares {
+                            // Full fill of both orders
+                            let _ = book.remove_sell();
                             break;
+                        } else {
+                            // PARTIAL FILL of resting order: Mutate in place to preserve queue priority!
+                            if let Some(best_sell_mut) = book.best_sell_mut() {
+                                best_sell_mut.remaining_shares -= new_buy.remaining_shares;
+                            }
+                            break; // Incoming order is completely filled, exit loop
                         }
+                    } else {
+                        // No match — unmatched remainder stays on book
+                        book.add_buy(new_buy);
+                        break;
                     }
                 }
             }
@@ -209,39 +237,95 @@ impl Engine {
                 loop {
                     let now = Utc::now();
 
-                    match book.peek_buy() {
-                        Some(best_buy) if new_sell.price <= best_buy.price => {
-                            let mut buy = book.pop_buy().unwrap();
+                    // Clean up any expired best buy orders before attempting to match
+                    while let Some(expired) = book.remove_expired_best_buy(now) {
+                        println!("Buy order expired: {:?}", expired);
+                    }
 
-                            if buy.expires_at <= now {
-                                println!("Buy order expired: {:?}", buy);
-                                continue;
-                            }
+                    // Determine if we have a match. The immutable borrow ends at the semicolon.
+                    let is_match = book
+                        .best_buy()
+                        .map_or(false, |best| new_sell.price <= best.price);
 
-                            Engine::publish_messages(nats_handler, buy.clone(), new_sell.clone())
-                                .await;
+                    if is_match {
+                        // Clone the order for the trade message.
+                        // The immutable borrow of `book` ends immediately after this line.
+                        let matched_buy = book.best_buy().cloned().unwrap();
+                        let matched_sell = new_sell.clone();
 
-                            match new_sell.remaining_shares.cmp(&buy.remaining_shares) {
-                                Ordering::Greater => {
-                                    new_sell.remaining_shares -= buy.remaining_shares;
-                                }
-                                Ordering::Less => {
-                                    buy.remaining_shares -= new_sell.remaining_shares;
-                                    book.push_buy(buy.clone());
-                                    break;
-                                }
-                                Ordering::Equal => {
-                                    break;
-                                }
-                            }
-                        }
-                        // No match — unmatched remainder stays on book (already in Redis from place_order).
-                        _ => {
-                            book.push_sell(new_sell);
+                        Engine::publish_trade_message(
+                            nats_handler,
+                            matched_buy.clone(),
+                            matched_sell,
+                        )
+                        .await;
+
+                        // Handle fill scenarios using mutable borrows (now perfectly safe)
+                        if new_sell.remaining_shares > matched_buy.remaining_shares {
+                            // Full fill of resting order, incoming order still has shares
+                            let _ = book.remove_buy();
+                            new_sell.remaining_shares -= matched_buy.remaining_shares;
+                        } else if new_sell.remaining_shares == matched_buy.remaining_shares {
+                            // Full fill of both orders
+                            let _ = book.remove_buy();
                             break;
+                        } else {
+                            // PARTIAL FILL of resting order: Mutate in place to preserve queue priority!
+                            if let Some(best_buy_mut) = book.best_buy_mut() {
+                                best_buy_mut.remaining_shares -= new_sell.remaining_shares;
+                            }
+                            break; // Incoming order is completely filled, exit loop
                         }
+                    } else {
+                        // No match — unmatched remainder stays on book
+                        book.add_sell(new_sell);
+                        break;
                     }
                 }
+            }
+        }
+    }
+
+    pub async fn cancel_order(&mut self, order: Order, nats_handler: &NatsHandler) {
+        let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
+            return;
+        };
+
+        let Some((is_buy, price)) = book.index.remove(&order.id) else {
+            return;
+        };
+
+        let orders = if is_buy {
+            book.buy.get_mut(&Reverse(price))
+        } else {
+            book.sell.get_mut(&price)
+        };
+
+        if let Some(orders) = orders {
+            let initial_len = orders.len();
+
+            orders.retain(|o| o.id != order.id);
+
+            // If length decreased, the order was successfully found and removed
+            if orders.len() < initial_len {
+                // Clean up the price level from the BTreeMap if it's now empty
+                if orders.is_empty() {
+                    if is_buy {
+                        book.buy.remove(&Reverse(price));
+                    } else {
+                        book.sell.remove(&price);
+                    }
+                }
+
+                nats_handler
+                    .trade_cancel_order(TradeMessage::CancelOrder {
+                        order,
+                        timestamp: Utc::now().timestamp_millis(),
+                    })
+                    .await
+                    .unwrap_or_else(|e| {
+                        eprintln!("Failed to publish trade CancelOrder message: {:?}", e);
+                    });
             }
         }
     }
