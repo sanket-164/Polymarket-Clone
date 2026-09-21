@@ -41,6 +41,8 @@ pub enum ErrorMessage {
     ExceedCloseTime,
     OrderNotFound,
     OrderNotOpen,
+    QuoteAmountNotGiven,
+    SharesNotGiven,
 }
 
 impl ErrorMessage {
@@ -68,6 +70,8 @@ impl ErrorMessage {
             ErrorMessage::ExceedCloseTime => "Exceed market close time".to_string(),
             ErrorMessage::OrderNotFound => "Order does not exist".to_string(),
             ErrorMessage::OrderNotOpen => "Order is not open to be cancelled".to_string(),
+            ErrorMessage::QuoteAmountNotGiven => "Quote amount is not given".to_string(),
+            ErrorMessage::SharesNotGiven => "Shares is not given".to_string(),
         }
     }
 }

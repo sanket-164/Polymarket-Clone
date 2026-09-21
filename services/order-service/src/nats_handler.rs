@@ -3,7 +3,10 @@ use async_nats::{
     jetstream::{self, consumer::pull::Stream},
 };
 use common::{
-    constant::{FEED_MARKET_ORDER, MATCHER_CANCEL_ORDER, MATCHER_PLACE_ORDER, MAX_NATS_RECONNECTS},
+    constant::{
+        FEED_MARKET_ORDER, MATCHER_CANCEL_ORDER, MATCHER_LIMIT_ORDER, MATCHER_MARKET_ORDER,
+        MAX_NATS_RECONNECTS,
+    },
     model::{FeedMessage, MatcherMessage},
 };
 use std::time::Duration;
@@ -78,11 +81,18 @@ impl NatsHandler {
         Ok(())
     }
 
-    pub async fn matcher_place_order(
+    pub async fn matcher_limit_order(
         &self,
         message: MatcherMessage,
     ) -> Result<(), async_nats::Error> {
-        self.publish(MATCHER_PLACE_ORDER, &message).await
+        self.publish(MATCHER_LIMIT_ORDER, &message).await
+    }
+
+    pub async fn matcher_market_order(
+        &self,
+        message: MatcherMessage,
+    ) -> Result<(), async_nats::Error> {
+        self.publish(MATCHER_MARKET_ORDER, &message).await
     }
 
     pub async fn matcher_cancel_order(

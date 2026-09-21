@@ -5,8 +5,8 @@ use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
     model::{
-        Holding, Market, Order, OrderSide, OrderStatus, Outcome, Trade, TransactionType, User,
-        Wallet,
+        Holding, Market, Order, OrderSide, OrderStatus, OrderType, Outcome, Trade, TransactionType,
+        User, Wallet,
     },
 };
 use rust_decimal::Decimal;
@@ -60,7 +60,7 @@ pub trait OrderExt {
         limit: i64,
         skip: i64,
     ) -> Result<Vec<Order>, sqlx::Error>;
-    async fn buy_order(
+    async fn buy_limit_order(
         &self,
         user_id: Uuid,
         market_id: Uuid,
@@ -69,7 +69,7 @@ pub trait OrderExt {
         price: Decimal,
         expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error>;
-    async fn sell_order(
+    async fn sell_limit_order(
         &self,
         user_id: Uuid,
         market_id: Uuid,
@@ -78,8 +78,30 @@ pub trait OrderExt {
         price: Decimal,
         expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error>;
-    async fn trade(&self, buy_order: Order, sell_order: Order) -> Result<Trade, sqlx::Error>;
+    async fn buy_market_order(
+        &self,
+        user_id: Uuid,
+        market_id: Uuid,
+        outcome_id: Uuid,
+        quote_amount: Decimal,
+        expires_at: DateTime<Utc>,
+    ) -> Result<Order, sqlx::Error>;
+    async fn sell_market_order(
+        &self,
+        user_id: Uuid,
+        market_id: Uuid,
+        outcome_id: Uuid,
+        shares: Decimal,
+        expires_at: DateTime<Utc>,
+    ) -> Result<Order, sqlx::Error>;
+    async fn limit_trade(&self, buy_order: Order, sell_order: Order) -> Result<Trade, sqlx::Error>;
     async fn cancel_order(&self, order: Order) -> Result<Order, sqlx::Error>;
+    async fn market_trade(
+        &self,
+        market_order: Order,
+        book_order: Order,
+    ) -> Result<Trade, sqlx::Error>;
+    async fn complete_order(&self, market_order: Order) -> Result<(), sqlx::Error>;
 }
 
 #[async_trait]
@@ -180,7 +202,7 @@ impl OrderExt for PGClient {
         order_id: Uuid,
     ) -> Result<Option<Order>, sqlx::Error> {
         let query = r#"
-            SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, expires_at, created_at, updated_at
+            SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, average_price, order_type, status, expires_at, created_at, updated_at
             FROM orders
             WHERE id = $1 AND user_id = $2"#;
 
@@ -206,7 +228,7 @@ impl OrderExt for PGClient {
         skip: i64,
     ) -> Result<Vec<Order>, sqlx::Error> {
         let mut query = String::from(
-            "SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, expires_at, created_at, updated_at
+            "SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, average_price, order_type, status, expires_at, created_at, updated_at
             FROM orders
             WHERE user_id = $1"
         );
@@ -266,7 +288,7 @@ impl OrderExt for PGClient {
         Ok(orders)
     }
 
-    async fn buy_order(
+    async fn buy_limit_order(
         &self,
         user_id: Uuid,
         market_id: Uuid,
@@ -292,11 +314,12 @@ impl OrderExt for PGClient {
                ON CONFLICT (user_id, market_id, outcome_id) DO NOTHING
            )
            INSERT INTO orders
-               (user_id, market_id, outcome_id, side, shares, remaining_shares, price, expires_at)
-           VALUES ($2, $3, $4, $5, $6, $6, $7, $8)
+               (user_id, market_id, outcome_id, side, shares, remaining_shares, price, order_type, expires_at)
+           VALUES ($2, $3, $4, $5, $6, $6, $7, $8, $9)
            RETURNING
                id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
+               order_type, quote_amount, average_price,
                expires_at, created_at, updated_at"#,
         )
         .bind(cost)
@@ -306,6 +329,7 @@ impl OrderExt for PGClient {
         .bind(OrderSide::BUY)
         .bind(shares) // (shares & remaining_shares)
         .bind(price)
+        .bind(OrderType::LIMIT)
         .bind(expires_at)
         .fetch_one(&mut *tx)
         .await?;
@@ -314,7 +338,7 @@ impl OrderExt for PGClient {
         Ok(order)
     }
 
-    async fn sell_order(
+    async fn sell_limit_order(
         &self,
         user_id: Uuid,
         market_id: Uuid,
@@ -334,11 +358,12 @@ impl OrderExt for PGClient {
                WHERE  user_id = $2 AND market_id = $3 AND outcome_id = $4
            )
            INSERT INTO orders
-               (user_id, market_id, outcome_id, side, shares, remaining_shares, price, expires_at)
-           VALUES ($2, $3, $4, $5, $1, $1, $6, $7)
+               (user_id, market_id, outcome_id, side, shares, remaining_shares, price, order_type, expires_at)
+           VALUES ($2, $3, $4, $5, $1, $1, $6, $7, $8)
            RETURNING
                id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
+               order_type, quote_amount, average_price,
                expires_at, created_at, updated_at"#,
         )
         .bind(shares) // (shares & remaining_shares)
@@ -347,6 +372,7 @@ impl OrderExt for PGClient {
         .bind(outcome_id)
         .bind(OrderSide::SELL)
         .bind(price)
+        .bind(OrderType::LIMIT)
         .bind(expires_at)
         .fetch_one(&mut *tx)
         .await?;
@@ -355,7 +381,95 @@ impl OrderExt for PGClient {
         Ok(order)
     }
 
-    async fn trade(&self, buy_order: Order, sell_order: Order) -> Result<Trade, sqlx::Error> {
+    async fn buy_market_order(
+        &self,
+        user_id: Uuid,
+        market_id: Uuid,
+        outcome_id: Uuid,
+        quote_amount: Decimal,
+        expires_at: DateTime<Utc>,
+    ) -> Result<Order, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        let order = sqlx::query_as::<_, Order>(
+            r#"WITH deduct_wallet AS (
+               UPDATE wallets
+               SET    balance         = balance         - $1,
+                      locked_balance  = locked_balance  + $1,
+                      updated_at      = NOW()
+               WHERE  user_id = $2
+           ),
+           upsert_holding AS (
+               INSERT INTO holdings (user_id, market_id, outcome_id, shares, locked_shares)
+               VALUES ($2, $3, $4, 0, 0)
+               ON CONFLICT (user_id, market_id, outcome_id) DO NOTHING
+           )
+           INSERT INTO orders
+               (user_id, market_id, outcome_id, side, quote_amount, order_type, expires_at)
+           VALUES ($2, $3, $4, $5, $6, $7, $8)
+           RETURNING
+               id, user_id, market_id, outcome_id, side,
+               shares, remaining_shares, price, status,
+               quote_amount, average_price, order_type,
+               expires_at, created_at, updated_at"#,
+        )
+        .bind(quote_amount)
+        .bind(user_id)
+        .bind(market_id)
+        .bind(outcome_id)
+        .bind(OrderSide::BUY)
+        .bind(quote_amount)
+        .bind(OrderType::MARKET)
+        .bind(expires_at)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(order)
+    }
+
+    async fn sell_market_order(
+        &self,
+        user_id: Uuid,
+        market_id: Uuid,
+        outcome_id: Uuid,
+        shares: Decimal,
+        expires_at: DateTime<Utc>,
+    ) -> Result<Order, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        let order = sqlx::query_as::<_, Order>(
+            r#"WITH lock_shares AS (
+               UPDATE holdings
+               SET    shares        = shares        - $1,
+                      locked_shares = locked_shares + $1,
+                      updated_at    = NOW()
+               WHERE  user_id = $2 AND market_id = $3 AND outcome_id = $4
+           )
+           INSERT INTO orders
+               (user_id, market_id, outcome_id, side, shares, remaining_shares, order_type, expires_at)
+           VALUES ($2, $3, $4, $5, $1, $1, $6, $7)
+           RETURNING
+               id, user_id, market_id, outcome_id, side,
+               shares, remaining_shares, price, status,
+               quote_amount, average_price, order_type,
+               expires_at, created_at, updated_at"#,
+        )
+        .bind(shares) // (shares & remaining_shares)
+        .bind(user_id)
+        .bind(market_id)
+        .bind(outcome_id)
+        .bind(OrderSide::SELL)
+        .bind(OrderType::MARKET)
+        .bind(expires_at)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(order)
+    }
+
+    async fn limit_trade(&self, buy_order: Order, sell_order: Order) -> Result<Trade, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
         let trade_shares = min(sell_order.remaining_shares, buy_order.remaining_shares);
@@ -488,6 +602,308 @@ impl OrderExt for PGClient {
         Ok(trade)
     }
 
+    async fn market_trade(
+        &self,
+        market_order: Order,
+        book_order: Order,
+    ) -> Result<Trade, sqlx::Error> {
+        let trade: Trade;
+
+        match market_order.side {
+            OrderSide::BUY => {
+                let mut tx = self.pool.begin().await?;
+
+                let trade_shares = if market_order.quote_amount
+                    >= book_order.price * book_order.remaining_shares
+                {
+                    book_order.remaining_shares
+                } else {
+                    (market_order.quote_amount / book_order.price).floor()
+                };
+                let trade_price = book_order.price;
+                let total_cost = trade_price * trade_shares;
+
+                trade = sqlx::query_as(
+                    r#"
+                    INSERT INTO trades (market_id, outcome_id, buy_order_id, sell_order_id, shares, price)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    RETURNING id, market_id, outcome_id, buy_order_id, sell_order_id, shares, price, created_at
+                    "#,
+                )
+                .bind(market_order.market_id)
+                .bind(market_order.outcome_id)
+                .bind(market_order.id)
+                .bind(book_order.id)
+                .bind(trade_shares)
+                .bind(trade_price)
+                .fetch_one(&mut *tx)
+                .await?;
+
+                // Buyer
+                sqlx::query(
+                    r#"
+                    UPDATE orders
+                    SET shares = shares + $1,
+                        quote_amount = quote_amount - $2,
+                        status = CASE
+                            WHEN quote_amount - $2 = 0 THEN $3
+                            ELSE $4
+                        END,
+                        updated_at = $5
+                    WHERE id = $6
+                    "#,
+                )
+                .bind(trade_shares)
+                .bind(total_cost)
+                .bind(OrderStatus::FILLED)
+                .bind(OrderStatus::PARTIAL)
+                .bind(Utc::now())
+                .bind(market_order.id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"UPDATE wallets SET locked_balance = locked_balance - $1 WHERE user_id = $2"#,
+                )
+                .bind(total_cost)
+                .bind(market_order.user_id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"
+                    UPDATE holdings
+                    SET shares = shares + $1, updated_at = $2
+                    WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
+                    "#,
+                )
+                .bind(trade_shares)
+                .bind(Utc::now())
+                .bind(market_order.user_id)
+                .bind(market_order.market_id)
+                .bind(market_order.outcome_id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"INSERT INTO transactions (wallet_id, amount, type)
+                    VALUES ((SELECT id FROM wallets WHERE user_id = $1), $2, $3)"#,
+                )
+                .bind(market_order.user_id)
+                .bind(total_cost)
+                .bind(TransactionType::BUY)
+                .execute(&mut *tx)
+                .await?;
+
+                // Seller
+                sqlx::query(
+                    r#"
+                    UPDATE orders
+                    SET remaining_shares = remaining_shares - $1,
+                        status = CASE
+                            WHEN remaining_shares - $1 = 0 THEN $2
+                            ELSE $3
+                        END,
+                        updated_at = $4
+                    WHERE id = $5
+                    "#,
+                )
+                .bind(trade_shares)
+                .bind(OrderStatus::FILLED)
+                .bind(OrderStatus::PARTIAL)
+                .bind(Utc::now())
+                .bind(book_order.id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"
+                    UPDATE holdings
+                    SET locked_shares = locked_shares - $1, updated_at = $2
+                    WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
+                    "#,
+                )
+                .bind(trade_shares)
+                .bind(Utc::now())
+                .bind(book_order.user_id)
+                .bind(book_order.market_id)
+                .bind(book_order.outcome_id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"UPDATE wallets
+                    SET balance = balance + $1, updated_at = $2
+                    WHERE user_id = $3
+                    "#,
+                )
+                .bind(total_cost)
+                .bind(Utc::now())
+                .bind(book_order.user_id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(r#"INSERT INTO transactions (wallet_id, amount, type) VALUES ((SELECT id FROM wallets WHERE user_id = $1), $2, $3)"#)
+                    .bind(book_order.user_id)
+                    .bind(total_cost)
+                    .bind(TransactionType::SELL)
+                    .execute(&mut *tx)
+                    .await?;
+
+                sqlx::query(r#"UPDATE outcome SET current_price = $1 WHERE id = $2"#)
+                    .bind(trade_price)
+                    .bind(book_order.outcome_id)
+                    .execute(&mut *tx)
+                    .await?;
+
+                tx.commit().await?;
+            }
+
+            OrderSide::SELL => {
+                let mut tx = self.pool.begin().await?;
+
+                let trade_shares = min(market_order.remaining_shares, book_order.remaining_shares);
+                let trade_price = book_order.price;
+                let total_cost = trade_price * trade_shares;
+
+                trade = sqlx::query_as(
+                    r#"
+                    INSERT INTO trades (market_id, outcome_id, buy_order_id, sell_order_id, shares, price)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    RETURNING id, market_id, outcome_id, buy_order_id, sell_order_id, shares, price, created_at
+                    "#,
+                )
+                .bind(market_order.market_id)
+                .bind(market_order.outcome_id)
+                .bind(book_order.id)
+                .bind(market_order.id)
+                .bind(trade_shares)
+                .bind(trade_price)
+                .fetch_one(&mut *tx)
+                .await?;
+
+                // Buyer
+                sqlx::query(
+                    r#"
+                    UPDATE orders
+                    SET remaining_shares = remaining_shares - $1,
+                        status = CASE
+                            WHEN remaining_shares - $1 = 0 THEN $2
+                            ELSE $3
+                        END,
+                        updated_at = $4
+                    WHERE id = $5
+                    "#,
+                )
+                .bind(trade_shares)
+                .bind(OrderStatus::FILLED)
+                .bind(OrderStatus::PARTIAL)
+                .bind(Utc::now())
+                .bind(book_order.id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"UPDATE wallets SET locked_balance = locked_balance - $1 WHERE user_id = $2"#,
+                )
+                .bind(total_cost)
+                .bind(book_order.user_id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"
+                    UPDATE holdings
+                    SET shares = shares + $1, updated_at = $2
+                    WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
+                    "#,
+                )
+                .bind(trade_shares)
+                .bind(Utc::now())
+                .bind(book_order.user_id)
+                .bind(book_order.market_id)
+                .bind(book_order.outcome_id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"INSERT INTO transactions (wallet_id, amount, type)
+                    VALUES ((SELECT id FROM wallets WHERE user_id = $1), $2, $3)"#,
+                )
+                .bind(book_order.user_id)
+                .bind(total_cost)
+                .bind(TransactionType::BUY)
+                .execute(&mut *tx)
+                .await?;
+
+                // Seller
+                sqlx::query(
+                    r#"
+                    UPDATE orders
+                    SET remaining_shares = remaining_shares - $1,
+                        status = CASE
+                            WHEN remaining_shares - $1 = 0 THEN $2
+                            ELSE $3
+                        END,
+                        updated_at = $4
+                    WHERE id = $5
+                    "#,
+                )
+                .bind(trade_shares)
+                .bind(OrderStatus::FILLED)
+                .bind(OrderStatus::PARTIAL)
+                .bind(Utc::now())
+                .bind(market_order.id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"
+                    UPDATE holdings
+                    SET locked_shares = locked_shares - $1, updated_at = $2
+                    WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
+                    "#,
+                )
+                .bind(trade_shares)
+                .bind(Utc::now())
+                .bind(market_order.user_id)
+                .bind(market_order.market_id)
+                .bind(market_order.outcome_id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"UPDATE wallets
+                    SET balance = balance + $1, updated_at = $2
+                    WHERE user_id = $3
+                    "#,
+                )
+                .bind(total_cost)
+                .bind(Utc::now())
+                .bind(market_order.user_id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(r#"INSERT INTO transactions (wallet_id, amount, type) VALUES ((SELECT id FROM wallets WHERE user_id = $1), $2, $3)"#)
+                    .bind(market_order.user_id)
+                    .bind(total_cost)
+                    .bind(TransactionType::SELL)
+                    .execute(&mut *tx)
+                    .await?;
+
+                sqlx::query(r#"UPDATE outcome SET current_price = $1 WHERE id = $2"#)
+                    .bind(trade_price)
+                    .bind(market_order.outcome_id)
+                    .execute(&mut *tx)
+                    .await?;
+
+                tx.commit().await?;
+            }
+        }
+
+        Ok(trade)
+    }
+
     async fn cancel_order(&self, order: Order) -> Result<Order, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
@@ -543,5 +959,76 @@ impl OrderExt for PGClient {
 
         tx.commit().await?;
         Ok(updated_order)
+    }
+
+    async fn complete_order(&self, market_order: Order) -> Result<(), sqlx::Error> {
+        match market_order.side {
+            OrderSide::BUY => {
+                let mut tx = self.pool.begin().await?;
+
+                sqlx::query(
+                    r#"
+                    UPDATE orders
+                    SET status = $1, updated_at = $2
+                    WHERE id = $3
+                    "#,
+                )
+                .bind(OrderStatus::FILLED)
+                .bind(Utc::now())
+                .bind(market_order.id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"
+                    UPDATE wallets
+                    SET locked_balance = locked_balance - $1, balance = balance + $1, updated_at = $2
+                    WHERE user_id = $3
+                    "#,
+                )
+                .bind(market_order.quote_amount)
+                .bind(Utc::now())
+                .bind(market_order.user_id)
+                .execute(&mut *tx)
+                .await?;
+
+                tx.commit().await?;
+            }
+            OrderSide::SELL => {
+                let mut tx = self.pool.begin().await?;
+
+                sqlx::query(
+                    r#"
+                    UPDATE orders
+                    SET status = $1, shares = shares - remaining_shares, remaining_shares = 0, updated_at = $2
+                    WHERE id = $3
+                    "#,
+                )
+                .bind(OrderStatus::FILLED)
+                .bind(Utc::now())
+                .bind(market_order.id)
+                .execute(&mut *tx)
+                .await?;
+
+                sqlx::query(
+                    r#"
+                    UPDATE holdings
+                    SET locked_shares = locked_shares - $1, shares = shares + $1, updated_at = $2
+                    WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
+                    "#,
+                )
+                .bind(market_order.remaining_shares)
+                .bind(Utc::now())
+                .bind(market_order.user_id)
+                .bind(market_order.market_id)
+                .bind(market_order.outcome_id)
+                .execute(&mut *tx)
+                .await?;
+
+                tx.commit().await?;
+            }
+        }
+
+        Ok(())
     }
 }

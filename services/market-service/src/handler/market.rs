@@ -156,13 +156,13 @@ async fn create_market(
 
     app_state
         .publisher
-        .matcher_place_order(first_order_message)
+        .matcher_limit_order(first_order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     app_state
         .publisher
-        .matcher_place_order(second_order_message)
+        .matcher_limit_order(second_order_message)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

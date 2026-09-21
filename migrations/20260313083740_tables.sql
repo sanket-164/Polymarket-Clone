@@ -8,6 +8,7 @@ CREATE TYPE transaction_type AS ENUM ('DEPOSIT', 'WITHDRAW', 'BUY', 'SELL', 'REF
 CREATE TYPE market_status AS ENUM ('PENDING', 'ACTIVE', 'CLOSED', 'RESOLVED', 'CANCELLED');
 CREATE TYPE order_side AS ENUM ('BUY', 'SELL');
 CREATE TYPE order_status AS ENUM ('PENDING', 'PARTIAL', 'FILLED', 'CANCELLED', 'EXPIRED');
+CREATE TYPE order_type AS ENUM ('LIMIT', 'MARKET');
 
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
@@ -91,9 +92,12 @@ CREATE TABLE IF NOT EXISTS orders (
     market_id UUID NOT NULL,
     outcome_id UUID NOT NULL,
     side order_side NOT NULL,
-    shares DECIMAL(20, 8) NOT NULL,
-    remaining_shares DECIMAL(20, 8) NOT NULL,
-    price DECIMAL(20, 8) NOT NULL,
+    shares DECIMAL(20, 8) DEFAULT 0.00,
+    remaining_shares DECIMAL(20, 8) DEFAULT 0.00,
+    price DECIMAL(20, 8) DEFAULT 0.00,
+    quote_amount DECIMAL(20, 8) DEFAULT 0.00,
+    average_price DECIMAL(20, 8) DEFAULT 0.00,
+    order_type order_type NOT NULL,
     status order_status NOT NULL DEFAULT 'PENDING',
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -154,7 +158,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 ALTER TABLE wallets ADD CONSTRAINT check_balance_non_negative CHECK (balance >= 0 AND locked_balance >= 0);
 ALTER TABLE holdings ADD CONSTRAINT unique_user_market_outcome UNIQUE (user_id, market_id, outcome_id);
 ALTER TABLE holdings ADD CONSTRAINT check_shares_non_negative CHECK (shares >= 0 AND locked_shares >= 0);
-ALTER TABLE orders ADD CONSTRAINT check_shares_price_non_negative CHECK (shares > 0 AND price >= 0);
+ALTER TABLE orders ADD CONSTRAINT check_orders_non_negative CHECK (shares >= 0 AND price >= 0 AND quote_amount >= 0 AND average_price >= 0);
 
 -- Indexes
 
@@ -167,13 +171,11 @@ CREATE INDEX idx_wallets_user_id ON wallets(user_id);
 
 -- Transactions
 CREATE INDEX idx_transactions_wallet_id ON transactions(wallet_id);
-CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
-CREATE INDEX idx_transactions_type ON transactions(type);
+CREATE INDEX idx_transactions_type ON transactions(wallet_id, type);
 
 -- Market
 CREATE INDEX idx_market_status ON market(status);
 CREATE INDEX idx_market_category ON market(category);
-CREATE INDEX idx_market_close_at ON market(close_at);
 
 -- Outcome
 CREATE INDEX idx_outcome_market_id ON outcome(market_id);
@@ -182,19 +184,16 @@ CREATE INDEX idx_outcome_market_id ON outcome(market_id);
 CREATE INDEX idx_holdings_user_id ON holdings(user_id);
 CREATE INDEX idx_holdings_market_id ON holdings(market_id);
 CREATE INDEX idx_holdings_user_market ON holdings(user_id, market_id);
-CREATE INDEX idx_holdings_user_market_outcome ON holdings(user_id, market_id, outcome_id);
 
 -- Orders
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_market_id ON orders(market_id);
 CREATE INDEX idx_orders_market_outcome ON orders(market_id, outcome_id);
-CREATE INDEX idx_orders_status ON orders(status) WHERE status IN ('PENDING', 'PARTIAL');
-CREATE INDEX idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX idx_orders_status ON orders(status);
 
 -- Trades
 CREATE INDEX idx_trades_market ON trades(market_id);
 CREATE INDEX idx_trades_market_outcome ON trades(market_id, outcome_id);
-CREATE INDEX idx_trades_created_at ON trades(created_at DESC);
 
 -- Resolved Markets
 CREATE INDEX idx_resolved_markets_market_id ON resolved_markets(market_id);

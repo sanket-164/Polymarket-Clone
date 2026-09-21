@@ -2,7 +2,10 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
-    model::{Admin, Market, MarketStatus, MarketWithOutcomes, Order, OrderSide, Outcome, Wallet},
+    model::{
+        Admin, Market, MarketStatus, MarketWithOutcomes, Order, OrderSide, OrderType, Outcome,
+        Wallet,
+    },
 };
 use sqlx::{Postgres, QueryBuilder, Row, postgres::PgRow};
 use uuid::Uuid;
@@ -164,9 +167,9 @@ impl MarketExt for PGClient {
     ) -> Result<Order, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
-        let insert_order_query = "INSERT INTO orders (user_id, market_id, outcome_id, side, shares, remaining_shares, price, expires_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, expires_at, created_at, updated_at";
+        let insert_order_query = "INSERT INTO orders (user_id, market_id, outcome_id, side, shares, remaining_shares, price, order_type, expires_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, average_price, order_type, status, expires_at, created_at, updated_at";
 
         let order: Order = sqlx::query_as(insert_order_query)
             .bind(admin_id)
@@ -176,6 +179,7 @@ impl MarketExt for PGClient {
             .bind(outcome.total_shares)
             .bind(outcome.total_shares)
             .bind(outcome.start_price)
+            .bind(OrderType::LIMIT)
             .bind(expires_at)
             .fetch_one(&mut *tx)
             .await?;

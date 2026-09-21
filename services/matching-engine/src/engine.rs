@@ -1,9 +1,10 @@
 use crate::nats_handler::NatsHandler;
 use chrono::{DateTime, Utc};
-use common::model::{Order, OrderSide, TradeMessage};
+use common::model::{Order, OrderSide, OrderType, TradeMessage};
 use rust_decimal::Decimal;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::println;
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -141,10 +142,17 @@ impl Engine {
             .or_insert_with(HashMap::new);
         outcome_books.insert(first_outcome_id, OrderBook::new());
         outcome_books.insert(second_outcome_id, OrderBook::new());
+
+        println!(
+            "Added market {} with outcomes {} and {}",
+            market_id, first_outcome_id, second_outcome_id
+        );
     }
 
     pub fn remove_market(&mut self, market_id: Uuid) {
         self.order_books.remove(&market_id);
+
+        println!("Removed market {}", market_id);
     }
 
     fn get_order_book_mut(
@@ -155,12 +163,12 @@ impl Engine {
         self.order_books.get_mut(market_id)?.get_mut(outcome_id)
     }
 
-    async fn publish_trade_message(nats_handler: &NatsHandler, buy: Order, sell: Order) {
+    async fn publish_limit_trade(nats_handler: &NatsHandler, buy: Order, sell: Order) {
         let filled = buy.remaining_shares.min(sell.remaining_shares);
         println!("Trade: {} shares for {}", filled, sell.price);
 
         if let Err(e) = nats_handler
-            .trade_update_order(TradeMessage::UpdateOrders {
+            .trade_limit_order(TradeMessage::LimitOrders {
                 buy,
                 sell,
                 timestamp: Utc::now().timestamp_millis(),
@@ -171,7 +179,39 @@ impl Engine {
         }
     }
 
-    pub async fn match_order(&mut self, order: Order, nats_handler: &NatsHandler) {
+    async fn publish_market_trade(
+        nats_handler: &NatsHandler,
+        market_order: Order,
+        book_order: Order,
+    ) {
+        let filled = match market_order.side {
+            OrderSide::BUY => {
+                if market_order.quote_amount >= book_order.price * book_order.remaining_shares {
+                    book_order.remaining_shares
+                } else {
+                    (market_order.quote_amount / book_order.price).floor()
+                }
+            }
+            OrderSide::SELL => market_order
+                .remaining_shares
+                .min(book_order.remaining_shares),
+        };
+
+        println!("Trade: {} shares for {}", filled, book_order.price);
+
+        if let Err(e) = nats_handler
+            .trade_market_order(TradeMessage::MarketOrders {
+                market_order,
+                book_order,
+                timestamp: Utc::now().timestamp_millis(),
+            })
+            .await
+        {
+            eprintln!("Failed to publish trade UpdateOrder message: {:?}", e);
+        }
+    }
+
+    async fn limit_order(&mut self, order: Order, nats_handler: &NatsHandler) {
         let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
             return;
         };
@@ -199,7 +239,7 @@ impl Engine {
                         let matched_sell = book.best_sell().cloned().unwrap();
                         let matched_buy = new_buy.clone();
 
-                        Engine::publish_trade_message(
+                        Engine::publish_limit_trade(
                             nats_handler,
                             matched_buy,
                             matched_sell.clone(),
@@ -253,7 +293,7 @@ impl Engine {
                         let matched_buy = book.best_buy().cloned().unwrap();
                         let matched_sell = new_sell.clone();
 
-                        Engine::publish_trade_message(
+                        Engine::publish_limit_trade(
                             nats_handler,
                             matched_buy.clone(),
                             matched_sell,
@@ -326,6 +366,147 @@ impl Engine {
                     .unwrap_or_else(|e| {
                         eprintln!("Failed to publish trade CancelOrder message: {:?}", e);
                     });
+            }
+        }
+    }
+
+    async fn market_order(&mut self, order: Order, nats_handler: &NatsHandler) {
+        let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
+            return;
+        };
+
+        match order.side {
+            OrderSide::BUY => {
+                let mut new_buy = order;
+
+                loop {
+                    let now = Utc::now();
+
+                    // Clean up any expired best sell orders before attempting to match
+                    while let Some(expired) = book.remove_expired_best_sell(now) {
+                        println!("Sell order expired: {:?}", expired);
+                    }
+
+                    let is_match = book
+                        .best_sell()
+                        .map_or(false, |best| new_buy.quote_amount >= best.price);
+
+                    if is_match {
+                        // Clone the order for the trade message.
+                        // The immutable borrow of `book` ends immediately after this line.
+                        let matched_sell = book.best_sell().cloned().unwrap();
+
+                        Engine::publish_market_trade(
+                            nats_handler,
+                            new_buy.clone(),
+                            matched_sell.clone(),
+                        )
+                        .await;
+
+                        let sell_cost = matched_sell.price * matched_sell.remaining_shares;
+
+                        // Full fill of resting order, incoming order still has shares
+                        if new_buy.quote_amount > sell_cost {
+                            new_buy.quote_amount -= sell_cost;
+                            let _ = book.remove_sell();
+
+                        // Full fill of both orders
+                        } else if new_buy.quote_amount == sell_cost {
+                            let _ = book.remove_sell();
+                            break;
+
+                        // PARTIAL FILL of resting order: Mutate in place to preserve queue priority!
+                        } else {
+                            if let Some(best_sell_mut) = book.best_sell_mut() {
+                                best_sell_mut.remaining_shares -=
+                                    (new_buy.quote_amount / best_sell_mut.price).floor();
+                            }
+
+                            // Incoming order is completely filled, exit loop
+                            break;
+                        }
+                    } else {
+                        nats_handler
+                            .trade_complete_order(TradeMessage::CompleteOrder {
+                                market_order: new_buy,
+                            })
+                            .await
+                            .unwrap_or_else(|e| {
+                                eprintln!("Failed to publish trade CompleteOrder message: {:?}", e);
+                            });
+                        break;
+                    }
+                }
+            }
+
+            OrderSide::SELL => {
+                let mut new_sell = order;
+
+                loop {
+                    let now = Utc::now();
+
+                    // Clean up any expired best buy orders before attempting to match
+                    while let Some(expired) = book.remove_expired_best_buy(now) {
+                        println!("Buy order expired: {:?}", expired);
+                    }
+
+                    // Determine if we have a match. The immutable borrow ends at the semicolon.
+                    let is_match = book.best_buy().is_some();
+
+                    if is_match {
+                        // Clone the order for the trade message.
+                        // The immutable borrow of `book` ends immediately after this line.
+                        let matched_buy = book.best_buy().cloned().unwrap();
+
+                        Engine::publish_market_trade(
+                            nats_handler,
+                            new_sell.clone(),
+                            matched_buy.clone(),
+                        )
+                        .await;
+
+                        // Full fill of resting order, incoming order still has shares
+                        if new_sell.remaining_shares > matched_buy.remaining_shares {
+                            new_sell.remaining_shares -= matched_buy.remaining_shares;
+                            let _ = book.remove_buy();
+
+                        // Full fill of both orders
+                        } else if new_sell.remaining_shares == matched_buy.remaining_shares {
+                            let _ = book.remove_buy();
+                            break;
+
+                        // PARTIAL FILL of resting order: Mutate in place to preserve queue priority!
+                        } else {
+                            if let Some(best_buy_mut) = book.best_buy_mut() {
+                                best_buy_mut.remaining_shares -= new_sell.remaining_shares;
+                            }
+
+                            // Incoming order is completely filled, exit loop
+                            break;
+                        }
+                    } else {
+                        nats_handler
+                            .trade_complete_order(TradeMessage::CompleteOrder {
+                                market_order: new_sell,
+                            })
+                            .await
+                            .unwrap_or_else(|e| {
+                                eprintln!("Failed to publish trade CompleteOrder message: {:?}", e);
+                            });
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    pub async fn match_order(&mut self, order: Order, nats_handler: &NatsHandler) {
+        match order.order_type {
+            OrderType::LIMIT => {
+                self.limit_order(order, nats_handler).await;
+            }
+            OrderType::MARKET => {
+                self.market_order(order, nats_handler).await;
             }
         }
     }

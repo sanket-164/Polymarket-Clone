@@ -2,49 +2,79 @@ use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use validator::{Validate, ValidationError};
+use validator::{Validate, ValidationError, ValidationErrors};
 
 use common::model::{OrderSide, OrderStatus};
 
 fn validate_positive_decimal(value: &Decimal) -> Result<(), ValidationError> {
     if *value <= Decimal::ZERO {
-        return Err(ValidationError::new("Balance must be greater than zero"));
+        return Err(ValidationError::new("must_be_positive"));
     }
     Ok(())
 }
 
 fn validate_expires_at(expires_at: &DateTime<Utc>) -> Result<(), ValidationError> {
-    let now = Utc::now();
-
-    if expires_at.to_utc() <= now {
-        return Err(ValidationError::new(
-            "expires_at must be greater than the current time",
-        ));
+    if expires_at.to_utc() <= Utc::now() {
+        return Err(ValidationError::new("must_be_in_future"));
     }
-
     Ok(())
 }
 
+// ---------- LIMIT ----------
+
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
-pub struct PlaceOrderDTO {
+pub struct LimitOrderDTO {
     pub market_id: Uuid,
     pub outcome_id: Uuid,
+    pub side: OrderSide,
+
     #[validate(custom(
         function = "validate_positive_decimal",
         message = "Shares must be greater than zero"
     ))]
     pub shares: Decimal,
+
     #[validate(custom(
         function = "validate_positive_decimal",
         message = "Price must be greater than zero"
     ))]
     pub price: Decimal,
-    pub side: OrderSide,
+
     #[validate(custom(
         function = "validate_expires_at",
         message = "expires_at must be greater than the current time"
     ))]
     pub expires_at: DateTime<Utc>,
+}
+
+// ---------- MARKET ----------s
+
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
+pub struct MarketOrderDTO {
+    pub market_id: Uuid,
+    pub outcome_id: Uuid,
+    pub side: OrderSide,
+    pub shares: Option<Decimal>,
+    pub quote_amount: Option<Decimal>,
+    // no price, no expires_at — market orders fill immediately against the book
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "order_type", rename_all = "lowercase")]
+pub enum PlaceOrderDTO {
+    Limit(LimitOrderDTO),
+    Market(MarketOrderDTO),
+}
+
+// validator's derive macro doesn't support enums directly (as of validator 0.18),
+// so Validate is implemented by hand, delegating to whichever variant is present.
+impl Validate for PlaceOrderDTO {
+    fn validate(&self) -> Result<(), ValidationErrors> {
+        match self {
+            PlaceOrderDTO::Limit(dto) => dto.validate(),
+            PlaceOrderDTO::Market(dto) => dto.validate(),
+        }
+    }
 }
 
 fn validate_after(after: &DateTime<Utc>) -> Result<(), ValidationError> {

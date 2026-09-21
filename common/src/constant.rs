@@ -41,7 +41,8 @@ pub const HOLDING: &str = "/holding";
 
 // NATS Config
 pub const MATCHER_STREAM: &str = "matcher";
-pub const MATCHER_PLACE_ORDER: &str = "matcher.place.order";
+pub const MATCHER_LIMIT_ORDER: &str = "matcher.limit.order";
+pub const MATCHER_MARKET_ORDER: &str = "matcher.market.order";
 pub const MATCHER_CANCEL_ORDER: &str = "matcher.cancel.order";
 pub const MATCHER_CREATE_MARKET: &str = "matcher.create.market";
 pub const MATCHER_REMOVE_MARKET: &str = "matcher.remove.market";
@@ -51,8 +52,10 @@ pub const FEED_REMOVE_MARKET: &str = "feed.remove.market";
 pub const FEED_CREATE_MARKET: &str = "feed.create.market";
 pub const MAX_NATS_RECONNECTS: u8 = 5;
 pub const TRADE_STREAM: &str = "trade";
-pub const TRADE_UPDATE_ORDER: &str = "trade.update.order";
+pub const TRADE_LIMIT_ORDER: &str = "trade.limit.order";
 pub const TRADE_CANCEL_ORDER: &str = "trade.cancel.order";
+pub const TRADE_MARKET_ORDER: &str = "trade.market.order";
+pub const TRADE_COMPLETE_ORDER: &str = "trade.complete.order";
 
 // Service Ports
 pub const AUTH_PORT: u16 = 3001;

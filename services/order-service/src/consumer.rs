@@ -123,12 +123,12 @@ pub async fn start_consumer(
         };
 
         match message {
-            TradeMessage::UpdateOrders {
+            TradeMessage::LimitOrders {
                 buy,
                 sell,
                 timestamp,
             } => {
-                let trade = match pg_client.trade(buy.clone(), sell.clone()).await {
+                let trade = match pg_client.limit_trade(buy.clone(), sell.clone()).await {
                     Ok(trade) => trade,
                     Err(e) => {
                         eprintln!("Trade error: {e}");
@@ -186,6 +186,54 @@ pub async fn start_consumer(
                     &nats_handler,
                 )
                 .await;
+            }
+
+            TradeMessage::MarketOrders {
+                market_order,
+                book_order,
+                timestamp,
+            } => {
+                let trade = match pg_client
+                    .market_trade(market_order.clone(), book_order.clone())
+                    .await
+                {
+                    Ok(trade) => trade,
+                    Err(e) => {
+                        eprintln!("Trade error: {e}");
+                        let _ = msg.ack().await;
+                        continue;
+                    }
+                };
+
+                update_orderbook(
+                    trade.market_id,
+                    book_order.outcome_id,
+                    book_order.side,
+                    book_order.price,
+                    trade.shares,
+                    Some(trade.price),
+                    timestamp,
+                    &mut redis,
+                    &nats_handler,
+                )
+                .await;
+
+                if let Err(e) = redis::cmd("SET")
+                    .arg(&format!("orderbook:{}:timestamp", trade.market_id))
+                    .arg(timestamp)
+                    .query_async::<()>(&mut *redis)
+                    .await
+                {
+                    eprintln!("Redis SET failed: {:?}", e);
+                }
+            }
+
+            TradeMessage::CompleteOrder { market_order } => {
+                if let Err(e) = pg_client.complete_order(market_order).await {
+                    eprintln!("Complete order error: {e}");
+                    let _ = msg.ack().await;
+                    continue;
+                }
             }
         }
 

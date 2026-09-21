@@ -86,6 +86,13 @@ pub enum OrderStatus {
     EXPIRED,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, sqlx::Type, Eq)]
+#[sqlx(type_name = "order_type")]
+pub enum OrderType {
+    LIMIT,
+    MARKET,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, Eq, PartialEq)]
 pub struct Order {
     pub id: Uuid,
@@ -96,6 +103,9 @@ pub struct Order {
     pub shares: Decimal,
     pub remaining_shares: Decimal,
     pub price: Decimal,
+    pub quote_amount: Decimal,
+    pub average_price: Decimal,
+    pub order_type: OrderType,
     pub status: OrderStatus,
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
@@ -223,7 +233,7 @@ pub enum FeedMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum TradeMessage {
-    UpdateOrders {
+    LimitOrders {
         buy: Order,
         sell: Order,
         timestamp: i64,
@@ -231,5 +241,13 @@ pub enum TradeMessage {
     CancelOrder {
         order: Order,
         timestamp: i64,
+    },
+    MarketOrders {
+        market_order: Order,
+        book_order: Order,
+        timestamp: i64,
+    },
+    CompleteOrder {
+        market_order: Order,
     },
 }
