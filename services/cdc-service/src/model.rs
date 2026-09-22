@@ -121,6 +121,13 @@ pub enum OrderStatus {
 
 #[repr(u8)]
 #[derive(Debug, Clone, Serialize_repr, Deserialize, PartialEq)]
+pub enum OrderType {
+    LIMIT = 1,
+    MARKET = 2,
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Serialize_repr, Deserialize, PartialEq)]
 pub enum TransactionType {
     DEPOSIT = 1,
     WITHDRAW = 2,
@@ -149,6 +156,11 @@ pub struct OrderRow {
     pub remaining_shares: Decimal,
     #[serde(with = "decimal64")]
     pub price: Decimal,
+    #[serde(with = "decimal64")]
+    pub quote_amount: Decimal,
+    #[serde(with = "decimal64")]
+    pub average_price: Decimal,
+    pub order_type: OrderType,
     pub status: OrderStatus,
     #[serde(with = "datetime_rfc3339")]
     pub expires_at: DateTime<Utc>,

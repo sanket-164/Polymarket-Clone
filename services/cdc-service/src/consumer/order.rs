@@ -100,8 +100,14 @@ async fn handle_order_event(
         Operation::Create => {
             if let Some(after) = event.after {
                 println!(
-                    "NEW ORDER | id={} user={} side={:?} shares={} price={} status={:?}",
-                    after.id, after.user_id, after.side, after.shares, after.price, after.status
+                    "NEW ORDER | id={} user={} side={:?} shares={} price={} status={:?} type={:?}",
+                    after.id,
+                    after.user_id,
+                    after.side,
+                    after.shares,
+                    after.price,
+                    after.status,
+                    after.order_type
                 );
 
                 if let Err(err) = ch_client.insert_order(&after).await {

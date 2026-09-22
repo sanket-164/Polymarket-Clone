@@ -17,6 +17,13 @@ CREATE TABLE IF NOT EXISTS orders
     shares Decimal64(8),
     remaining_shares Decimal64(8),
     price Decimal64(8),
+    quote_amount Decimal64(8),
+    average_price Decimal64(8),
+    
+    order_type Enum8(
+        'LIMIT' = 1,
+        'MARKET' = 2
+    ),
 
     status Enum8(
         'PENDING' = 1,
