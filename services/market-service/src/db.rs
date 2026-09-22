@@ -464,8 +464,8 @@ impl MarketExt for PGClient {
     ) -> Result<(), sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
-        // 1. Refund balance of unmatched buy orders
-        // Reduce loacked_balance and return balance (remaining_shares * price)
+        // 1. Refund balance of unmatched limit buy orders
+        // Reduce locked_balance and return balance (remaining_shares * price)
         sqlx::query(
             "UPDATE wallets w
             SET balance        = w.balance + unmatched_buys.total,
@@ -477,6 +477,7 @@ impl MarketExt for PGClient {
                 WHERE market_id = $2
                 AND side      = 'BUY'
                 AND status    IN ('PENDING', 'PARTIAL')
+                AND order_type = 'LIMIT'
                 GROUP BY user_id
             ) AS unmatched_buys
             WHERE w.user_id = unmatched_buys.user_id",
@@ -486,7 +487,7 @@ impl MarketExt for PGClient {
         .execute(&mut *tx)
         .await?;
 
-        // 2. Return unmatched sell order shares back to holdings
+        // 2. Return unmatched limit sell order shares back to holdings
         sqlx::query(
             "UPDATE holdings h
             SET shares        = h.shares + unmatched_sells.total_shares,
@@ -498,6 +499,7 @@ impl MarketExt for PGClient {
                 WHERE market_id = $2
                 AND side      = 'SELL'
                 AND status    IN ('PENDING', 'PARTIAL')
+                AND order_type = 'LIMIT'
                 GROUP BY user_id, outcome_id
             ) AS unmatched_sells
             WHERE h.user_id    = unmatched_sells.user_id

@@ -67,6 +67,15 @@ async fn update_orderbook(
         }
     }
 
+    if let Err(e) = redis::cmd("SET")
+        .arg(&format!("orderbook:{}:timestamp", market_id))
+        .arg(timestamp)
+        .query_async::<()>(&mut *redis)
+        .await
+    {
+        eprintln!("Redis SET failed: {:?}", e);
+    }
+
     let feed_message = FeedMessage::OrderFeed {
         feed: OrderFeed {
             market_id,
@@ -153,33 +162,21 @@ pub async fn start_consumer(
                     )
                     .await;
                 }
-
-                if let Err(e) = redis::cmd("SET")
-                    .arg(&format!("orderbook:{}:timestamp", trade.market_id))
-                    .arg(timestamp)
-                    .query_async::<()>(&mut *redis)
-                    .await
-                {
-                    eprintln!("Redis SET failed: {:?}", e);
-                }
             }
 
-            TradeMessage::CancelOrder { order, timestamp } => {
-                let cancel_order = match pg_client.cancel_order(order.clone()).await {
-                    Ok(order) => order,
-                    Err(e) => {
-                        eprintln!("Cancel order error: {e}");
-                        let _ = msg.ack().await;
-                        continue;
-                    }
-                };
+            TradeMessage::CancelledOrder { order, timestamp } => {
+                if let Err(e) = pg_client.cancelled_order(order.clone()).await {
+                    eprintln!("Cancelled order error: {e}");
+                    let _ = msg.ack().await;
+                    continue;
+                }
 
                 update_orderbook(
-                    cancel_order.market_id,
-                    cancel_order.outcome_id,
-                    cancel_order.side,
-                    cancel_order.price,
-                    cancel_order.remaining_shares,
+                    order.market_id,
+                    order.outcome_id,
+                    order.side,
+                    order.price,
+                    order.remaining_shares,
                     None,
                     timestamp,
                     &mut redis,
@@ -217,23 +214,35 @@ pub async fn start_consumer(
                     &nats_handler,
                 )
                 .await;
-
-                if let Err(e) = redis::cmd("SET")
-                    .arg(&format!("orderbook:{}:timestamp", trade.market_id))
-                    .arg(timestamp)
-                    .query_async::<()>(&mut *redis)
-                    .await
-                {
-                    eprintln!("Redis SET failed: {:?}", e);
-                }
             }
 
-            TradeMessage::CompleteOrder { market_order } => {
-                if let Err(e) = pg_client.complete_order(market_order).await {
+            TradeMessage::CompletedOrder { market_order } => {
+                if let Err(e) = pg_client.completed_order(market_order).await {
                     eprintln!("Complete order error: {e}");
                     let _ = msg.ack().await;
                     continue;
                 }
+            }
+
+            TradeMessage::ExpiredOrder { order } => {
+                if let Err(e) = pg_client.expired_order(order.clone()).await {
+                    eprintln!("Expired order error: {e}");
+                    let _ = msg.ack().await;
+                    continue;
+                }
+
+                update_orderbook(
+                    order.market_id,
+                    order.outcome_id,
+                    order.side,
+                    order.price,
+                    order.remaining_shares,
+                    None,
+                    order.expires_at.timestamp_millis(),
+                    &mut redis,
+                    &nats_handler,
+                )
+                .await;
             }
         }
 

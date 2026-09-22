@@ -200,7 +200,10 @@ pub enum MatcherMessage {
     PlaceOrder {
         order: Order,
     },
-    CancelOrder {
+    CancelledOrder {
+        order: Order,
+    },
+    ExpiredOrder {
         order: Order,
     },
     CreateMarket {
@@ -239,7 +242,7 @@ pub enum TradeMessage {
         sell: Order,
         timestamp: i64,
     },
-    CancelOrder {
+    CancelledOrder {
         order: Order,
         timestamp: i64,
     },
@@ -248,7 +251,10 @@ pub enum TradeMessage {
         book_order: Order,
         timestamp: i64,
     },
-    CompleteOrder {
+    CompletedOrder {
         market_order: Order,
+    },
+    ExpiredOrder {
+        order: Order,
     },
 }

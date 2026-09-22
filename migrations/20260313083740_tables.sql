@@ -234,7 +234,8 @@ BEGIN
     SET status = 'EXPIRED',
         updated_at = CURRENT_TIMESTAMP
     WHERE status IN ('PENDING', 'PARTIAL')
-        AND expires_at <= now();
+        AND expires_at <= now()
+        AND order_type = 'LIMIT';
 END;
 $$ LANGUAGE plpgsql;
 

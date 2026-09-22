@@ -211,6 +211,38 @@ impl Engine {
         }
     }
 
+    async fn publish_cancelled_order(nats_handler: &NatsHandler, order: Order) {
+        println!("Order cancelled: {:?}", order);
+        if let Err(e) = nats_handler
+            .trade_cancelled_order(TradeMessage::CancelledOrder {
+                order,
+                timestamp: Utc::now().timestamp_millis(),
+            })
+            .await
+        {
+            eprintln!("Failed to publish trade CancelledOrder message: {:?}", e);
+        }
+    }
+
+    async fn publish_completed_order(nats_handler: &NatsHandler, market_order: Order) {
+        if let Err(e) = nats_handler
+            .trade_completed_order(TradeMessage::CompletedOrder { market_order })
+            .await
+        {
+            eprintln!("Failed to publish trade CompletedOrder message: {:?}", e);
+        }
+    }
+
+    async fn publish_expired_order(nats_handler: &NatsHandler, order: Order) {
+        println!("Order expired: {:?}", order);
+        if let Err(e) = nats_handler
+            .trade_expired_order(TradeMessage::ExpiredOrder { order })
+            .await
+        {
+            eprintln!("Failed to publish trade ExpiredOrder message: {:?}", e);
+        }
+    }
+
     async fn limit_order(&mut self, order: Order, nats_handler: &NatsHandler) {
         let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
             return;
@@ -225,7 +257,7 @@ impl Engine {
 
                     // Clean up any expired best sell orders before attempting to match
                     while let Some(expired) = book.remove_expired_best_sell(now) {
-                        println!("Sell order expired: {:?}", expired);
+                        Engine::publish_expired_order(nats_handler, expired).await;
                     }
 
                     // Determine if we have a match. The immutable borrow ends at the semicolon.
@@ -279,7 +311,7 @@ impl Engine {
 
                     // Clean up any expired best buy orders before attempting to match
                     while let Some(expired) = book.remove_expired_best_buy(now) {
-                        println!("Buy order expired: {:?}", expired);
+                        Engine::publish_expired_order(nats_handler, expired).await;
                     }
 
                     // Determine if we have a match. The immutable borrow ends at the semicolon.
@@ -326,50 +358,6 @@ impl Engine {
         }
     }
 
-    pub async fn cancel_order(&mut self, order: Order, nats_handler: &NatsHandler) {
-        let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
-            return;
-        };
-
-        let Some((is_buy, price)) = book.index.remove(&order.id) else {
-            return;
-        };
-
-        let orders = if is_buy {
-            book.buy.get_mut(&Reverse(price))
-        } else {
-            book.sell.get_mut(&price)
-        };
-
-        if let Some(orders) = orders {
-            let initial_len = orders.len();
-
-            orders.retain(|o| o.id != order.id);
-
-            // If length decreased, the order was successfully found and removed
-            if orders.len() < initial_len {
-                // Clean up the price level from the BTreeMap if it's now empty
-                if orders.is_empty() {
-                    if is_buy {
-                        book.buy.remove(&Reverse(price));
-                    } else {
-                        book.sell.remove(&price);
-                    }
-                }
-
-                nats_handler
-                    .trade_cancel_order(TradeMessage::CancelOrder {
-                        order,
-                        timestamp: Utc::now().timestamp_millis(),
-                    })
-                    .await
-                    .unwrap_or_else(|e| {
-                        eprintln!("Failed to publish trade CancelOrder message: {:?}", e);
-                    });
-            }
-        }
-    }
-
     async fn market_order(&mut self, order: Order, nats_handler: &NatsHandler) {
         let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
             return;
@@ -384,7 +372,7 @@ impl Engine {
 
                     // Clean up any expired best sell orders before attempting to match
                     while let Some(expired) = book.remove_expired_best_sell(now) {
-                        println!("Sell order expired: {:?}", expired);
+                        Engine::publish_expired_order(nats_handler, expired).await;
                     }
 
                     let is_match = book
@@ -426,14 +414,7 @@ impl Engine {
                             break;
                         }
                     } else {
-                        nats_handler
-                            .trade_complete_order(TradeMessage::CompleteOrder {
-                                market_order: new_buy,
-                            })
-                            .await
-                            .unwrap_or_else(|e| {
-                                eprintln!("Failed to publish trade CompleteOrder message: {:?}", e);
-                            });
+                        Engine::publish_completed_order(nats_handler, new_buy).await;
                         break;
                     }
                 }
@@ -447,7 +428,7 @@ impl Engine {
 
                     // Clean up any expired best buy orders before attempting to match
                     while let Some(expired) = book.remove_expired_best_buy(now) {
-                        println!("Buy order expired: {:?}", expired);
+                        Engine::publish_expired_order(nats_handler, expired).await;
                     }
 
                     // Determine if we have a match. The immutable borrow ends at the semicolon.
@@ -485,14 +466,7 @@ impl Engine {
                             break;
                         }
                     } else {
-                        nats_handler
-                            .trade_complete_order(TradeMessage::CompleteOrder {
-                                market_order: new_sell,
-                            })
-                            .await
-                            .unwrap_or_else(|e| {
-                                eprintln!("Failed to publish trade CompleteOrder message: {:?}", e);
-                            });
+                        Engine::publish_completed_order(nats_handler, new_sell).await;
                         break;
                     }
                 }
@@ -508,6 +482,56 @@ impl Engine {
             OrderType::MARKET => {
                 self.market_order(order, nats_handler).await;
             }
+        }
+    }
+
+    async fn remove_order(&mut self, order: Order) -> bool {
+        let Some(book) = self.get_order_book_mut(&order.market_id, &order.outcome_id) else {
+            return false;
+        };
+
+        let Some((is_buy, price)) = book.index.remove(&order.id) else {
+            return false;
+        };
+
+        let orders = if is_buy {
+            book.buy.get_mut(&Reverse(price))
+        } else {
+            book.sell.get_mut(&price)
+        };
+
+        if let Some(orders) = orders {
+            let initial_len = orders.len();
+
+            orders.retain(|o| o.id != order.id);
+
+            // If length decreased, the order was successfully found and removed
+            if orders.len() < initial_len {
+                // Clean up the price level from the BTreeMap if it's now empty
+                if orders.is_empty() {
+                    if is_buy {
+                        book.buy.remove(&Reverse(price));
+                    } else {
+                        book.sell.remove(&price);
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    pub async fn cancelled_order(&mut self, order: Order, nats_handler: &NatsHandler) {
+        if Engine::remove_order(self, order.clone()).await {
+            Engine::publish_cancelled_order(nats_handler, order).await;
+        }
+    }
+
+    pub async fn expired_order(&mut self, order: Order, nats_handler: &NatsHandler) {
+        if Engine::remove_order(self, order.clone()).await {
+            Engine::publish_expired_order(nats_handler, order).await;
         }
     }
 }

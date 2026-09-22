@@ -386,7 +386,7 @@ async fn cancel_order(
 
     app_state
         .publisher
-        .matcher_cancel_order(MatcherMessage::CancelOrder { order })
+        .matcher_cancelled_order(MatcherMessage::CancelledOrder { order })
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 

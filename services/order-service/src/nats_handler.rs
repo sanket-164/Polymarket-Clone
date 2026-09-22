@@ -4,7 +4,7 @@ use async_nats::{
 };
 use common::{
     constant::{
-        FEED_MARKET_ORDER, MATCHER_CANCEL_ORDER, MATCHER_LIMIT_ORDER, MATCHER_MARKET_ORDER,
+        FEED_MARKET_ORDER, MATCHER_CANCELLED_ORDER, MATCHER_LIMIT_ORDER, MATCHER_MARKET_ORDER,
         MAX_NATS_RECONNECTS,
     },
     model::{FeedMessage, MatcherMessage},
@@ -95,11 +95,11 @@ impl NatsHandler {
         self.publish(MATCHER_MARKET_ORDER, &message).await
     }
 
-    pub async fn matcher_cancel_order(
+    pub async fn matcher_cancelled_order(
         &self,
         message: MatcherMessage,
     ) -> Result<(), async_nats::Error> {
-        self.publish(MATCHER_CANCEL_ORDER, &message).await
+        self.publish(MATCHER_CANCELLED_ORDER, &message).await
     }
 
     pub async fn feed_market_order(&self, message: FeedMessage) -> Result<(), async_nats::Error> {

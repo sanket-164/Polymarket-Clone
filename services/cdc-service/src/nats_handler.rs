@@ -1,13 +1,16 @@
-use async_nats::{Client, ConnectOptions};
+use async_nats::{
+    ConnectOptions,
+    jetstream::{self, Context},
+};
 use common::{
-    constant::{FEED_MARKET_ORDER, MAX_NATS_RECONNECTS},
-    model::FeedMessage,
+    constant::{MATCHER_EXPIRED_ORDER, MAX_NATS_RECONNECTS},
+    model::TradeMessage,
 };
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct NatsHandler {
-    pub client: Client,
+    pub jetstream: Context,
 }
 
 impl NatsHandler {
@@ -29,20 +32,23 @@ impl NatsHandler {
             .connect(url)
             .await?;
 
-        Ok(Self { client })
+        let jetstream = jetstream::new(client.clone());
+
+        Ok(Self { jetstream })
     }
 
-    pub async fn feed_market_order(&self, message: FeedMessage) -> Result<(), async_nats::Error> {
+    pub async fn matcher_expired_order(
+        &self,
+        message: TradeMessage,
+    ) -> Result<(), async_nats::Error> {
         let payload = serde_json::to_vec(&message).map_err(|e| {
             async_nats::Error::from(Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
         })?;
 
-        self.client
-            .publish(FEED_MARKET_ORDER, payload.into())
+        self.jetstream
+            .publish(MATCHER_EXPIRED_ORDER, payload.into())
+            .await?
             .await?;
-
-        self.client.flush().await?;
-
         Ok(())
     }
 }

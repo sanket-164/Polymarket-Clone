@@ -95,13 +95,14 @@ pub trait OrderExt {
         expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error>;
     async fn limit_trade(&self, buy_order: Order, sell_order: Order) -> Result<Trade, sqlx::Error>;
-    async fn cancel_order(&self, order: Order) -> Result<Order, sqlx::Error>;
     async fn market_trade(
         &self,
         market_order: Order,
         book_order: Order,
     ) -> Result<Trade, sqlx::Error>;
-    async fn complete_order(&self, market_order: Order) -> Result<(), sqlx::Error>;
+    async fn cancelled_order(&self, order: Order) -> Result<(), sqlx::Error>;
+    async fn completed_order(&self, market_order: Order) -> Result<(), sqlx::Error>;
+    async fn expired_order(&self, order: Order) -> Result<(), sqlx::Error>;
 }
 
 #[async_trait]
@@ -297,9 +298,6 @@ impl OrderExt for PGClient {
         price: Decimal,
         expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error> {
-        let cost = price * shares;
-        let mut tx = self.pool.begin().await?;
-
         let order = sqlx::query_as::<_, Order>(
             r#"WITH deduct_wallet AS (
                UPDATE wallets
@@ -322,7 +320,7 @@ impl OrderExt for PGClient {
                order_type, quote_amount, remaining_quote, average_price,
                expires_at, created_at, updated_at"#,
         )
-        .bind(cost)
+        .bind(price * shares)
         .bind(user_id)
         .bind(market_id)
         .bind(outcome_id)
@@ -331,10 +329,9 @@ impl OrderExt for PGClient {
         .bind(price)
         .bind(OrderType::LIMIT)
         .bind(expires_at)
-        .fetch_one(&mut *tx)
+        .fetch_one(&self.pool)
         .await?;
 
-        tx.commit().await?;
         Ok(order)
     }
 
@@ -347,8 +344,6 @@ impl OrderExt for PGClient {
         price: Decimal,
         expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-
         let order = sqlx::query_as::<_, Order>(
             r#"WITH lock_shares AS (
                UPDATE holdings
@@ -374,10 +369,9 @@ impl OrderExt for PGClient {
         .bind(price)
         .bind(OrderType::LIMIT)
         .bind(expires_at)
-        .fetch_one(&mut *tx)
+        .fetch_one(&self.pool)
         .await?;
 
-        tx.commit().await?;
         Ok(order)
     }
 
@@ -389,8 +383,6 @@ impl OrderExt for PGClient {
         quote_amount: Decimal,
         expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-
         let order = sqlx::query_as::<_, Order>(
             r#"WITH deduct_wallet AS (
                UPDATE wallets
@@ -421,10 +413,9 @@ impl OrderExt for PGClient {
         .bind(quote_amount)
         .bind(OrderType::MARKET)
         .bind(expires_at)
-        .fetch_one(&mut *tx)
+        .fetch_one(&self.pool)
         .await?;
 
-        tx.commit().await?;
         Ok(order)
     }
 
@@ -436,8 +427,6 @@ impl OrderExt for PGClient {
         shares: Decimal,
         expires_at: DateTime<Utc>,
     ) -> Result<Order, sqlx::Error> {
-        let mut tx = self.pool.begin().await?;
-
         let order = sqlx::query_as::<_, Order>(
             r#"WITH lock_shares AS (
                UPDATE holdings
@@ -462,10 +451,9 @@ impl OrderExt for PGClient {
         .bind(OrderSide::SELL)
         .bind(OrderType::MARKET)
         .bind(expires_at)
-        .fetch_one(&mut *tx)
+        .fetch_one(&self.pool)
         .await?;
 
-        tx.commit().await?;
         Ok(order)
     }
 
@@ -929,28 +917,26 @@ impl OrderExt for PGClient {
         Ok(trade)
     }
 
-    async fn cancel_order(&self, order: Order) -> Result<Order, sqlx::Error> {
+    async fn cancelled_order(&self, order: Order) -> Result<(), sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
         // Update the order status to CANCELLED
-        let updated_order = sqlx::query_as::<_, Order>(
+        sqlx::query(
             r#"
             UPDATE orders
             SET status = $1, updated_at = $2
             WHERE id = $3
-            RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, remaining_quote, average_price, order_type, status, expires_at, created_at, updated_at
             "#,
         )
         .bind(OrderStatus::CANCELLED)
         .bind(Utc::now())
         .bind(order.id)
-        .fetch_one(&mut *tx)
+        .execute(&mut *tx)
         .await?;
 
         // Unlock the shares or balance based on the order side
         match order.side {
             OrderSide::BUY => {
-                let total_cost = order.price * order.remaining_shares;
                 sqlx::query(
                     r#"
                     UPDATE wallets
@@ -958,7 +944,7 @@ impl OrderExt for PGClient {
                     WHERE user_id = $3
                     "#,
                 )
-                .bind(total_cost)
+                .bind(order.price * order.remaining_shares)
                 .bind(Utc::now())
                 .bind(order.user_id)
                 .execute(&mut *tx)
@@ -983,14 +969,12 @@ impl OrderExt for PGClient {
         }
 
         tx.commit().await?;
-        Ok(updated_order)
+        Ok(())
     }
 
-    async fn complete_order(&self, market_order: Order) -> Result<(), sqlx::Error> {
+    async fn completed_order(&self, market_order: Order) -> Result<(), sqlx::Error> {
         match market_order.side {
             OrderSide::BUY => {
-                let mut tx = self.pool.begin().await?;
-
                 sqlx::query(
                     r#"
                     UPDATE wallets
@@ -1001,14 +985,10 @@ impl OrderExt for PGClient {
                 .bind(market_order.remaining_quote)
                 .bind(Utc::now())
                 .bind(market_order.user_id)
-                .execute(&mut *tx)
+                .execute(&self.pool)
                 .await?;
-
-                tx.commit().await?;
             }
             OrderSide::SELL => {
-                let mut tx = self.pool.begin().await?;
-
                 sqlx::query(
                     r#"
                     UPDATE holdings
@@ -1021,10 +1001,46 @@ impl OrderExt for PGClient {
                 .bind(market_order.user_id)
                 .bind(market_order.market_id)
                 .bind(market_order.outcome_id)
-                .execute(&mut *tx)
+                .execute(&self.pool)
                 .await?;
+            }
+        }
 
-                tx.commit().await?;
+        Ok(())
+    }
+
+    async fn expired_order(&self, order: Order) -> Result<(), sqlx::Error> {
+        // Unlock the shares or balance based on the order side
+        match order.side {
+            OrderSide::BUY => {
+                sqlx::query(
+                    r#"
+                    UPDATE wallets
+                    SET locked_balance = locked_balance - $1, balance = balance + $1, updated_at = $2
+                    WHERE user_id = $3
+                    "#,
+                )
+                .bind(order.price * order.remaining_shares)
+                .bind(Utc::now())
+                .bind(order.user_id)
+                .execute(&self.pool)
+                .await?;
+            }
+            OrderSide::SELL => {
+                sqlx::query(
+                    r#"
+                    UPDATE holdings
+                    SET locked_shares = locked_shares - $1, shares = shares + $1, updated_at = $2
+                    WHERE user_id = $3 AND market_id = $4 AND outcome_id = $5
+                    "#,
+                )
+                .bind(order.remaining_shares)
+                .bind(Utc::now())
+                .bind(order.user_id)
+                .bind(order.market_id)
+                .bind(order.outcome_id)
+                .execute(&self.pool)
+                .await?;
             }
         }
 

@@ -1,16 +1,13 @@
-use chrono::Utc;
 use common::constant::{
     AUTO_COMMIT_INTERVAL_MS, AUTO_OFFSET_RESET, CDC_ORDER_TOPIC, ENABLE_AUTO_COMMIT,
     ORDER_GROUP_ID, SESSION_TIMEOUT_MS,
 };
-use common::model::{FeedMessage, OrderFeed};
-use deadpool_redis::Pool;
+use common::model::{Order, TradeMessage};
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::Message;
-use rust_decimal::prelude::ToPrimitive;
 
-use crate::model::{OrderSide, OrderStatus};
+use crate::model::{OrderSide, OrderStatus, OrderType};
 use crate::nats_handler::NatsHandler;
 use crate::{
     ch_client::CHClient,
@@ -21,16 +18,10 @@ pub struct OrderConsumer {
     pub consumer: StreamConsumer,
     pub ch_client: CHClient,
     pub publisher: NatsHandler,
-    pub redis_pool: Pool,
 }
 
 impl OrderConsumer {
-    pub fn init(
-        bootstrap_servers: &str,
-        ch_client: CHClient,
-        publisher: NatsHandler,
-        redis_pool: Pool,
-    ) -> Self {
+    pub async fn init(bootstrap_servers: &str, ch_client: CHClient, nats_url: &str) -> Self {
         let consumer: StreamConsumer = ClientConfig::new()
             .set("bootstrap.servers", bootstrap_servers)
             .set("group.id", ORDER_GROUP_ID)
@@ -41,11 +32,18 @@ impl OrderConsumer {
             .create()
             .expect("Failed to create Kafka consumer");
 
+        let publisher = match NatsHandler::new(nats_url).await {
+            Ok(p) => p,
+            Err(e) => {
+                println!("Failed to connect publisher: {e}");
+                std::process::exit(1);
+            }
+        };
+
         Self {
             consumer,
             ch_client,
             publisher,
-            redis_pool,
         }
     }
 
@@ -74,13 +72,7 @@ impl OrderConsumer {
 
                     match serde_json::from_str::<ConsumerEvent<OrderRow>>(payload) {
                         Ok(event) => {
-                            handle_order_event(
-                                event,
-                                &self.ch_client,
-                                &self.publisher,
-                                &self.redis_pool,
-                            )
-                            .await
+                            handle_order_event(event, &self.ch_client, &self.publisher).await
                         }
                         Err(e) => eprintln!("Failed to parse event: {} \nRaw: {}", e, payload),
                     }
@@ -94,7 +86,6 @@ async fn handle_order_event(
     event: ConsumerEvent<OrderRow>,
     ch_client: &CHClient,
     publisher: &NatsHandler,
-    redis_pool: &Pool,
 ) {
     match event.op {
         Operation::Create => {
@@ -136,84 +127,32 @@ async fn handle_order_event(
                     eprintln!("Failed to update order in ClickHouse: {}", err);
                 }
 
-                if after.status == OrderStatus::EXPIRED {
-                    let mut redis = match redis_pool.get().await {
-                        Ok(r) => r,
-                        Err(e) => {
-                            eprintln!("Failed to get Redis connection: {e}");
-                            return;
-                        }
-                    };
-
-                    let base_key = format!(
-                        "orderbook:{}:{}:{}",
-                        after.market_id,
-                        after.outcome_id,
-                        match after.side {
-                            OrderSide::BUY => "buy",
-                            OrderSide::SELL => "sell",
-                        }
-                    );
-
-                    let qty_key = format!("{}:qty", base_key);
-                    let price_str = after.price.normalize().to_string();
-
-                    // Update the shares in HashMap
-                    let new_qty: f64 = match redis::cmd("HINCRBYFLOAT")
-                        .arg(&qty_key)
-                        .arg(&price_str)
-                        .arg(-after.remaining_shares.to_f64().unwrap_or(0.0))
-                        .query_async(&mut *redis)
-                        .await
-                    {
-                        Ok(v) => v,
-                        Err(e) => {
-                            eprintln!("Redis HINCRBYFLOAT failed: {:?}", e);
-                            return;
-                        }
-                    };
-
-                    // Remove price & shares from HashMap & SortedSet if share's quantity is 0
-                    if new_qty <= 0.0 {
-                        if let Err(e) = redis::pipe()
-                            .cmd("HDEL")
-                            .arg(&qty_key)
-                            .arg(&price_str)
-                            .cmd("ZREM")
-                            .arg(&base_key)
-                            .arg(&price_str)
-                            .query_async::<()>(&mut *redis)
-                            .await
-                        {
-                            eprintln!("Redis cleanup failed: {:?}", e);
-                        }
-                    }
-
-                    if let Err(e) = redis::cmd("SET")
-                        .arg(&format!("orderbook:{}:timestamp", after.market_id))
-                        .arg(Utc::now().timestamp_millis())
-                        .query_async::<()>(&mut *redis)
-                        .await
-                    {
-                        eprintln!("Redis SET failed: {:?}", e);
-                    }
-
-                    let feed_message = FeedMessage::OrderFeed {
-                        feed: OrderFeed {
+                if after.status == OrderStatus::EXPIRED && after.order_type == OrderType::LIMIT {
+                    let expired_order_message = TradeMessage::ExpiredOrder {
+                        order: Order {
+                            id: after.id,
                             market_id: after.market_id,
                             outcome_id: after.outcome_id,
+                            user_id: after.user_id,
                             side: match after.side {
                                 OrderSide::BUY => common::model::OrderSide::BUY,
                                 OrderSide::SELL => common::model::OrderSide::SELL,
                             },
-                            quantity: -after.remaining_shares, // negative to signal reduction to feed subscribers
-                            price: after.price.normalize(),
-                            trade: None,
-                            timestamp: Utc::now().timestamp_millis(),
+                            price: after.price,
+                            shares: after.shares,
+                            remaining_shares: after.remaining_shares,
+                            status: common::model::OrderStatus::EXPIRED,
+                            average_price: after.average_price,
+                            quote_amount: after.quote_amount,
+                            remaining_quote: after.remaining_quote,
+                            order_type: common::model::OrderType::LIMIT,
+                            expires_at: after.expires_at,
+                            created_at: after.created_at,
+                            updated_at: after.updated_at,
                         },
                     };
 
-                    if let Err(e) = publisher.feed_market_order(feed_message).await {
+                    if let Err(e) = publisher.matcher_expired_order(expired_order_message).await {
                         eprintln!("Failed to publish feed update OrderFeed message: {:?}", e);
                     }
                 }

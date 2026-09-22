@@ -1,5 +1,4 @@
-use common::config::{ClickhouseConfig, NatsConfig, RedisConfig, RedpandaConfig};
-use deadpool_redis::{Config, Runtime};
+use common::config::{ClickhouseConfig, NatsConfig, RedpandaConfig};
 use rdkafka::util::get_rdkafka_version;
 
 use crate::ch_client::CHClient;
@@ -7,7 +6,6 @@ use crate::consumer::holding::HoldingConsumer;
 use crate::consumer::order::OrderConsumer;
 use crate::consumer::trade::TradeConsumer;
 use crate::consumer::transaction::TransactionConsumer;
-use crate::nats_handler::NatsHandler;
 
 mod ch_client;
 mod consumer;
@@ -38,22 +36,12 @@ async fn main() {
 
     println!("ClickHouse connected successfully.");
 
-    let publisher = match NatsHandler::new(&NatsConfig::init().nats_url).await {
-        Ok(p) => p,
-        Err(e) => {
-            println!("Failed to connect publisher: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    let redis_pool = Config::from_url(RedisConfig::init().redis_url)
-        .create_pool(Some(Runtime::Tokio1))
-        .unwrap();
-
-    println!("Redis Pool Created!");
-
-    let order_consumer =
-        OrderConsumer::init(&bootstrap_servers, ch_client.clone(), publisher, redis_pool);
+    let order_consumer = OrderConsumer::init(
+        &bootstrap_servers,
+        ch_client.clone(),
+        &NatsConfig::init().nats_url,
+    )
+    .await;
     let holding_consumer = HoldingConsumer::init(&bootstrap_servers, ch_client.clone());
     let trade_consumer = TradeConsumer::init(&bootstrap_servers, ch_client.clone());
     let transaction_consumer = TransactionConsumer::init(&bootstrap_servers, ch_client.clone());
