@@ -505,15 +505,20 @@ impl OrderExt for PGClient {
                 UPDATE orders
                 SET
                     remaining_shares = remaining_shares - $1,
+                    average_price = (
+                        (average_price * (shares - remaining_shares) + $2 * $1)
+                        / (shares - remaining_shares + $1)
+                    ),
                     status = CASE
-                        WHEN remaining_shares - $1 = 0 THEN $2
-                        ELSE $3
+                        WHEN remaining_shares - $1 = 0 THEN $3
+                        ELSE $4
                     END,
-                    updated_at = $4
-                WHERE id = $5
+                    updated_at = $5
+                WHERE id = $6
                 "#,
             )
             .bind(trade_shares)
+            .bind(trade_price)
             .bind(OrderStatus::FILLED)
             .bind(OrderStatus::PARTIAL)
             .bind(Utc::now())
@@ -645,16 +650,21 @@ impl OrderExt for PGClient {
                     UPDATE orders
                     SET shares = shares + $1,
                         quote_amount = quote_amount - $2,
+                        average_price = (
+                            (average_price * (shares - remaining_shares) + $3 * $1)
+                            / (shares - remaining_shares + $1)
+                        ),
                         status = CASE
-                            WHEN quote_amount - $2 = 0 THEN $3
-                            ELSE $4
+                            WHEN quote_amount - $2 = 0 THEN $4
+                            ELSE $5
                         END,
-                        updated_at = $5
-                    WHERE id = $6
+                        updated_at = $6
+                    WHERE id = $7
                     "#,
                 )
                 .bind(trade_shares)
                 .bind(total_cost)
+                .bind(trade_price)
                 .bind(OrderStatus::FILLED)
                 .bind(OrderStatus::PARTIAL)
                 .bind(Utc::now())
@@ -700,15 +710,20 @@ impl OrderExt for PGClient {
                     r#"
                     UPDATE orders
                     SET remaining_shares = remaining_shares - $1,
+                        average_price = (
+                            (average_price * (shares - remaining_shares) + $2 * $1)
+                            / (shares - remaining_shares + $1)
+                        ),
                         status = CASE
-                            WHEN remaining_shares - $1 = 0 THEN $2
-                            ELSE $3
+                            WHEN remaining_shares - $1 = 0 THEN $3
+                            ELSE $4
                         END,
-                        updated_at = $4
-                    WHERE id = $5
+                        updated_at = $5
+                    WHERE id = $6
                     "#,
                 )
                 .bind(trade_shares)
+                .bind(trade_price)
                 .bind(OrderStatus::FILLED)
                 .bind(OrderStatus::PARTIAL)
                 .bind(Utc::now())
@@ -787,15 +802,20 @@ impl OrderExt for PGClient {
                     r#"
                     UPDATE orders
                     SET remaining_shares = remaining_shares - $1,
+                        average_price = (
+                            (average_price * (shares - remaining_shares) + $2 * $1)
+                            / (shares - remaining_shares + $1)
+                        ),
                         status = CASE
-                            WHEN remaining_shares - $1 = 0 THEN $2
-                            ELSE $3
+                            WHEN remaining_shares - $1 = 0 THEN $3
+                            ELSE $4
                         END,
-                        updated_at = $4
-                    WHERE id = $5
+                        updated_at = $5
+                    WHERE id = $6
                     "#,
                 )
                 .bind(trade_shares)
+                .bind(trade_price)
                 .bind(OrderStatus::FILLED)
                 .bind(OrderStatus::PARTIAL)
                 .bind(Utc::now())
@@ -841,15 +861,20 @@ impl OrderExt for PGClient {
                     r#"
                     UPDATE orders
                     SET remaining_shares = remaining_shares - $1,
+                        average_price = (
+                            (average_price * (shares - remaining_shares) + $2 * $1)
+                            / (shares - remaining_shares + $1)
+                        ),
                         status = CASE
-                            WHEN remaining_shares - $1 = 0 THEN $2
-                            ELSE $3
+                            WHEN remaining_shares - $1 = 0 THEN $3
+                            ELSE $4
                         END,
-                        updated_at = $4
-                    WHERE id = $5
+                        updated_at = $5
+                    WHERE id = $6
                     "#,
                 )
                 .bind(trade_shares)
+                .bind(trade_price)
                 .bind(OrderStatus::FILLED)
                 .bind(OrderStatus::PARTIAL)
                 .bind(Utc::now())
