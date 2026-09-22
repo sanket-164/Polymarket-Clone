@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { placeOrder } from "@/lib/order/order-api";
-import type { OrderSide } from "@/lib/order/types";
+import type { OrderSide, OrderType } from "@/lib/order/types";
 import type { Outcome } from "@/lib/market/types";
 
 /* ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ function ExpirationSelect({
  * Limit order form
  * ------------------------------------------------------------------------- */
 
-interface LimitOrderFormProps {
+interface OrderFormProps {
   marketId: string;
   marketCloseAt: string;
   firstOutcome: Outcome;
@@ -194,6 +194,7 @@ interface LimitOrderFormProps {
 
 interface FormState {
   side: OrderSide;
+  orderType: OrderType;
   outcomeId: string;
   shares: number;
   price: string;
@@ -201,17 +202,18 @@ interface FormState {
 
 const QUICK_SHARE_OPTIONS = [-100, -10, +10, +100, +200];
 
-export function LimitOrderForm({
+export function OrderForm({
   marketId,
   marketCloseAt,
   firstOutcome,
   secondOutcome,
   currentPrices,
   onSuccess,
-}: LimitOrderFormProps) {
+}: OrderFormProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const [formState, setFormState] = useState<FormState>({
     side: "BUY",
+    orderType: "limit",
     outcomeId: firstOutcome.id,
     shares: 100,
     price: firstOutcome.current_price.slice(0, 4),
@@ -249,16 +251,23 @@ export function LimitOrderForm({
   const priceNum = parseFloat(formState.price) || 0;
   const totalCost = formState.shares * priceNum;
   const potentialWin =
-    formState.side === "BUY"
-      ? formState.shares * (1 - priceNum)
-      : formState.shares * priceNum;
+    formState.orderType === "market"
+      ? null
+      : formState.side === "BUY"
+        ? formState.shares * (1 - priceNum)
+        : formState.shares * priceNum;
 
-  const handleSideChange = (side: OrderSide) => {
-    setFormState((prev) => ({
-      ...prev,
-      side,
-      price: getDefaultPriceForOutcome(prev.outcomeId),
-    }));
+  const isMarketOrder = formState.orderType === "market";
+  const isMarketBuy = isMarketOrder && formState.side === "BUY";
+  const quantityLabel = isMarketOrder ? "Amount / Shares" : "Shares";
+  const totalValue = isMarketBuy
+    ? formState.shares
+    : formState.orderType === "market"
+      ? formState.shares * Number(selectedLivePrice)
+      : totalCost;
+
+  const handleOrderTypeChange = (orderType: OrderType) => {
+    setFormState((prev) => ({ ...prev, orderType }));
     setError(null);
     setSuccessMessage(null);
   };
@@ -292,7 +301,7 @@ export function LimitOrderForm({
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (side: OrderSide) => {
     if (isLoading) {
       return;
     }
@@ -302,15 +311,18 @@ export function LimitOrderForm({
       return;
     }
 
+    const submitQuantityLabel =
+      isMarketOrder && side === "BUY" ? "Amount" : "Shares";
+
     if (formState.shares <= 0) {
-      setError("Shares must be greater than 0");
+      setError(`${submitQuantityLabel} must be greater than 0`);
       return;
     }
-    if (priceNum <= 0 || priceNum > 1) {
+    if (!isMarketOrder && (priceNum <= 0 || priceNum > 1)) {
       setError("Price must be between 0.01 and 1.00");
       return;
     }
-    if (expiration === "custom" && !expiresAt) {
+    if (!isMarketOrder && expiration === "custom" && !expiresAt) {
       setError("Please pick an expiration date and time");
       return;
     }
@@ -318,16 +330,37 @@ export function LimitOrderForm({
     setIsSubmitting(true);
     setError(null);
     setSuccessMessage(null);
+    setFormState((prev) => ({ ...prev, side }));
 
     try {
-      await placeOrder({
-        market_id: marketId,
-        outcome_id: formState.outcomeId,
-        shares: formState.shares,
-        price: priceNum,
-        side: formState.side,
-        expires_at: effectiveExpiresAt,
-      });
+      if (isMarketOrder && side === "BUY") {
+        await placeOrder({
+          market_id: marketId,
+          outcome_id: formState.outcomeId,
+          side: "BUY",
+          quote_amount: formState.shares,
+          order_type: "market",
+        });
+      } else if (isMarketOrder) {
+        await placeOrder({
+          market_id: marketId,
+          outcome_id: formState.outcomeId,
+          side: "SELL",
+          shares: formState.shares,
+          price: "market",
+          order_type: "market",
+        });
+      } else {
+        await placeOrder({
+          market_id: marketId,
+          outcome_id: formState.outcomeId,
+          shares: formState.shares,
+          price: priceNum,
+          side,
+          order_type: "limit",
+          expires_at: effectiveExpiresAt,
+        });
+      }
 
       setSuccessMessage("Order placed successfully!");
       setFormState((prev) => ({
@@ -345,44 +378,39 @@ export function LimitOrderForm({
 
   const getOutcomeButtonClass = (outcomeId: string) => {
     const isSelected = formState.outcomeId === outcomeId;
+    const isFirstOutcome = outcomeId === firstOutcome.id;
 
     if (!isSelected) {
-      return "bg-card/50 text-secondary hover:bg-card hover:text-text";
+      return isFirstOutcome
+        ? "bg-buy/10 text-buy hover:bg-buy/20"
+        : "bg-sell/10 text-sell hover:bg-sell/20";
     }
 
-    return formState.side === "BUY"
-      ? "bg-green-600 text-white hover:bg-green-700"
-      : "bg-red-600 text-white hover:bg-red-700";
+    return isFirstOutcome
+      ? "bg-buy text-text hover:bg-buy/90"
+      : "bg-sell text-text hover:bg-sell/90";
   };
 
   return (
     <div className="rounded-2xl p-6">
       <h2 className="text-lg font-semibold text-text mb-4">Place Order</h2>
 
-      {/* Buy/Sell Toggle */}
-      <div className="flex gap-2 mb-4">
-        <button
-          type="button"
-          onClick={() => handleSideChange("BUY")}
-          className={`flex-1 py-2 px-4 rounded-lg font-semibold transition ${
-            formState.side === "BUY"
-              ? "bg-green-600 text-white"
-              : "bg-card text-secondary hover:bg-card/70"
-          }`}
-        >
-          Buy
-        </button>
-        <button
-          type="button"
-          onClick={() => handleSideChange("SELL")}
-          className={`flex-1 py-2 px-4 rounded-lg font-semibold transition ${
-            formState.side === "SELL"
-              ? "bg-red-600 text-white"
-              : "bg-card text-secondary hover:bg-card/70"
-          }`}
-        >
-          Sell
-        </button>
+      {/* Limit/market order type */}
+      <div className="mb-4 flex gap-2 rounded-lg border border-border bg-card p-1">
+        {(["limit", "market"] as const).map((orderType) => (
+          <button
+            key={orderType}
+            type="button"
+            onClick={() => handleOrderTypeChange(orderType)}
+            className={`flex-1 rounded-md py-2 text-sm font-semibold capitalize transition ${
+              formState.orderType === orderType
+                ? "bg-accent text-text"
+                : "text-secondary hover:text-text"
+            }`}
+          >
+            {orderType}
+          </button>
+        ))}
       </div>
 
       {/* Yes/No Outcome Selection (Displays real-time WebSocket price) */}
@@ -414,48 +442,38 @@ export function LimitOrderForm({
       </div>
 
       {/* Limit Price Input */}
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <label className="block text-sm font-medium text-secondary">
-            Price
-          </label>
-          <button
-            type="button"
-            onClick={() =>
-              setFormState((prev) => ({
-                ...prev,
-                price: Number(selectedLivePrice).toFixed(2),
-              }))
-            }
-            className="text-xs text-accent hover:text-accent/80 transition font-medium"
-          >
-            Set to market ({Number(selectedLivePrice).toFixed(2)})
-          </button>
+      {!isMarketOrder && (
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-2">
+            <label className="block text-sm font-medium text-secondary">
+              Price
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*\.?[0-9]*"
+              min="0"
+              max="1"
+              value={formState.price}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                  setFormState((prev) => ({ ...prev, price: val }));
+                }
+              }}
+              className="flex-1 px-3 py-2 bg-card border border-border rounded-lg text-text text-right font-mono focus:outline-none focus:border-accent"
+              placeholder="0.00"
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            inputMode="decimal"
-            pattern="[0-9]*\.?[0-9]*"
-            min="0"
-            max="1"
-            value={formState.price}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === "" || /^\d*\.?\d*$/.test(val)) {
-                setFormState((prev) => ({ ...prev, price: val }));
-              }
-            }}
-            className="flex-1 px-3 py-2 bg-card border border-border rounded-lg text-text text-right font-mono focus:outline-none focus:border-accent"
-            placeholder="0.00"
-          />
-        </div>
-      </div>
+      )}
 
       {/* Shares Input */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-secondary mb-2">
-          Shares
+          {quantityLabel}
         </label>
         <div className="flex items-center gap-2 mb-2">
           <input
@@ -490,29 +508,33 @@ export function LimitOrderForm({
         </div>
       </div>
 
-      {/* Expiration Dropdown */}
-      <div className="mb-4">
-        <ExpirationSelect
-          value={expiration}
-          customValue={customExpiration}
-          onChange={handleExpirationChange}
-          onCustomChange={setCustomExpiration}
-        />
-      </div>
+      {/* Expiration only applies to limit orders */}
+      {!isMarketOrder && (
+        <div className="mb-4">
+          <ExpirationSelect
+            value={expiration}
+            customValue={customExpiration}
+            onChange={handleExpirationChange}
+            onCustomChange={setCustomExpiration}
+          />
+        </div>
+      )}
 
       {/* Summary (No currency signs) */}
-      <div className="space-y-2 mb-4 p-3 bg-card/30 rounded-lg">
-        <div className="flex justify-between text-sm">
-          <span className="text-secondary">Total</span>
-          <span className="font-mono text-text">{totalCost.toFixed(2)}</span>
+      {!isMarketOrder && (
+        <div className="space-y-2 mb-4 p-3 bg-card/30 rounded-lg">
+          <div className="flex justify-between text-sm">
+            <span className="text-secondary">Total</span>
+            <span className="font-mono text-text">{totalValue.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-secondary flex items-center gap-1">Win</span>
+            <span className="font-mono text-green-500">
+              {potentialWin?.toFixed(2)}
+            </span>
+          </div>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-secondary flex items-center gap-1">Win</span>
-          <span className="font-mono text-green-500">
-            {potentialWin.toFixed(2)}
-          </span>
-        </div>
-      </div>
+      )}
 
       {/* Error/Success Messages */}
       {error && (
@@ -526,15 +548,41 @@ export function LimitOrderForm({
         </div>
       )}
 
-      {/* Trade Button */}
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={isSubmitting || formState.shares <= 0 || priceNum <= 0}
-        className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
-      >
-        {isSubmitting ? "Placing..." : "Trade"}
-      </button>
+      {/* Order actions */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => handleSubmit("BUY")}
+          disabled={
+            isSubmitting ||
+            formState.shares <= 0 ||
+            (!isMarketOrder && priceNum <= 0)
+          }
+          className="w-full rounded-lg bg-green-600 px-4 py-3 font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-600/50"
+        >
+          {isSubmitting && formState.side === "BUY"
+            ? "Placing..."
+            : isMarketOrder
+              ? "Buy Amount"
+              : "Buy"}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSubmit("SELL")}
+          disabled={
+            isSubmitting ||
+            formState.shares <= 0 ||
+            (!isMarketOrder && priceNum <= 0)
+          }
+          className="w-full rounded-lg bg-red-600 px-4 py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-600/50"
+        >
+          {isSubmitting && formState.side === "SELL"
+            ? "Placing..."
+            : isMarketOrder
+              ? "Sell Shares"
+              : "Sell"}
+        </button>
+      </div>
 
       {isLoginPromptOpen ? (
         <div

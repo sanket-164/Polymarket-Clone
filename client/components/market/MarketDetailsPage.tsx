@@ -13,7 +13,7 @@ import { getMarketDetails, getMarketSnapshot } from "@/lib/market/market-api";
 import type { MarketDetails, MarketSnapshot } from "@/lib/market/types";
 import { MarketOrderBook } from "@/components/market/MarketOrderBook";
 import { MarketPriceGraph } from "@/components/market/MarketPriceGraph";
-import { LimitOrderForm } from "@/components/order/LimitOrderForm";
+import { OrderForm } from "@/components/order/OrderForm";
 import { useOrderbookWebSocket } from "@/hooks/useOrderbookWebSocket";
 import { getOrders } from "@/lib/order/order-api";
 import type { Order, OrdersQuery } from "@/lib/order/types";
@@ -332,7 +332,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
         <div className="border border-border bg-surface rounded-2xl lg:col-span-1">
           {/* Limit Order Form */}
           {isMarketActive ? (
-            <LimitOrderForm
+            <OrderForm
               marketId={marketId}
               marketCloseAt={market.close_at}
               firstOutcome={market.first_outcome}

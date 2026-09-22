@@ -1,16 +1,41 @@
 // lib/order/types.ts
 export type OrderSide = "BUY" | "SELL";
 
+export type OrderType = "limit" | "market";
+
 export type OrderStatus = "PENDING" | "FILLED" | "CANCELLED" | "PARTIAL" | "EXPIRED";
 
-export interface OrderRequest {
+export interface LimitOrderRequest {
   market_id: string;
   outcome_id: string;
   shares: number;
   price: number;
   side: OrderSide;
+  order_type: "limit";
   expires_at: string;
 }
+
+export interface MarketBuyOrderRequest {
+  market_id: string;
+  outcome_id: string;
+  side: "BUY";
+  quote_amount: number;
+  order_type: "market";
+}
+
+export interface MarketSellOrderRequest {
+  market_id: string;
+  outcome_id: string;
+  side: "SELL";
+  shares: number;
+  price: "market";
+  order_type: "market";
+}
+
+export type OrderRequest =
+  | LimitOrderRequest
+  | MarketBuyOrderRequest
+  | MarketSellOrderRequest;
 
 export interface Order {
   id: string;
