@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS orders (
     remaining_shares DECIMAL(20, 8) DEFAULT 0.00,
     price DECIMAL(20, 8) DEFAULT 0.00,
     quote_amount DECIMAL(20, 8) DEFAULT 0.00,
+    remaining_quote DECIMAL(20, 8) DEFAULT 0.00,
     average_price DECIMAL(20, 8) DEFAULT 0.00,
     order_type order_type NOT NULL,
     status order_status NOT NULL DEFAULT 'PENDING',

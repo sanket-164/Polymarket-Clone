@@ -104,6 +104,7 @@ pub struct Order {
     pub remaining_shares: Decimal,
     pub price: Decimal,
     pub quote_amount: Decimal,
+    pub remaining_quote: Decimal,
     pub average_price: Decimal,
     pub order_type: OrderType,
     pub status: OrderStatus,

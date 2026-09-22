@@ -159,6 +159,8 @@ pub struct OrderRow {
     #[serde(with = "decimal64")]
     pub quote_amount: Decimal,
     #[serde(with = "decimal64")]
+    pub remaining_quote: Decimal,
+    #[serde(with = "decimal64")]
     pub average_price: Decimal,
     pub order_type: OrderType,
     pub status: OrderStatus,

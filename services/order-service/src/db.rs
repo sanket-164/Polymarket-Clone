@@ -202,7 +202,7 @@ impl OrderExt for PGClient {
         order_id: Uuid,
     ) -> Result<Option<Order>, sqlx::Error> {
         let query = r#"
-            SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, average_price, order_type, status, expires_at, created_at, updated_at
+            SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, remaining_quote, average_price, order_type, status, expires_at, created_at, updated_at
             FROM orders
             WHERE id = $1 AND user_id = $2"#;
 
@@ -228,7 +228,7 @@ impl OrderExt for PGClient {
         skip: i64,
     ) -> Result<Vec<Order>, sqlx::Error> {
         let mut query = String::from(
-            "SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, average_price, order_type, status, expires_at, created_at, updated_at
+            "SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, remaining_quote, average_price, order_type, status, expires_at, created_at, updated_at
             FROM orders
             WHERE user_id = $1"
         );
@@ -319,7 +319,7 @@ impl OrderExt for PGClient {
            RETURNING
                id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
-               order_type, quote_amount, average_price,
+               order_type, quote_amount, remaining_quote, average_price,
                expires_at, created_at, updated_at"#,
         )
         .bind(cost)
@@ -363,7 +363,7 @@ impl OrderExt for PGClient {
            RETURNING
                id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
-               order_type, quote_amount, average_price,
+               order_type, quote_amount, remaining_quote, average_price,
                expires_at, created_at, updated_at"#,
         )
         .bind(shares) // (shares & remaining_shares)
@@ -405,12 +405,12 @@ impl OrderExt for PGClient {
                ON CONFLICT (user_id, market_id, outcome_id) DO NOTHING
            )
            INSERT INTO orders
-               (user_id, market_id, outcome_id, side, quote_amount, order_type, expires_at)
-           VALUES ($2, $3, $4, $5, $6, $7, $8)
+               (user_id, market_id, outcome_id, side, quote_amount, remaining_quote, order_type, expires_at)
+           VALUES ($2, $3, $4, $5, $6, $6, $7, $8)
            RETURNING
                id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
-               quote_amount, average_price, order_type,
+               quote_amount, remaining_quote, average_price, order_type,
                expires_at, created_at, updated_at"#,
         )
         .bind(quote_amount)
@@ -452,7 +452,7 @@ impl OrderExt for PGClient {
            RETURNING
                id, user_id, market_id, outcome_id, side,
                shares, remaining_shares, price, status,
-               quote_amount, average_price, order_type,
+               quote_amount, remaining_quote, average_price, order_type,
                expires_at, created_at, updated_at"#,
         )
         .bind(shares) // (shares & remaining_shares)
@@ -618,12 +618,12 @@ impl OrderExt for PGClient {
             OrderSide::BUY => {
                 let mut tx = self.pool.begin().await?;
 
-                let trade_shares = if market_order.quote_amount
+                let trade_shares = if market_order.remaining_quote
                     >= book_order.price * book_order.remaining_shares
                 {
                     book_order.remaining_shares
                 } else {
-                    (market_order.quote_amount / book_order.price).floor()
+                    (market_order.remaining_quote / book_order.price).floor()
                 };
                 let trade_price = book_order.price;
                 let total_cost = trade_price * trade_shares;
@@ -649,13 +649,13 @@ impl OrderExt for PGClient {
                     r#"
                     UPDATE orders
                     SET shares = shares + $1,
-                        quote_amount = quote_amount - $2,
+                        remaining_quote = remaining_quote - $2,
                         average_price = (
                             (average_price * (shares - remaining_shares) + $3 * $1)
                             / (shares - remaining_shares + $1)
                         ),
                         status = CASE
-                            WHEN quote_amount - $2 = 0 THEN $4
+                            WHEN remaining_quote - $2 = 0 THEN $4
                             ELSE $5
                         END,
                         updated_at = $6
@@ -938,7 +938,7 @@ impl OrderExt for PGClient {
             UPDATE orders
             SET status = $1, updated_at = $2
             WHERE id = $3
-            RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, status, expires_at, created_at, updated_at
+            RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, remaining_quote, average_price, order_type, status, expires_at, created_at, updated_at
             "#,
         )
         .bind(OrderStatus::CANCELLED)
@@ -993,25 +993,12 @@ impl OrderExt for PGClient {
 
                 sqlx::query(
                     r#"
-                    UPDATE orders
-                    SET status = $1, updated_at = $2
-                    WHERE id = $3
-                    "#,
-                )
-                .bind(OrderStatus::FILLED)
-                .bind(Utc::now())
-                .bind(market_order.id)
-                .execute(&mut *tx)
-                .await?;
-
-                sqlx::query(
-                    r#"
                     UPDATE wallets
                     SET locked_balance = locked_balance - $1, balance = balance + $1, updated_at = $2
                     WHERE user_id = $3
                     "#,
                 )
-                .bind(market_order.quote_amount)
+                .bind(market_order.remaining_quote)
                 .bind(Utc::now())
                 .bind(market_order.user_id)
                 .execute(&mut *tx)
@@ -1021,19 +1008,6 @@ impl OrderExt for PGClient {
             }
             OrderSide::SELL => {
                 let mut tx = self.pool.begin().await?;
-
-                sqlx::query(
-                    r#"
-                    UPDATE orders
-                    SET status = $1, shares = shares - remaining_shares, remaining_shares = 0, updated_at = $2
-                    WHERE id = $3
-                    "#,
-                )
-                .bind(OrderStatus::FILLED)
-                .bind(Utc::now())
-                .bind(market_order.id)
-                .execute(&mut *tx)
-                .await?;
 
                 sqlx::query(
                     r#"

@@ -186,10 +186,10 @@ impl Engine {
     ) {
         let filled = match market_order.side {
             OrderSide::BUY => {
-                if market_order.quote_amount >= book_order.price * book_order.remaining_shares {
+                if market_order.remaining_quote >= book_order.price * book_order.remaining_shares {
                     book_order.remaining_shares
                 } else {
-                    (market_order.quote_amount / book_order.price).floor()
+                    (market_order.remaining_quote / book_order.price).floor()
                 }
             }
             OrderSide::SELL => market_order
@@ -389,7 +389,7 @@ impl Engine {
 
                     let is_match = book
                         .best_sell()
-                        .map_or(false, |best| new_buy.quote_amount >= best.price);
+                        .map_or(false, |best| new_buy.remaining_quote >= best.price);
 
                     if is_match {
                         // Clone the order for the trade message.
@@ -406,12 +406,12 @@ impl Engine {
                         let sell_cost = matched_sell.price * matched_sell.remaining_shares;
 
                         // Full fill of resting order, incoming order still has shares
-                        if new_buy.quote_amount > sell_cost {
-                            new_buy.quote_amount -= sell_cost;
+                        if new_buy.remaining_quote > sell_cost {
+                            new_buy.remaining_quote -= sell_cost;
                             let _ = book.remove_sell();
 
                         // Full fill of both orders
-                        } else if new_buy.quote_amount == sell_cost {
+                        } else if new_buy.remaining_quote == sell_cost {
                             let _ = book.remove_sell();
                             break;
 
@@ -419,7 +419,7 @@ impl Engine {
                         } else {
                             if let Some(best_sell_mut) = book.best_sell_mut() {
                                 best_sell_mut.remaining_shares -=
-                                    (new_buy.quote_amount / best_sell_mut.price).floor();
+                                    (new_buy.remaining_quote / best_sell_mut.price).floor();
                             }
 
                             // Incoming order is completely filled, exit loop

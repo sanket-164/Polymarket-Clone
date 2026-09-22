@@ -169,7 +169,7 @@ impl MarketExt for PGClient {
 
         let insert_order_query = "INSERT INTO orders (user_id, market_id, outcome_id, side, shares, remaining_shares, price, order_type, expires_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-           RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, average_price, order_type, status, expires_at, created_at, updated_at";
+           RETURNING id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, remaining_quote, average_price, order_type, status, expires_at, created_at, updated_at";
 
         let order: Order = sqlx::query_as(insert_order_query)
             .bind(admin_id)
