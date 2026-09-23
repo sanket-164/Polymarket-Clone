@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/toast/ToastProvider";
 import {
   formatDateTime,
   formatShares,
@@ -25,6 +26,7 @@ type ActiveOrderStatus = Exclude<
 
 export function MarketDetailsPage({ marketId }: { marketId: string }) {
   const { isLoading, isAuthenticated } = useAuth();
+  const { error: showError, success: showSuccess } = useToast();
   const [market, setMarket] = useState<MarketDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMarketLoading, setIsMarketLoading] = useState(true);
@@ -211,10 +213,14 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
       setMarketOrders((currentOrders) =>
         currentOrders.filter((order) => order.id !== orderId)
       );
+      showSuccess("Order cancelled successfully.");
     } catch (caughtError: unknown) {
-      setMarketOrdersError(
-        getMarketError(caughtError, "Unable to cancel this order.")
+      const message = getMarketError(
+        caughtError,
+        "Unable to cancel this order."
       );
+      setMarketOrdersError(message);
+      showError(message);
     } finally {
       setCancellingOrderId(null);
     }

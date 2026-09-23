@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { FormField } from "@/components/auth/FormField";
+import { useToast } from "@/components/toast/ToastProvider";
 import { resetPassword, sendOtp } from "@/lib/auth/auth-api";
 import { ApiError } from "@/lib/api/http";
 
@@ -12,18 +13,15 @@ type ResetMode = "otp" | "old-password";
 
 export function ResetPasswordForm() {
   const router = useRouter();
+  const { error: showError, success: showSuccess } = useToast();
   const [mode, setMode] = useState<ResetMode>("otp");
   const [otpEmail, setOtpEmail] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   async function handleSendOtp(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
-    setMessage(null);
     setIsSendingOtp(true);
 
     const formData = new FormData(event.currentTarget);
@@ -33,10 +31,11 @@ export function ResetPasswordForm() {
       const response = await sendOtp(email);
       setOtpEmail(email);
       setIsOtpSent(true);
-      setMessage(response.message);
+      showSuccess(response.message || "OTP sent to your email.");
     } catch (caughtError) {
       setIsOtpSent(false);
-      setError(getFormError(caughtError));
+      const message = getFormError(caughtError);
+      showError(message);
     } finally {
       setIsSendingOtp(false);
     }
@@ -44,8 +43,6 @@ export function ResetPasswordForm() {
 
   async function handleResetPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
-    setMessage(null);
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -54,13 +51,15 @@ export function ResetPasswordForm() {
     const confirmPassword = String(formData.get("confirmPassword"));
 
     if (mode === "otp" && !isOtpSent) {
-      setError("Send the OTP before resetting your password.");
+      const message = "Send the OTP before resetting your password.";
+      showError(message);
       setIsSubmitting(false);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match.");
+      const message = "Passwords do not match.";
+      showError(message);
       setIsSubmitting(false);
       return;
     }
@@ -82,10 +81,11 @@ export function ResetPasswordForm() {
             }
       );
 
-      setMessage(response.message);
+      showSuccess(response.message || "Password updated successfully.");
       router.push("/login");
     } catch (caughtError) {
-      setError(getFormError(caughtError));
+      const message = getFormError(caughtError);
+      showError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -106,8 +106,6 @@ export function ResetPasswordForm() {
           type="button"
           onClick={() => {
             setMode("old-password");
-            setError(null);
-            setMessage(null);
           }}
           disabled={isSubmitting || isSendingOtp}
           className={getModeClassName(mode === "old-password")}
@@ -131,7 +129,6 @@ export function ResetPasswordForm() {
             onChange={(event) => {
               setOtpEmail(event.target.value);
               setIsOtpSent(false);
-              setMessage(null);
             }}
             disabled={isSendingOtp}
             className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-card px-3 text-sm text-text outline-none transition placeholder:text-secondary focus:border-accent focus:ring-2 focus:ring-accent/25"
@@ -216,9 +213,6 @@ export function ResetPasswordForm() {
             />
           </>
         ) : null}
-
-        {error ? <p className="text-sm text-sell">{error}</p> : null}
-        {message ? <p className="text-sm text-buy">{message}</p> : null}
 
         <button
           type="submit"

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/toast/ToastProvider";
 import { placeOrder } from "@/lib/order/order-api";
 import type { OrderSide, OrderType } from "@/lib/order/types";
 import type { Outcome } from "@/lib/market/types";
@@ -211,6 +212,7 @@ export function OrderForm({
   onSuccess,
 }: OrderFormProps) {
   const { isAuthenticated, isLoading } = useAuth();
+  const { error: showError, success: showSuccess } = useToast();
   const [formState, setFormState] = useState<FormState>({
     side: "BUY",
     orderType: "limit",
@@ -222,7 +224,6 @@ export function OrderForm({
   const [customExpiration, setCustomExpiration] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false);
 
   const expiresAt = useMemo(
@@ -269,7 +270,6 @@ export function OrderForm({
   const handleOrderTypeChange = (orderType: OrderType) => {
     setFormState((prev) => ({ ...prev, orderType }));
     setError(null);
-    setSuccessMessage(null);
   };
 
   const handleOutcomeChange = (outcomeId: string) => {
@@ -283,7 +283,6 @@ export function OrderForm({
     }));
 
     setError(null);
-    setSuccessMessage(null);
   };
 
   const handleSharesChange = (delta: number) => {
@@ -329,7 +328,6 @@ export function OrderForm({
 
     setIsSubmitting(true);
     setError(null);
-    setSuccessMessage(null);
     setFormState((prev) => ({ ...prev, side }));
 
     try {
@@ -362,7 +360,7 @@ export function OrderForm({
         });
       }
 
-      setSuccessMessage("Order placed successfully!");
+      showSuccess("Order placed successfully.");
       setFormState((prev) => ({
         ...prev,
         shares: 100,
@@ -370,7 +368,10 @@ export function OrderForm({
       }));
       onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to place order");
+      const message =
+        err instanceof Error ? err.message : "Failed to place order";
+      setError(message);
+      showError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -536,18 +537,11 @@ export function OrderForm({
         </div>
       )}
 
-      {/* Error/Success Messages */}
       {error && (
         <div className="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
           {error}
         </div>
       )}
-      {successMessage && (
-        <div className="mb-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">
-          {successMessage}
-        </div>
-      )}
-
       {/* Order actions */}
       <div className="grid grid-cols-2 gap-2">
         <button

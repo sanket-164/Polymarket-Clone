@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/toast/ToastProvider";
 import { ApiError } from "@/lib/api/http";
 import {
   depositWallet,
@@ -41,6 +42,7 @@ export function ProfilePanel() {
     profile: cachedProfile,
     setProfileCache,
   } = useAuth();
+  const { error: showError, success: showSuccess } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -53,7 +55,6 @@ export function ProfilePanel() {
   >(null);
   const [walletAmount, setWalletAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -152,7 +153,6 @@ export function ProfilePanel() {
     }
 
     setError(null);
-    setSuccess(null);
     setIsSavingProfile(true);
 
     const formData = new FormData(event.currentTarget);
@@ -167,9 +167,14 @@ export function ProfilePanel() {
 
       setProfile(updatedProfile);
       setProfileCache(updatedProfile);
-      setSuccess("Profile updated.");
+      showSuccess("Profile updated successfully.");
     } catch (caughtError) {
-      setError(getPanelError(caughtError, "Unable to update your profile."));
+      const message = getPanelError(
+        caughtError,
+        "Unable to update your profile."
+      );
+      setError(message);
+      showError(message);
     } finally {
       setIsSavingProfile(false);
     }
@@ -185,7 +190,6 @@ export function ProfilePanel() {
     }
 
     setError(null);
-    setSuccess(null);
 
     if (file.size > MAX_PROFILE_IMAGE_SIZE) {
       setError("Profile picture must be 1 MB or smaller.");
@@ -207,11 +211,14 @@ export function ProfilePanel() {
 
       setProfile(updatedProfile);
       setProfileCache(updatedProfile);
-      setSuccess("Profile picture updated.");
+      showSuccess("Profile picture updated successfully.");
     } catch (caughtError) {
-      setError(
-        getPanelError(caughtError, "Unable to update your profile picture.")
+      const message = getPanelError(
+        caughtError,
+        "Unable to update your profile picture."
       );
+      setError(message);
+      showError(message);
     } finally {
       setIsUploadingPicture(false);
       event.target.value = "";
@@ -220,7 +227,6 @@ export function ProfilePanel() {
 
   function openWalletActionModal(action: "deposit" | "withdraw") {
     setError(null);
-    setSuccess(null);
     setWalletAction(action);
     setWalletAmount("");
   }
@@ -251,7 +257,6 @@ export function ProfilePanel() {
     }
 
     setError(null);
-    setSuccess(null);
     setIsWalletActionLoading(true);
 
     try {
@@ -261,10 +266,10 @@ export function ProfilePanel() {
           : await withdrawWallet(amount);
 
       setBalance(updatedBalance);
-      setSuccess(
+      showSuccess(
         walletAction === "deposit"
-          ? "Deposit completed."
-          : "Withdraw completed."
+          ? "Deposit completed successfully."
+          : "Withdrawal completed successfully."
       );
       setWalletAction(null);
       setWalletAmount("");
@@ -285,14 +290,14 @@ export function ProfilePanel() {
         }
       }
     } catch (caughtError) {
-      setError(
-        getPanelError(
-          caughtError,
-          walletAction === "deposit"
-            ? "Unable to deposit funds."
-            : "Unable to withdraw funds."
-        )
+      const message = getPanelError(
+        caughtError,
+        walletAction === "deposit"
+          ? "Unable to deposit funds."
+          : "Unable to withdraw funds."
       );
+      setError(message);
+      showError(message);
     } finally {
       setIsWalletActionLoading(false);
     }
@@ -379,12 +384,6 @@ export function ProfilePanel() {
         {error ? (
           <p className="mt-6 rounded-lg border border-accent/40 bg-card px-4 py-3 text-sm text-secondary">
             {error}
-          </p>
-        ) : null}
-
-        {success ? (
-          <p className="mt-6 rounded-lg border border-buy/40 bg-card px-4 py-3 text-sm text-buy">
-            {success}
           </p>
         ) : null}
 

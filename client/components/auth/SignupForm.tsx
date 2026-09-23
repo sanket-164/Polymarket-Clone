@@ -5,17 +5,17 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { FormField } from "@/components/auth/FormField";
+import { useToast } from "@/components/toast/ToastProvider";
 import { signUp } from "@/lib/auth/auth-api";
 import { ApiError } from "@/lib/api/http";
 
 export function SignupForm() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const { error: showError, success: showSuccess } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -23,7 +23,8 @@ export function SignupForm() {
     const confirmPassword = String(formData.get("confirmPassword"));
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      const message = "Passwords do not match.";
+      showError(message);
       setIsSubmitting(false);
       return;
     }
@@ -36,9 +37,11 @@ export function SignupForm() {
         confirmPassword,
       });
 
+      showSuccess("Your account was created successfully.");
       router.push("/login");
     } catch (caughtError) {
-      setError(getFormError(caughtError));
+      const message = getFormError(caughtError);
+      showError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -47,7 +50,12 @@ export function SignupForm() {
   return (
     <AuthCard eyebrow="Create an account" title="Sign up">
       <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-        <FormField id="signup-name" label="Name" name="name" autoComplete="name" />
+        <FormField
+          id="signup-name"
+          label="Name"
+          name="name"
+          autoComplete="name"
+        />
         <FormField
           id="signup-email"
           label="Email"
@@ -71,8 +79,6 @@ export function SignupForm() {
           autoComplete="new-password"
           minLength={8}
         />
-
-        {error ? <p className="text-sm text-sell">{error}</p> : null}
 
         <button
           type="submit"

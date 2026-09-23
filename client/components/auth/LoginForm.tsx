@@ -6,18 +6,18 @@ import { useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { FormField } from "@/components/auth/FormField";
+import { useToast } from "@/components/toast/ToastProvider";
 import { signIn } from "@/lib/auth/auth-api";
 import { ApiError } from "@/lib/api/http";
 
 export function LoginForm() {
   const router = useRouter();
   const { setSession } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  const { error: showError, success: showSuccess } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -29,9 +29,11 @@ export function LoginForm() {
       });
 
       setSession(session.access_token);
+      showSuccess("You are now logged in.");
       router.push("/");
     } catch (caughtError) {
-      setError(getFormError(caughtError));
+      const message = getFormError(caughtError);
+      showError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -55,8 +57,6 @@ export function LoginForm() {
           autoComplete="current-password"
           minLength={8}
         />
-
-        {error ? <p className="text-sm text-sell">{error}</p> : null}
 
         <button
           type="submit"
