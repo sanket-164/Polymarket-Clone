@@ -43,6 +43,7 @@ pub enum ErrorMessage {
     OrderNotOpen,
     QuoteAmountNotGiven,
     SharesNotGiven,
+    NotLimitOrder,
 }
 
 impl ErrorMessage {
@@ -72,6 +73,7 @@ impl ErrorMessage {
             ErrorMessage::OrderNotOpen => "Order is not open to be cancelled".to_string(),
             ErrorMessage::QuoteAmountNotGiven => "Quote amount is not given".to_string(),
             ErrorMessage::SharesNotGiven => "Shares is not given".to_string(),
+            ErrorMessage::NotLimitOrder => "Order is not a limit order".to_string(),
         }
     }
 }

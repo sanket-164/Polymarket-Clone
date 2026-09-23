@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::{Validate, ValidationError, ValidationErrors};
 
-use common::model::{OrderSide, OrderStatus};
+use common::model::{OrderSide, OrderStatus, OrderType};
 
 fn validate_positive_decimal(value: &Decimal) -> Result<(), ValidationError> {
     if *value <= Decimal::ZERO {
@@ -117,6 +117,7 @@ pub struct OrderQueryDTO {
     pub market_id: Option<Uuid>,
     pub side: Option<OrderSide>,
     pub status: Option<OrderStatus>,
+    pub order_type: Option<OrderType>,
     pub before: Option<DateTime<Utc>>,
     #[validate(custom(function = "validate_after"))]
     pub after: Option<DateTime<Utc>>,

@@ -5,8 +5,8 @@ use chrono::{DateTime, Utc};
 use common::{
     database::client::PGClient,
     model::{
-        Holding, Market, Order, OrderSide, OrderStatus, OrderType, Outcome, Trade, TransactionType,
-        User, Wallet,
+        Holding, Market, Order, OrderSide, OrderStatus, OrderType, OrderWithTrades, Outcome, Trade,
+        TransactionType, User, Wallet,
     },
 };
 use rust_decimal::Decimal;
@@ -48,12 +48,18 @@ pub trait OrderExt {
         user_id: Uuid,
         order_id: Uuid,
     ) -> Result<Option<Order>, sqlx::Error>;
+    async fn get_order_details_by_id(
+        &self,
+        user_id: Uuid,
+        order_id: Uuid,
+    ) -> Result<Option<OrderWithTrades>, sqlx::Error>;
     async fn get_user_orders(
         &self,
         user_id: Uuid,
         market_id: Option<Uuid>,
         side: Option<OrderSide>,
         status: Option<OrderStatus>,
+        order_type: Option<OrderType>,
         before: Option<DateTime<Utc>>,
         after: Option<DateTime<Utc>>,
         order_by: String,
@@ -216,12 +222,49 @@ impl OrderExt for PGClient {
         Ok(order)
     }
 
+    async fn get_order_details_by_id(
+        &self,
+        user_id: Uuid,
+        order_id: Uuid,
+    ) -> Result<Option<OrderWithTrades>, sqlx::Error> {
+        let query = r#"
+            SELECT id, user_id, market_id, outcome_id, side, shares, remaining_shares, price, quote_amount, remaining_quote, average_price, order_type, status, expires_at, created_at, updated_at
+            FROM orders
+            WHERE id = $1 AND user_id = $2"#;
+
+        let order = sqlx::query_as::<_, Order>(query)
+            .bind(order_id)
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        if order.is_none() {
+            return Ok(None);
+        }
+
+        let query_trades = r#"
+            SELECT id, market_id, buy_order_id, sell_order_id, shares, price, created_at
+            FROM trades
+            WHERE buy_order_id = $1 OR sell_order_id = $1"#;
+
+        let trades = sqlx::query_as::<_, Trade>(query_trades)
+            .bind(order_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(Some(OrderWithTrades {
+            order: order.unwrap(),
+            trade: trades,
+        }))
+    }
+
     async fn get_user_orders(
         &self,
         user_id: Uuid,
         market_id: Option<Uuid>,
         side: Option<OrderSide>,
         status: Option<OrderStatus>,
+        order_type: Option<OrderType>,
         before: Option<DateTime<Utc>>,
         after: Option<DateTime<Utc>>,
         order_by: String,
@@ -246,6 +289,10 @@ impl OrderExt for PGClient {
         }
         if status.is_some() {
             query.push_str(&format!(" AND status = ${param_index}"));
+            param_index += 1;
+        }
+        if order_type.is_some() {
+            query.push_str(&format!(" AND order_type = ${param_index}"));
             param_index += 1;
         }
         if before.is_some() {
@@ -274,6 +321,9 @@ impl OrderExt for PGClient {
         }
         if let Some(s) = status {
             q = q.bind(s);
+        }
+        if let Some(ot) = order_type {
+            q = q.bind(ot);
         }
         if let Some(b) = before {
             q = q.bind(b);

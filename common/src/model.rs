@@ -124,6 +124,13 @@ pub struct Trade {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrderWithTrades {
+    #[serde(flatten)]
+    pub order: Order,
+    pub trade: Vec<Trade>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, sqlx::Type)]
 pub struct ResolvedMarket {
     pub id: Uuid,

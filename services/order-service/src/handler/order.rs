@@ -11,7 +11,9 @@ use chrono::Utc;
 use common::{
     constant::{CANCEL, DEFAULT_LIMIT, ORDER_ID, ROOT},
     error::{ErrorMessage, HttpError},
-    model::{FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderSide, OrderStatus},
+    model::{
+        FeedMessage, MarketStatus, MatcherMessage, OrderFeed, OrderSide, OrderStatus, OrderType,
+    },
 };
 use rust_decimal::prelude::ToPrimitive;
 use uuid::Uuid;
@@ -27,7 +29,25 @@ pub fn order_handler() -> Router<Arc<AppState>> {
     Router::new()
         .route(ROOT, get(get_orders))
         .route(ROOT, post(place_order))
+        .route(ORDER_ID, get(get_order_details))
         .route(&format!("{CANCEL}{ORDER_ID}"), put(cancel_order))
+}
+
+async fn get_order_details(
+    State(app_state): State<Arc<AppState>>,
+    Extension(user_id): Extension<Uuid>,
+    Path(order_id): Path<Uuid>,
+) -> Result<impl IntoResponse, HttpError> {
+    let order_details = app_state
+        .pg_client
+        .get_order_details_by_id(user_id, order_id)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?
+        .ok_or(HttpError::not_found(
+            ErrorMessage::OrderNotFound.to_string(),
+        ))?;
+
+    Ok((StatusCode::OK, Json(order_details)))
 }
 
 async fn get_orders(
@@ -64,6 +84,7 @@ async fn get_orders(
             query_params.market_id,
             query_params.side,
             query_params.status,
+            query_params.order_type,
             query_params.before,
             query_params.after,
             order_by,
@@ -381,6 +402,12 @@ async fn cancel_order(
     {
         return Err(HttpError::bad_request(
             ErrorMessage::OrderNotOpen.to_string(),
+        ));
+    }
+
+    if order.order_type == OrderType::MARKET {
+        return Err(HttpError::bad_request(
+            ErrorMessage::NotLimitOrder.to_string(),
         ));
     }
 
