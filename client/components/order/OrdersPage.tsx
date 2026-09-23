@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ApiError } from "@/lib/api/http";
 import { getOrders } from "@/lib/order/order-api";
@@ -27,13 +27,21 @@ const DEFAULT_ORDER_QUERY: Required<OrdersQuery> = {
   after: "",
 };
 
+const ORDER_ROW_HEIGHT = 78;
+const ORDER_VIEWPORT_HEIGHT = 600;
+const ORDER_OVERSCAN = 5;
+
 export function OrdersPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [query, setQuery] = useState(DEFAULT_ORDER_QUERY);
   const [isOrdersLoading, setIsOrdersLoading] = useState(true);
+  const [hasMoreOrders, setHasMoreOrders] = useState(true);
+  const [scrollTop, setScrollTop] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const ordersViewportRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isLoading) {
@@ -45,6 +53,7 @@ export function OrdersPage() {
       setOrders([]);
       setError(null);
       setIsOrdersLoading(false);
+      setHasMoreOrders(false);
       return;
     }
 
@@ -55,7 +64,10 @@ export function OrdersPage() {
     getOrders(query)
       .then((response) => {
         if (isCurrent) {
-          setOrders(response);
+          setOrders((currentOrders) =>
+            query.skip === 0 ? response : [...currentOrders, ...response]
+          );
+          setHasMoreOrders(response.length === query.limit);
         }
       })
       .catch((caughtError: unknown) => {
@@ -76,30 +88,40 @@ export function OrdersPage() {
 
   function handleFilterChange(key: keyof Required<OrdersQuery>, value: string) {
     setIsOrdersLoading(true);
+    setOrders([]);
+    setScrollTop(0);
+    ordersViewportRef.current?.scrollTo({ top: 0 });
     setQuery((currentQuery) => ({
       ...currentQuery,
       [key]: key === "limit" || key === "skip" ? Number(value) : value,
-      ...(key === "side" || key === "status" || key === "order_type"
-        ? { skip: 0 }
-        : null),
+      skip: 0,
     }));
   }
 
-  function handlePrevious() {
-    setIsOrdersLoading(true);
-    setQuery((currentQuery) => ({
-      ...currentQuery,
-      skip: Math.max(0, currentQuery.skip - currentQuery.limit),
-    }));
-  }
+  useEffect(() => {
+    const viewport = ordersViewportRef.current;
+    const loadMore = loadMoreRef.current;
 
-  function handleNext() {
-    setIsOrdersLoading(true);
-    setQuery((currentQuery) => ({
-      ...currentQuery,
-      skip: currentQuery.skip + currentQuery.limit,
-    }));
-  }
+    if (!viewport || !loadMore || !isAuthenticated || !hasMoreOrders) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isOrdersLoading) {
+          setIsOrdersLoading(true);
+          setQuery((currentQuery) => ({
+            ...currentQuery,
+            skip: currentQuery.skip + currentQuery.limit,
+          }));
+        }
+      },
+      { root: viewport, rootMargin: "240px" }
+    );
+
+    observer.observe(loadMore);
+    return () => observer.disconnect();
+  }, [hasMoreOrders, isAuthenticated, isOrdersLoading]);
 
   if (isLoading) {
     return (
@@ -177,9 +199,13 @@ export function OrdersPage() {
           </div>
         ) : null}
 
-        <div className="mt-6 overflow-x-auto rounded-xl border border-border bg-card">
+        <div
+          ref={ordersViewportRef}
+          onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+          className="mt-6 max-h-[min(65vh,600px)] overflow-auto rounded-xl border border-border bg-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-            <thead className="bg-surface text-xs uppercase text-secondary">
+            <thead className="sticky top-0 z-10 bg-surface text-xs uppercase text-secondary">
               <tr>
                 <th className="border-b border-border px-3 py-3 font-medium">
                   Order type
@@ -201,65 +227,15 @@ export function OrdersPage() {
                 </th>
               </tr>
             </thead>
-            <tbody>
-              {isOrdersLoading ? (
+            <tbody style={{ height: orders.length * ORDER_ROW_HEIGHT }}>
+              {isOrdersLoading && orders.length === 0 ? (
                 <SkeletonOrderRows />
               ) : orders.length > 0 ? (
-                orders.map((order) => (
-                  <tr
-                    key={order.id}
-                    tabIndex={0}
-                    role="button"
-                    onClick={() => router.push(`/orders/${order.id}`)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        router.push(`/orders/${order.id}`);
-                      }
-                    }}
-                    className="cursor-pointer transition hover:bg-surface focus:bg-surface focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent"
-                  >
-                    <td className="border-b border-border px-3 py-3 text-text">
-                      {order.order_type}
-                    </td>
-                    <td className="border-b border-border px-3 py-3">
-                      <OrderSideBadge side={order.side} />
-                    </td>
-                    <td className="border-b border-border px-3 py-3 font-mono text-text">
-                      <div>{formatShares(order.shares)}</div>
-                      {!isMarketBuyOrder(order) ? (
-                        <div className="mt-1 text-xs text-secondary">
-                          {formatShares(order.remaining_shares)} remaining
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="border-b border-border px-3 py-3 font-mono text-text">
-                      {isMarketBuyOrder(order) ? (
-                        <>
-                          <div>{formatCurrency(order.quote_amount)}</div>
-                          <div className="mt-1 text-xs text-secondary">
-                            {formatCurrency(order.remaining_quote)} remaining
-                          </div>
-                        </>
-                      ) : isMarketSellOrder(order) ? (
-                        <div>{formatCurrency(order.average_price)} average</div>
-                      ) : (
-                        <>
-                          <div>{formatCurrency(order.price)}</div>
-                          <div className="mt-1 text-xs text-secondary">
-                            {formatCurrency(order.average_price)} average
-                          </div>
-                        </>
-                      )}
-                    </td>
-                    <td className="border-b border-border px-3 py-3">
-                      <OrderStatusBadge status={order.status} />
-                    </td>
-                    <td className="border-b border-border px-3 py-3 text-secondary">
-                      {formatDateTime(order.created_at)}
-                    </td>
-                  </tr>
-                ))
+                <VirtualizedOrderRows
+                  orders={orders}
+                  router={router}
+                  scrollTop={scrollTop}
+                />
               ) : (
                 <tr>
                   <td
@@ -272,25 +248,18 @@ export function OrdersPage() {
               )}
             </tbody>
           </table>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            disabled={query.skip === 0 || isOrdersLoading}
-            onClick={handlePrevious}
-            className="h-10 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-text transition hover:border-accent disabled:opacity-40"
+          <div
+            ref={loadMoreRef}
+            className="flex h-12 items-center justify-center"
           >
-            Previous
-          </button>
-          <button
-            type="button"
-            disabled={orders.length < query.limit || isOrdersLoading}
-            onClick={handleNext}
-            className="h-10 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-text transition hover:border-accent disabled:opacity-40"
-          >
-            Next
-          </button>
+            {isOrdersLoading && orders.length > 0 ? (
+              <span className="text-xs text-secondary">
+                Loading more orders...
+              </span>
+            ) : !hasMoreOrders && orders.length > 0 ? (
+              <span className="text-xs text-secondary">End of orders</span>
+            ) : null}
+          </div>
         </div>
       </div>
     </section>
@@ -358,6 +327,111 @@ function SelectField({
         ))}
       </select>
     </label>
+  );
+}
+
+function VirtualizedOrderRows({
+  orders,
+  router,
+  scrollTop,
+}: {
+  orders: Order[];
+  router: ReturnType<typeof useRouter>;
+  scrollTop: number;
+}) {
+  const firstVisibleIndex = Math.floor(scrollTop / ORDER_ROW_HEIGHT);
+  const firstRenderedIndex = Math.max(0, firstVisibleIndex - ORDER_OVERSCAN);
+  const lastRenderedIndex = Math.min(
+    orders.length,
+    Math.ceil((scrollTop + ORDER_VIEWPORT_HEIGHT) / ORDER_ROW_HEIGHT) +
+      ORDER_OVERSCAN
+  );
+  const visibleOrders = orders.slice(firstRenderedIndex, lastRenderedIndex);
+
+  return (
+    <>
+      <tr
+        aria-hidden="true"
+        style={{ height: firstRenderedIndex * ORDER_ROW_HEIGHT }}
+      >
+        <td colSpan={6} />
+      </tr>
+      {visibleOrders.map((order) => (
+        <tr
+          key={order.id}
+          tabIndex={0}
+          role="button"
+          style={{ height: ORDER_ROW_HEIGHT }}
+          onClick={() => router.push(`/orders/${order.id}`)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              router.push(`/orders/${order.id}`);
+            }
+          }}
+          className="cursor-pointer transition hover:bg-surface focus:bg-surface focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent"
+        >
+          <td className="border-b border-border px-3 py-3 text-text">
+            {order.order_type}
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <OrderSideBadge side={order.side} />
+          </td>
+          <td className="border-b border-border px-3 py-3 font-mono text-text">
+            <div>{formatShares(order.shares)}</div>
+            {!isMarketBuyOrder(order) ? (
+              <div className="mt-1 text-xs text-secondary">
+                {formatShares(order.remaining_shares)} remaining
+              </div>
+            ) : null}
+          </td>
+          <td className="border-b border-border px-3 py-3 font-mono text-text">
+            {isMarketBuyOrder(order) ? (
+              <>
+                <div>{formatCurrency(order.quote_amount)}</div>
+                <div className="mt-1 text-xs text-secondary">
+                  {formatCurrency(order.remaining_quote)} remaining
+                </div>
+              </>
+            ) : isMarketSellOrder(order) ? (
+              <div>{formatCurrency(order.average_price)} average</div>
+            ) : (
+              <>
+                <div>{formatCurrency(order.price)}</div>
+                <div className="mt-1 text-xs text-secondary">
+                  {formatCurrency(order.average_price)} average
+                </div>
+              </>
+            )}
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <OrderStatusBadge status={order.status} />
+          </td>
+          <td className="border-b border-border px-3 py-3 text-secondary">
+            {formatDateTime(order.created_at) ? (
+              <>
+                <div className="text-text">
+                  {formatDateTime(order.created_at)?.time}
+                </div>
+                <div className="mt-1 text-xs text-secondary">
+                  {formatDateTime(order.created_at)?.date}
+                </div>
+              </>
+            ) : (
+              "Unavailable"
+            )}
+          </td>
+        </tr>
+      ))}
+      <tr
+        aria-hidden="true"
+        style={{
+          height: (orders.length - lastRenderedIndex) * ORDER_ROW_HEIGHT,
+        }}
+      >
+        <td colSpan={6} />
+      </tr>
+    </>
   );
 }
 
@@ -431,13 +505,23 @@ function formatShares(value: string | number | null | undefined) {
 
 function formatDateTime(value: string | null | undefined) {
   if (!value) {
-    return "Unavailable";
+    return null;
   }
 
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return {
+    time: new Intl.DateTimeFormat("en-US", {
+      timeStyle: "short",
+    }).format(date),
+    date: new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+    }).format(date),
+  };
 }
 
 function getOrdersError(caughtError: unknown, fallback: string) {
