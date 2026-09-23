@@ -2,6 +2,7 @@
 export type OrderSide = "BUY" | "SELL";
 
 export type OrderType = "limit" | "market";
+export type OrderQueryType = "LIMIT" | "MARKET";
 
 export type OrderStatus = "PENDING" | "FILLED" | "CANCELLED" | "PARTIAL" | "EXPIRED";
 
@@ -65,6 +66,7 @@ export type OrdersQuery = {
   market_id?: string;
   side?: OrderSide | "";
   status?: OrderStatus | "";
+  order_type?: OrderQueryType | "";
   order_field?: OrderSortField;
   order_by?: "ASC" | "DESC";
   limit?: number;

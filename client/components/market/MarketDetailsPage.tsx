@@ -15,20 +15,8 @@ import { MarketOrderBook } from "@/components/market/MarketOrderBook";
 import { MarketPriceGraph } from "@/components/market/MarketPriceGraph";
 import { OrderForm } from "@/components/order/OrderForm";
 import { useOrderbookWebSocket } from "@/hooks/useOrderbookWebSocket";
-import { getOrders } from "@/lib/order/order-api";
-import type { Order, OrdersQuery } from "@/lib/order/types";
-
-const DEFAULT_MARKET_ORDER_QUERY: Required<OrdersQuery> = {
-  market_id: "",
-  order_by: "DESC",
-  order_field: "created_at",
-  side: "",
-  status: "",
-  limit: 5,
-  skip: 0,
-  before: "",
-  after: "",
-};
+import { cancelOrder, getOrders } from "@/lib/order/order-api";
+import type { Order } from "@/lib/order/types";
 
 export function MarketDetailsPage({ marketId }: { marketId: string }) {
   const { isLoading, isAuthenticated } = useAuth();
@@ -78,12 +66,11 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
   >([]);
   const [showMarketOrders, setShowMarketOrders] = useState(false);
   const [marketOrders, setMarketOrders] = useState<Order[]>([]);
-  const [marketOrderQuery, setMarketOrderQuery] = useState({
-    ...DEFAULT_MARKET_ORDER_QUERY,
-    market_id: marketId,
-  });
   const [isMarketOrdersLoading, setIsMarketOrdersLoading] = useState(false);
   const [marketOrdersError, setMarketOrdersError] = useState<string | null>(
+    null
+  );
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(
     null
   );
   // Initialize history when market loads
@@ -105,7 +92,6 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowMarketOrders(false);
       setMarketOrders([]);
-      setMarketOrderQuery(DEFAULT_MARKET_ORDER_QUERY);
       setMarketOrdersError(null);
       return;
     }
@@ -116,11 +102,28 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
     setIsMarketOrdersLoading(true);
     setMarketOrdersError(null);
 
-    getOrders(marketOrderQuery)
-      .then((ordersResponse) => {
+    Promise.all(
+      (["PENDING", "PARTIAL"] as const).map((status) =>
+        getOrders({
+          market_id: marketId,
+          order_by: "DESC",
+          order_field: "created_at",
+          order_type: "LIMIT",
+          status,
+        })
+      )
+    )
+      .then((ordersResponses) => {
         if (!isCurrent) return;
         setMarketOrders(
-          ordersResponse.filter((order) => order.market_id === marketId)
+          ordersResponses
+            .flat()
+            .filter((order) => order.market_id === marketId)
+            .sort(
+              (firstOrder, secondOrder) =>
+                new Date(secondOrder.created_at).getTime() -
+                new Date(firstOrder.created_at).getTime()
+            )
         );
       })
       .catch((caughtError: unknown) => {
@@ -140,13 +143,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
     return () => {
       isCurrent = false;
     };
-  }, [
-    isAuthenticated,
-    isLoading,
-    marketOrderQuery,
-    marketId,
-    showMarketOrders,
-  ]);
+  }, [isAuthenticated, isLoading, marketId, showMarketOrders]);
 
   // Add a graph point whenever the feed publishes a trade value.
   useEffect(() => {
@@ -177,32 +174,22 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
     });
   }, [currentPrices, market]);
 
-  function handleMarketOrderFilterChange(
-    key: keyof Required<OrdersQuery>,
-    value: string
-  ) {
-    setIsMarketOrdersLoading(true);
-    setMarketOrderQuery((currentQuery) => ({
-      ...currentQuery,
-      [key]: key === "limit" || key === "skip" ? Number(value) : value,
-      ...(key === "side" || key === "status" ? { skip: 0 } : null),
-    }));
-  }
+  async function handleCancelOrder(orderId: string) {
+    setCancellingOrderId(orderId);
+    setMarketOrdersError(null);
 
-  function handlePreviousMarketOrders() {
-    setIsMarketOrdersLoading(true);
-    setMarketOrderQuery((currentQuery) => ({
-      ...currentQuery,
-      skip: Math.max(0, currentQuery.skip - currentQuery.limit),
-    }));
-  }
-
-  function handleNextMarketOrders() {
-    setIsMarketOrdersLoading(true);
-    setMarketOrderQuery((currentQuery) => ({
-      ...currentQuery,
-      skip: currentQuery.skip + currentQuery.limit,
-    }));
+    try {
+      await cancelOrder(orderId);
+      setMarketOrders((currentOrders) =>
+        currentOrders.filter((order) => order.id !== orderId)
+      );
+    } catch (caughtError: unknown) {
+      setMarketOrdersError(
+        getMarketError(caughtError, "Unable to cancel this order.")
+      );
+    } finally {
+      setCancellingOrderId(null);
+    }
   }
 
   if (isLoading || isMarketLoading) {
@@ -384,80 +371,8 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                  <SelectField
-                    id="market-order-side"
-                    label="Side"
-                    value={marketOrderQuery.side}
-                    onChange={(value) =>
-                      handleMarketOrderFilterChange("side", value)
-                    }
-                    options={[
-                      { label: "All", value: "" },
-                      { label: "Buy", value: "BUY" },
-                      { label: "Sell", value: "SELL" },
-                    ]}
-                  />
-                  <SelectField
-                    id="market-order-status"
-                    label="Status"
-                    value={marketOrderQuery.status}
-                    onChange={(value) =>
-                      handleMarketOrderFilterChange("status", value)
-                    }
-                    options={[
-                      { label: "All", value: "" },
-                      { label: "Pending", value: "PENDING" },
-                      { label: "Filled", value: "FILLED" },
-                      { label: "Partially filled", value: "PARTIAL" },
-                      { label: "Cancelled", value: "CANCELLED" },
-                      { label: "Expired", value: "EXPIRED" },
-                    ]}
-                  />
-                  <SelectField
-                    id="market-order-field"
-                    label="Sort by"
-                    value={marketOrderQuery.order_field}
-                    onChange={(value) =>
-                      handleMarketOrderFilterChange("order_field", value)
-                    }
-                    options={[
-                      { label: "Created", value: "created_at" },
-                      { label: "Price", value: "price" },
-                      { label: "Shares", value: "shares" },
-                    ]}
-                  />
-                  <SelectField
-                    id="market-order-direction"
-                    label="Direction"
-                    value={marketOrderQuery.order_by}
-                    onChange={(value) =>
-                      handleMarketOrderFilterChange("order_by", value)
-                    }
-                    options={[
-                      { label: "Descending", value: "DESC" },
-                      { label: "Ascending", value: "ASC" },
-                    ]}
-                  />
-                  <SelectField
-                    id="market-order-limit"
-                    label="Limit"
-                    value={String(marketOrderQuery.limit)}
-                    onChange={(value) =>
-                      handleMarketOrderFilterChange("limit", value)
-                    }
-                    options={[
-                      { label: "5", value: "5" },
-                      { label: "10", value: "10" },
-                      { label: "15", value: "15" },
-                    ]}
-                  />
-                </div>
-              </div>
-
               <div className="overflow-x-auto rounded-xl border border-border bg-card">
-                <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+                <table className="w-full min-w-[960px] border-collapse text-left text-sm">
                   <thead className="bg-surface text-xs uppercase text-secondary">
                     <tr>
                       <th className="border-b border-border px-3 py-3 font-medium">
@@ -473,13 +388,13 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                         Status
                       </th>
                       <th className="border-b border-border px-3 py-3 font-medium">
-                        Order ID
-                      </th>
-                      <th className="border-b border-border px-3 py-3 font-medium">
                         Expires
                       </th>
                       <th className="border-b border-border px-3 py-3 font-medium">
                         Created
+                      </th>
+                      <th className="border-b border-border px-3 py-3 text-right font-medium">
+                        Action
                       </th>
                     </tr>
                   </thead>
@@ -507,14 +422,23 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                           <td className="border-b border-border px-3 py-3">
                             <OrderStatusBadge status={order.status} />
                           </td>
-                          <td className="border-b border-border px-3 py-3 font-mono text-xs text-secondary">
-                            {order.id}
-                          </td>
                           <td className="border-b border-border px-3 py-3 text-secondary">
                             {formatDateTime(order.expires_at)}
                           </td>
                           <td className="border-b border-border px-3 py-3 text-secondary">
                             {formatDateTime(order.created_at)}
+                          </td>
+                          <td className="border-b border-border px-3 py-3 text-right">
+                            <button
+                              type="button"
+                              disabled={cancellingOrderId !== null}
+                              onClick={() => handleCancelOrder(order.id)}
+                              className="h-9 rounded-lg border border-sell/40 bg-sell/10 px-3 text-sm font-semibold text-sell transition hover:bg-sell/20 disabled:opacity-40"
+                            >
+                              {cancellingOrderId === order.id
+                                ? "Cancelling..."
+                                : "Cancel"}
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -530,30 +454,6 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                     )}
                   </tbody>
                 </table>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  disabled={
-                    marketOrderQuery.skip === 0 || isMarketOrdersLoading
-                  }
-                  onClick={handlePreviousMarketOrders}
-                  className="h-10 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-text transition hover:border-accent disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  disabled={
-                    marketOrders.length < marketOrderQuery.limit ||
-                    isMarketOrdersLoading
-                  }
-                  onClick={handleNextMarketOrders}
-                  className="h-10 rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-text transition hover:border-accent disabled:opacity-40"
-                >
-                  Next
-                </button>
               </div>
             </div>
           ) : null}
@@ -571,40 +471,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
         {value}
       </span>
     </div>
-  );
-}
-
-function SelectField({
-  id,
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  options: Array<{ label: string; value: string }>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label htmlFor={id} className="block">
-      <span className="text-xs font-medium uppercase text-secondary">
-        {label}
-      </span>
-      <select
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/25"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 
@@ -790,13 +656,13 @@ function SkeletonMarketOrderRows() {
             <div className="h-6 w-20 rounded-full bg-surface" />
           </td>
           <td className="border-b border-border px-3 py-3">
-            <div className="h-3 w-28 rounded bg-surface" />
-          </td>
-          <td className="border-b border-border px-3 py-3">
             <div className="h-3 w-24 rounded bg-surface" />
           </td>
           <td className="border-b border-border px-3 py-3">
             <div className="h-3 w-24 rounded bg-surface" />
+          </td>
+          <td className="border-b border-border px-3 py-3 text-right">
+            <div className="ml-auto h-9 w-16 rounded-lg bg-surface" />
           </td>
         </tr>
       ))}

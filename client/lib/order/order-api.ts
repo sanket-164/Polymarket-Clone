@@ -19,6 +19,9 @@ export async function getOrders(query: OrdersQuery): Promise<Order[]> {
     if (query.side) {
         params.set("side", query.side);
     }
+    if (query.order_type) {
+        params.set("order_type", query.order_type);
+    }
     if (query.status) {
         params.set("status", query.status);
     }
@@ -47,5 +50,12 @@ export async function getOrders(query: OrdersQuery): Promise<Order[]> {
     return apiFetch<Order[]>(url, {
         baseUrl: ORDER_SERVICE_URL,
         method: "GET",
+    });
+}
+
+export async function cancelOrder(orderId: string): Promise<void> {
+    await apiFetch(`/api/order/cancel/${encodeURIComponent(orderId)}`, {
+        baseUrl: ORDER_SERVICE_URL,
+        method: "PUT",
     });
 }

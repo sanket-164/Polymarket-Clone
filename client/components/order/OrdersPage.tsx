@@ -18,6 +18,7 @@ const DEFAULT_ORDER_QUERY: Required<OrdersQuery> = {
   order_field: "created_at",
   side: "",
   status: "",
+  order_type: "",
   limit: 5,
   skip: 0,
   before: "",
