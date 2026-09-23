@@ -18,6 +18,11 @@ import { useOrderbookWebSocket } from "@/hooks/useOrderbookWebSocket";
 import { cancelOrder, getOrders } from "@/lib/order/order-api";
 import type { Order } from "@/lib/order/types";
 
+type ActiveOrderStatus = Exclude<
+  Order["status"],
+  "EXPIRED" | "CANCELLED" | "FILLED"
+>;
+
 export function MarketDetailsPage({ marketId }: { marketId: string }) {
   const { isLoading, isAuthenticated } = useAuth();
   const [market, setMarket] = useState<MarketDetails | null>(null);
@@ -66,6 +71,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
   >([]);
   const [showMarketOrders, setShowMarketOrders] = useState(false);
   const [marketOrders, setMarketOrders] = useState<Order[]>([]);
+  const [selectedOutcomeId, setSelectedOutcomeId] = useState("");
   const [isMarketOrdersLoading, setIsMarketOrdersLoading] = useState(false);
   const [marketOrdersError, setMarketOrdersError] = useState<string | null>(
     null
@@ -73,6 +79,13 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(
     null
   );
+  const defaultOutcomeId = market?.first_outcome.id;
+
+  useEffect(() => {
+    // Reset the selected outcome when navigating to another market.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedOutcomeId("");
+  }, [marketId]);
   // Initialize history when market loads
   useEffect(() => {
     if (market && priceHistory.length === 0) {
@@ -98,6 +111,10 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
 
     if (!showMarketOrders || isLoading) return;
 
+    const outcomeId = selectedOutcomeId || defaultOutcomeId;
+
+    if (!outcomeId) return;
+
     let isCurrent = true;
     setIsMarketOrdersLoading(true);
     setMarketOrdersError(null);
@@ -106,6 +123,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
       (["PENDING", "PARTIAL"] as const).map((status) =>
         getOrders({
           market_id: marketId,
+          outcome_id: outcomeId,
           order_by: "DESC",
           order_field: "created_at",
           order_type: "LIMIT",
@@ -118,7 +136,10 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
         setMarketOrders(
           ordersResponses
             .flat()
-            .filter((order) => order.market_id === marketId)
+            .filter(
+              (order) =>
+                order.market_id === marketId && order.outcome_id === outcomeId
+            )
             .sort(
               (firstOrder, secondOrder) =>
                 new Date(secondOrder.created_at).getTime() -
@@ -143,7 +164,14 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
     return () => {
       isCurrent = false;
     };
-  }, [isAuthenticated, isLoading, marketId, showMarketOrders]);
+  }, [
+    isAuthenticated,
+    isLoading,
+    defaultOutcomeId,
+    marketId,
+    selectedOutcomeId,
+    showMarketOrders,
+  ]);
 
   // Add a graph point whenever the feed publishes a trade value.
   useEffect(() => {
@@ -305,6 +333,8 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
               firstOutcome={market.first_outcome}
               secondOutcome={market.second_outcome}
               currentPrices={currentPrices}
+              selectedOutcomeId={selectedOutcomeId || market.first_outcome.id}
+              onSelectedOutcomeChange={setSelectedOutcomeId}
             />
           )}
         </div>
@@ -351,13 +381,17 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-text">
-                Your Open Orders
+                Your Open Orders for{" "}
+                {getOutcomeLabel(
+                  market,
+                  selectedOutcomeId || market.first_outcome.id
+                )}
               </h2>
             </div>
             <button
               type="button"
               onClick={() => setShowMarketOrders((current) => !current)}
-              className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-semibold text-text transition hover:border-accent"
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-border bg-accent px-4 text-sm font-semibold text-text transition hover:border-accent"
             >
               {showMarketOrders ? "Hide" : "View"}
             </button>
@@ -390,7 +424,10 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                       <th className="border-b border-border px-3 py-3 font-medium">
                         Created
                       </th>
-                      <th className="border-b border-border px-3 py-3 text-right font-medium">
+                      <th className="border-b border-border px-3 py-3 font-medium">
+                        View
+                      </th>
+                      <th className="border-b border-border px-3 py-3 font-medium">
                         Action
                       </th>
                     </tr>
@@ -420,37 +457,39 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                             </div>
                           </td>
                           <td className="border-b border-border px-3 py-3">
-                            <OrderStatusBadge status={order.status} />
+                            <OrderStatusBadge
+                              status={order.status as ActiveOrderStatus}
+                            />
                           </td>
                           <td className="border-b border-border px-3 py-3 text-secondary">
                             {formatDateTime(order.created_at)}
                           </td>
-                          <td className="border-b border-border px-3 py-3 text-right">
-                            <div className="flex justify-end gap-2">
-                              <Link
-                                href={`/orders/${order.id}`}
-                                className="inline-flex h-9 items-center justify-center rounded-lg border border-accent bg-accent px-3 text-sm font-semibold text-text transition hover:brightness-110"
-                              >
-                                View
-                              </Link>
-                              <button
-                                type="button"
-                                disabled={cancellingOrderId !== null}
-                                onClick={() => handleCancelOrder(order.id)}
-                                className="h-9 rounded-lg border border-sell/40 bg-sell/10 px-3 text-sm font-semibold text-sell transition hover:bg-sell/20 disabled:opacity-40"
-                              >
-                                {cancellingOrderId === order.id
-                                  ? "Cancelling..."
-                                  : "Cancel"}
-                              </button>
-                            </div>
+                          <td className="border-b border-border px-3 py-3">
+                            <Link
+                              href={`/orders/${order.id}`}
+                              className="inline-flex h-9 items-center justify-center rounded-lg border border-accent/40 bg-accent/10 px-3 w-full text-sm font-semibold text-accent transition hover:bg-accent/20 disabled:opacity-40"
+                            >
+                              Details
+                            </Link>
+                          </td>
+                          <td className="border-b border-border px-3 py-3">
+                            <button
+                              type="button"
+                              disabled={cancellingOrderId !== null}
+                              onClick={() => handleCancelOrder(order.id)}
+                              className="h-9 rounded-lg border border-sell/40 bg-sell/10 px-3 w-full text-sm font-semibold text-sell transition hover:bg-sell/20 disabled:opacity-40"
+                            >
+                              {cancellingOrderId === order.id
+                                ? "Cancelling..."
+                                : "Cancel"}
+                            </button>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={7}
                           className="px-3 py-6 text-center text-secondary"
                         >
                           No orders found for this market.
@@ -479,6 +518,14 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function getOutcomeLabel(market: MarketDetails, outcomeId: string) {
+  if (outcomeId === market.second_outcome.id) {
+    return market.second_outcome.label;
+  }
+
+  return market.first_outcome.label;
+}
+
 function OrderSideBadge({ side }: { side: Order["side"] }) {
   const isBuy = side === "BUY";
 
@@ -495,14 +542,11 @@ function OrderSideBadge({ side }: { side: Order["side"] }) {
   );
 }
 
-function OrderStatusBadge({ status }: { status: Order["status"] }) {
+function OrderStatusBadge({ status }: { status: ActiveOrderStatus }) {
   const classes = {
     PENDING: "border-accent/30 bg-accent/15 text-accent",
-    FILLED: "border-buy/30 bg-buy/15 text-buy",
-    CANCELLED: "border-border bg-card text-secondary",
     PARTIAL: "border-accent/30 bg-accent/15 text-accent",
-    EXPIRED: "border-border bg-card text-secondary",
-  } satisfies Record<Order["status"], string>;
+  } satisfies Record<ActiveOrderStatus, string>;
 
   return (
     <span
@@ -664,7 +708,10 @@ function SkeletonMarketOrderRows() {
             <div className="h-3 w-24 rounded bg-surface" />
           </td>
           <td className="border-b border-border px-3 py-3 text-right">
-            <div className="ml-auto h-9 w-32 rounded-lg bg-surface" />
+            <div className="ml-auto h-9 w-20 rounded-lg bg-surface" />
+          </td>
+          <td className="border-b border-border px-3 py-3 text-right">
+            <div className="ml-auto h-9 w-16 rounded-lg bg-surface" />
           </td>
         </tr>
       ))}

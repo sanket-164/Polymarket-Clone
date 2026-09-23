@@ -82,6 +82,7 @@ async fn get_orders(
         .get_user_orders(
             user_id,
             query_params.market_id,
+            query_params.outcome_id,
             query_params.side,
             query_params.status,
             query_params.order_type,

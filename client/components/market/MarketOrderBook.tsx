@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type {
   MarketDetails,
   MarketSnapshot,
@@ -12,6 +11,8 @@ type MarketOrderBookProps = {
   firstOutcome: MarketDetails["first_outcome"];
   secondOutcome: MarketDetails["second_outcome"];
   currentPrices?: Record<string, string>;
+  selectedOutcomeId: string;
+  onSelectedOutcomeChange: (outcomeId: string) => void;
 };
 
 export function MarketOrderBook({
@@ -19,11 +20,9 @@ export function MarketOrderBook({
   firstOutcome,
   secondOutcome,
   currentPrices = {},
+  selectedOutcomeId,
+  onSelectedOutcomeChange,
 }: MarketOrderBookProps) {
-  const [selectedOutcomeId, setSelectedOutcomeId] = useState<string>(
-    snapshot.snapshot[0]?.outcome_id || ""
-  );
-
   const selectedOutcome = snapshot.snapshot.find(
     (o) => o.outcome_id === selectedOutcomeId
   );
@@ -50,7 +49,7 @@ export function MarketOrderBook({
           {snapshot.snapshot.map((outcome) => (
             <button
               key={outcome.outcome_id}
-              onClick={() => setSelectedOutcomeId(outcome.outcome_id)}
+              onClick={() => onSelectedOutcomeChange(outcome.outcome_id)}
               className={`rounded-md px-4 py-1.5 text-sm font-medium transition w-full ${
                 selectedOutcomeId === outcome.outcome_id
                   ? "text-text shadow-sm bg-blue-600"

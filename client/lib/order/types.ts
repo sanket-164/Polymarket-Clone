@@ -84,6 +84,7 @@ export type OrderSortField = "shares" | "price" | "created_at";
 
 export type OrdersQuery = {
   market_id?: string;
+  outcome_id?: string;
   side?: OrderSide | "";
   status?: OrderStatus | "";
   order_type?: OrderQueryType | "";

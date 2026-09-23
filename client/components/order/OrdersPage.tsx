@@ -15,6 +15,7 @@ import type {
 
 const DEFAULT_ORDER_QUERY: Required<OrdersQuery> = {
   market_id: "",
+  outcome_id: "",
   order_by: "DESC",
   order_field: "created_at",
   side: "",

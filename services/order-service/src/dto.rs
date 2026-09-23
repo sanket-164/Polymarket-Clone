@@ -115,6 +115,7 @@ fn validate_before_after(dto: &OrderQueryDTO) -> Result<(), ValidationError> {
 #[validate(schema(function = "validate_before_after"))]
 pub struct OrderQueryDTO {
     pub market_id: Option<Uuid>,
+    pub outcome_id: Option<Uuid>,
     pub side: Option<OrderSide>,
     pub status: Option<OrderStatus>,
     pub order_type: Option<OrderType>,

@@ -16,6 +16,9 @@ export async function getOrders(query: OrdersQuery): Promise<Order[]> {
     if (query.market_id) {
         params.set("market_id", query.market_id);
     }
+    if (query.outcome_id) {
+        params.set("outcome_id", query.outcome_id);
+    }
     if (query.side) {
         params.set("side", query.side);
     }

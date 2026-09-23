@@ -57,6 +57,7 @@ pub trait OrderExt {
         &self,
         user_id: Uuid,
         market_id: Option<Uuid>,
+        outcome_id: Option<Uuid>,
         side: Option<OrderSide>,
         status: Option<OrderStatus>,
         order_type: Option<OrderType>,
@@ -262,6 +263,7 @@ impl OrderExt for PGClient {
         &self,
         user_id: Uuid,
         market_id: Option<Uuid>,
+        outcome_id: Option<Uuid>,
         side: Option<OrderSide>,
         status: Option<OrderStatus>,
         order_type: Option<OrderType>,
@@ -281,6 +283,10 @@ impl OrderExt for PGClient {
 
         if market_id.is_some() {
             query.push_str(&format!(" AND market_id = ${param_index}"));
+            param_index += 1;
+        }
+        if outcome_id.is_some() {
+            query.push_str(&format!(" AND outcome_id = ${param_index}"));
             param_index += 1;
         }
         if side.is_some() {
@@ -315,6 +321,9 @@ impl OrderExt for PGClient {
 
         if let Some(mid) = market_id {
             q = q.bind(mid);
+        }
+        if let Some(oid) = outcome_id {
+            q = q.bind(oid);
         }
         if let Some(ot) = side {
             q = q.bind(ot);
