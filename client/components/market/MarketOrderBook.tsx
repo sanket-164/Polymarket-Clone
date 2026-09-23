@@ -12,7 +12,6 @@ type MarketOrderBookProps = {
   secondOutcome: MarketDetails["second_outcome"];
   currentPrices?: Record<string, string>;
   selectedOutcomeId: string;
-  onSelectedOutcomeChange: (outcomeId: string) => void;
 };
 
 export function MarketOrderBook({
@@ -21,7 +20,6 @@ export function MarketOrderBook({
   secondOutcome,
   currentPrices = {},
   selectedOutcomeId,
-  onSelectedOutcomeChange,
 }: MarketOrderBookProps) {
   const selectedOutcome = snapshot.snapshot.find(
     (o) => o.outcome_id === selectedOutcomeId
@@ -38,32 +36,7 @@ export function MarketOrderBook({
   if (!selectedOutcome) return null;
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-6">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-text">Order Book</h2>
-        </div>
-
-        {/* Outcome Toggle Tabs */}
-        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
-          {snapshot.snapshot.map((outcome) => (
-            <button
-              key={outcome.outcome_id}
-              onClick={() => onSelectedOutcomeChange(outcome.outcome_id)}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium transition w-full ${
-                selectedOutcomeId === outcome.outcome_id
-                  ? "text-text shadow-sm bg-blue-600"
-                  : "text-secondary hover:text-text"
-              }`}
-            >
-              {outcome.outcome_label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <OrderBookView snapshot={selectedOutcome} currentPrice={currentPrice} />
-    </div>
+    <OrderBookView snapshot={selectedOutcome} currentPrice={currentPrice} />
   );
 }
 
@@ -109,8 +82,9 @@ function OrderBookView({
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       {/* Table Header */}
-      <div className="grid grid-cols-2 border-b border-border bg-surface px-4 py-2 text-xs font-medium uppercase tracking-wider text-secondary">
+      <div className="grid grid-cols-3 border-b border-border bg-surface px-4 py-2 text-xs font-medium uppercase tracking-wider text-secondary">
         <div className="text-left">Price</div>
+        <div className="text-center">Orderbook</div>
         <div className="text-right">Qty</div>
       </div>
 

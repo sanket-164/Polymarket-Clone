@@ -190,6 +190,7 @@ interface OrderFormProps {
   firstOutcome: Outcome;
   secondOutcome: Outcome;
   currentPrices: Record<string, string>;
+  onOutcomeChange?: (outcomeId: string) => void;
   onSuccess?: () => void;
 }
 
@@ -209,6 +210,7 @@ export function OrderForm({
   firstOutcome,
   secondOutcome,
   currentPrices,
+  onOutcomeChange,
   onSuccess,
 }: OrderFormProps) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -223,7 +225,6 @@ export function OrderForm({
   const [expiration, setExpiration] = useState<ExpirationKey>("never");
   const [customExpiration, setCustomExpiration] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false);
 
   const expiresAt = useMemo(
@@ -269,7 +270,6 @@ export function OrderForm({
 
   const handleOrderTypeChange = (orderType: OrderType) => {
     setFormState((prev) => ({ ...prev, orderType }));
-    setError(null);
   };
 
   const handleOutcomeChange = (outcomeId: string) => {
@@ -282,7 +282,7 @@ export function OrderForm({
       price: Number(newLivePrice).toFixed(2),
     }));
 
-    setError(null);
+    onOutcomeChange?.(outcomeId);
   };
 
   const handleSharesChange = (delta: number) => {
@@ -313,21 +313,25 @@ export function OrderForm({
     const submitQuantityLabel =
       isMarketOrder && side === "BUY" ? "Amount" : "Shares";
 
+    if (new Date(marketCloseAt).getTime() < new Date().getTime()) {
+      showError("Market is closed. Cannot place order.");
+      return;
+    }
+
     if (formState.shares <= 0) {
-      setError(`${submitQuantityLabel} must be greater than 0`);
+      showError(`${submitQuantityLabel} must be greater than 0`);
       return;
     }
     if (!isMarketOrder && (priceNum <= 0 || priceNum > 1)) {
-      setError("Price must be between 0.01 and 1.00");
+      showError("Price must be between 0.01 and 1.00");
       return;
     }
     if (!isMarketOrder && expiration === "custom" && !expiresAt) {
-      setError("Please pick an expiration date and time");
+      showError("Please pick an expiration date and time");
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
     setFormState((prev) => ({ ...prev, side }));
 
     try {
@@ -370,7 +374,6 @@ export function OrderForm({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to place order";
-      setError(message);
       showError(message);
     } finally {
       setIsSubmitting(false);
@@ -537,11 +540,6 @@ export function OrderForm({
         </div>
       )}
 
-      {error && (
-        <div className="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
-          {error}
-        </div>
-      )}
       {/* Order actions */}
       <div className="grid grid-cols-2 gap-2">
         <button

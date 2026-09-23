@@ -10,7 +10,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { formatProbability } from "@/components/market/market-format";
+import {
+  formatDateTime,
+  formatProbability,
+  formatShares,
+} from "@/components/market/market-format";
 import type { MarketDetails } from "@/lib/market/types";
 
 type PriceHistoryPoint = {
@@ -22,6 +26,7 @@ type PriceHistoryPoint = {
 type MarketPriceGraphProps = {
   firstOutcome: MarketDetails["first_outcome"];
   secondOutcome: MarketDetails["second_outcome"];
+  marketCloseAt: string;
   priceHistory: PriceHistoryPoint[];
 };
 
@@ -31,6 +36,7 @@ const SELL_COLOR = "#ef4444"; // rose-500
 export function MarketPriceGraph({
   firstOutcome,
   secondOutcome,
+  marketCloseAt,
   priceHistory,
 }: MarketPriceGraphProps) {
   // Keep only the last 20 trade points to prevent clutter and focus on recent activity
@@ -182,6 +188,48 @@ export function MarketPriceGraph({
           value={formatProbability(currentSecondPrice.toString())}
         />
       </div>
+
+      <div className="mt-3 grid gap-2 border-t border-border pt-3 text-sm sm:grid-cols-3">
+        <MarketMetric
+          label={`Total ${firstOutcome.label} shares`}
+          value={formatShares(firstOutcome.total_shares)}
+        />
+        <MarketMetric
+          label="Closes"
+          value={formatDateTime(marketCloseAt)}
+          align="center"
+        />
+        <MarketMetric
+          label={`Total ${secondOutcome.label} shares`}
+          value={formatShares(secondOutcome.total_shares)}
+          align="right"
+        />
+      </div>
+    </div>
+  );
+}
+
+function MarketMetric({
+  label,
+  value,
+  align = "left",
+}: {
+  label: string;
+  value: string;
+  align?: "left" | "center" | "right";
+}) {
+  return (
+    <div
+      className={
+        align === "center"
+          ? "text-center"
+          : align === "right"
+            ? "text-right"
+            : undefined
+      }
+    >
+      <div className="text-xs text-secondary">{label}</div>
+      <div className="mt-1 font-medium text-text tabular-nums">{value}</div>
     </div>
   );
 }

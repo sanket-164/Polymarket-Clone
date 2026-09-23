@@ -328,6 +328,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
             <MarketPriceGraph
               firstOutcome={market.first_outcome}
               secondOutcome={market.second_outcome}
+              marketCloseAt={market.close_at}
               priceHistory={priceHistory}
             />
           </div>
@@ -340,49 +341,38 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
               secondOutcome={market.second_outcome}
               currentPrices={currentPrices}
               selectedOutcomeId={selectedOutcomeId || market.first_outcome.id}
-              onSelectedOutcomeChange={setSelectedOutcomeId}
             />
           )}
         </div>
 
-        {/* Right Column: Limit Order Form & Market Details */}
-        <div className="border border-border bg-surface rounded-2xl lg:col-span-1">
-          {/* Limit Order Form */}
-          {isMarketActive ? (
-            <OrderForm
-              marketId={marketId}
-              marketCloseAt={market.close_at}
-              firstOutcome={market.first_outcome}
-              secondOutcome={market.second_outcome}
-              currentPrices={currentPrices}
-              onSuccess={() => {
-                // Optionally refresh orderbook or show notification
-              }}
-            />
-          ) : (
-            <div className="border-b border-border p-6">
-              <p className="text-sm font-medium text-text">
-                Market is {market.status}
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-3 p-6">
-            <DetailRow
-              label={`Available ${market.first_outcome.label} Shares`}
-              value={formatShares(Number(market.first_outcome.total_shares))}
-            />
-            <DetailRow
-              label={`Available ${market.second_outcome.label} Shares`}
-              value={formatShares(Number(market.second_outcome.total_shares))}
-            />
-            <DetailRow label="Starts" value={formatDateTime(market.start_at)} />
-            <DetailRow label="Closes" value={formatDateTime(market.close_at)} />
+        {/* Right Column: Market Details & Order Form */}
+        <div className="self-start space-y-6 lg:sticky lg:top-20 lg:col-span-1">
+          <div className="rounded-2xl border border-border bg-surface">
+            {/* Limit Order Form */}
+            {isMarketActive ? (
+              <OrderForm
+                marketId={marketId}
+                marketCloseAt={market.close_at}
+                firstOutcome={market.first_outcome}
+                secondOutcome={market.second_outcome}
+                currentPrices={currentPrices}
+                onOutcomeChange={setSelectedOutcomeId}
+                onSuccess={() => {
+                  // Optionally refresh orderbook or show notification
+                }}
+              />
+            ) : (
+              <div className="p-6">
+                <p className="text-sm font-medium text-text">
+                  Market is {market.status}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {isAuthenticated ? (
+      {isAuthenticated && isMarketActive ? (
         <div className="mt-6 rounded-2xl border border-border bg-surface p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -510,17 +500,6 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
         </div>
       ) : null}
     </section>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between border-b border-border/50 pb-2 last:border-0 last:pb-0">
-      <span className="text-sm text-secondary">{label}</span>
-      <span className="text-sm font-medium text-text tabular-nums">
-        {value}
-      </span>
-    </div>
   );
 }
 
