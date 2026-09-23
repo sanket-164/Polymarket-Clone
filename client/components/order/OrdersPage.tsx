@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ApiError } from "@/lib/api/http";
@@ -19,13 +20,14 @@ const DEFAULT_ORDER_QUERY: Required<OrdersQuery> = {
   side: "",
   status: "",
   order_type: "",
-  limit: 5,
+  limit: 10,
   skip: 0,
   before: "",
   after: "",
 };
 
 export function OrdersPage() {
+  const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [query, setQuery] = useState(DEFAULT_ORDER_QUERY);
@@ -76,7 +78,9 @@ export function OrdersPage() {
     setQuery((currentQuery) => ({
       ...currentQuery,
       [key]: key === "limit" || key === "skip" ? Number(value) : value,
-      ...(key === "side" || key === "status" ? { skip: 0 } : null),
+      ...(key === "side" || key === "status" || key === "order_type"
+        ? { skip: 0 }
+        : null),
     }));
   }
 
@@ -123,14 +127,10 @@ export function OrdersPage() {
           <div>
             <p className="text-sm text-secondary">Trading activity</p>
             <h1 className="mt-1 text-2xl font-bold text-text sm:text-3xl">
-              Orders
+              Review your orders
             </h1>
-            <p className="mt-2 text-sm text-secondary">
-              Review your buy and sell orders with the same filters as your
-              profile view.
-            </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-3 lg:w-[780px]">
+          <div className="grid gap-2 sm:grid-cols-3 lg:w-[480px]">
             <SelectField
               id="order-side"
               label="Side"
@@ -157,35 +157,14 @@ export function OrdersPage() {
               ]}
             />
             <SelectField
-              id="order-field"
-              label="Sort by"
-              value={query.order_field}
-              onChange={(value) => handleFilterChange("order_field", value)}
+              id="order-type"
+              label="Order type"
+              value={query.order_type}
+              onChange={(value) => handleFilterChange("order_type", value)}
               options={[
-                { label: "Created", value: "created_at" },
-                { label: "Price", value: "price" },
-                { label: "Shares", value: "shares" },
-              ]}
-            />
-            <SelectField
-              id="order-direction"
-              label="Direction"
-              value={query.order_by}
-              onChange={(value) => handleFilterChange("order_by", value)}
-              options={[
-                { label: "Descending", value: "DESC" },
-                { label: "Ascending", value: "ASC" },
-              ]}
-            />
-            <SelectField
-              id="order-limit"
-              label="Limit"
-              value={String(query.limit)}
-              onChange={(value) => handleFilterChange("limit", value)}
-              options={[
-                { label: "5", value: "5" },
-                { label: "10", value: "10" },
-                { label: "15", value: "15" },
+                { label: "All", value: "" },
+                { label: "Limit", value: "LIMIT" },
+                { label: "Market", value: "MARKET" },
               ]}
             />
           </div>
@@ -198,9 +177,12 @@ export function OrdersPage() {
         ) : null}
 
         <div className="mt-6 overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[760px] border-collapse text-left text-sm">
             <thead className="bg-surface text-xs uppercase text-secondary">
               <tr>
+                <th className="border-b border-border px-3 py-3 font-medium">
+                  Order type
+                </th>
                 <th className="border-b border-border px-3 py-3 font-medium">
                   Side
                 </th>
@@ -214,15 +196,6 @@ export function OrdersPage() {
                   Status
                 </th>
                 <th className="border-b border-border px-3 py-3 font-medium">
-                  Market
-                </th>
-                <th className="border-b border-border px-3 py-3 font-medium">
-                  Order ID
-                </th>
-                <th className="border-b border-border px-3 py-3 font-medium">
-                  Expires
-                </th>
-                <th className="border-b border-border px-3 py-3 font-medium">
                   Created
                 </th>
               </tr>
@@ -232,35 +205,54 @@ export function OrdersPage() {
                 <SkeletonOrderRows />
               ) : orders.length > 0 ? (
                 orders.map((order) => (
-                  <tr key={order.id} className="transition hover:bg-surface">
+                  <tr
+                    key={order.id}
+                    tabIndex={0}
+                    role="button"
+                    onClick={() => router.push(`/orders/${order.id}`)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        router.push(`/orders/${order.id}`);
+                      }
+                    }}
+                    className="cursor-pointer transition hover:bg-surface focus:bg-surface focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent"
+                  >
+                    <td className="border-b border-border px-3 py-3 text-text">
+                      {order.order_type}
+                    </td>
                     <td className="border-b border-border px-3 py-3">
                       <OrderSideBadge side={order.side} />
                     </td>
                     <td className="border-b border-border px-3 py-3 font-mono text-text">
                       <div>{formatShares(order.shares)}</div>
-                      <div className="text-xs text-secondary">
-                        {formatShares(order.remaining_shares)} remaining
-                      </div>
+                      {!isMarketBuyOrder(order) ? (
+                        <div className="mt-1 text-xs text-secondary">
+                          {formatShares(order.remaining_shares)} remaining
+                        </div>
+                      ) : null}
                     </td>
                     <td className="border-b border-border px-3 py-3 font-mono text-text">
-                      {formatCurrency(order.price)}
+                      {isMarketBuyOrder(order) ? (
+                        <>
+                          <div>{formatCurrency(order.quote_amount)}</div>
+                          <div className="mt-1 text-xs text-secondary">
+                            {formatCurrency(order.remaining_quote)} remaining
+                          </div>
+                        </>
+                      ) : isMarketSellOrder(order) ? (
+                        <div>{formatCurrency(order.average_price)} average</div>
+                      ) : (
+                        <>
+                          <div>{formatCurrency(order.price)}</div>
+                          <div className="mt-1 text-xs text-secondary">
+                            {formatCurrency(order.average_price)} average
+                          </div>
+                        </>
+                      )}
                     </td>
                     <td className="border-b border-border px-3 py-3">
                       <OrderStatusBadge status={order.status} />
-                    </td>
-                    <td className="border-b border-border px-3 py-3">
-                      <Link
-                        href={`/markets/${order.market_id}`}
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-text transition hover:border-accent"
-                      >
-                        Open market
-                      </Link>
-                    </td>
-                    <td className="border-b border-border px-3 py-3 font-mono text-xs text-secondary">
-                      {order.id}
-                    </td>
-                    <td className="border-b border-border px-3 py-3 text-secondary">
-                      {formatDateTime(order.expires_at)}
                     </td>
                     <td className="border-b border-border px-3 py-3 text-secondary">
                       {formatDateTime(order.created_at)}
@@ -270,7 +262,7 @@ export function OrdersPage() {
               ) : (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={6}
                     className="px-3 py-6 text-center text-secondary"
                   >
                     No orders found.
@@ -391,7 +383,7 @@ function OrderStatusBadge({ status }: { status: string }) {
   const className =
     normalizedStatus === "FILLED"
       ? "border-buy/30 bg-buy/15 text-buy"
-      : normalizedStatus === "CANCELLED"
+      : normalizedStatus === "CANCELLED" || normalizedStatus === "EXPIRED"
         ? "border-sell/30 bg-sell/15 text-sell"
         : normalizedStatus === "PARTIAL"
           ? "border-accent/30 bg-accent/15 text-accent"
@@ -404,6 +396,14 @@ function OrderStatusBadge({ status }: { status: string }) {
       {status.replace("_", " ")}
     </span>
   );
+}
+
+function isMarketBuyOrder(order: Order) {
+  return order.order_type === "MARKET" && order.side === "BUY";
+}
+
+function isMarketSellOrder(order: Order) {
+  return order.order_type === "MARKET" && order.side === "SELL";
 }
 
 function formatCurrency(value: string | number | null | undefined) {
@@ -457,6 +457,9 @@ function SkeletonOrderRows() {
       {Array.from({ length: 5 }).map((_, index) => (
         <tr key={index} className="animate-pulse">
           <td className="border-b border-border px-3 py-3">
+            <div className="h-4 w-20 rounded bg-surface" />
+          </td>
+          <td className="border-b border-border px-3 py-3">
             <div className="h-6 w-14 rounded-full bg-surface" />
           </td>
           <td className="border-b border-border px-3 py-3">
@@ -466,19 +469,16 @@ function SkeletonOrderRows() {
             </div>
           </td>
           <td className="border-b border-border px-3 py-3">
-            <div className="h-4 w-16 rounded bg-surface" />
+            <div className="space-y-2">
+              <div className="h-4 w-16 rounded bg-surface" />
+              <div className="h-3 w-28 rounded bg-surface" />
+            </div>
+          </td>
+          <td className="border-b border-border px-3 py-3">
+            <div className="h-4 w-20 rounded bg-surface" />
           </td>
           <td className="border-b border-border px-3 py-3">
             <div className="h-6 w-20 rounded-full bg-surface" />
-          </td>
-          <td className="border-b border-border px-3 py-3">
-            <div className="h-9 w-28 rounded-lg bg-surface" />
-          </td>
-          <td className="border-b border-border px-3 py-3">
-            <div className="h-3 w-28 rounded bg-surface" />
-          </td>
-          <td className="border-b border-border px-3 py-3">
-            <div className="h-3 w-24 rounded bg-surface" />
           </td>
           <td className="border-b border-border px-3 py-3">
             <div className="h-3 w-24 rounded bg-surface" />

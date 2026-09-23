@@ -351,7 +351,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-text">
-                Review your buy and sell activity
+                Your Open Orders
               </h2>
             </div>
             <button
@@ -372,7 +372,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
               ) : null}
 
               <div className="overflow-x-auto rounded-xl border border-border bg-card">
-                <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+                <table className="w-full min-w-[900px] border-collapse text-left text-sm">
                   <thead className="bg-surface text-xs uppercase text-secondary">
                     <tr>
                       <th className="border-b border-border px-3 py-3 font-medium">
@@ -386,9 +386,6 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                       </th>
                       <th className="border-b border-border px-3 py-3 font-medium">
                         Status
-                      </th>
-                      <th className="border-b border-border px-3 py-3 font-medium">
-                        Expires
                       </th>
                       <th className="border-b border-border px-3 py-3 font-medium">
                         Created
@@ -417,35 +414,43 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
                             </div>
                           </td>
                           <td className="border-b border-border px-3 py-3 font-mono text-text">
-                            {formatCurrency(order.price)}
+                            <div>{formatCurrency(order.price)}</div>
+                            <div className="mt-1 text-xs text-secondary">
+                              {formatCurrency(order.average_price)} average
+                            </div>
                           </td>
                           <td className="border-b border-border px-3 py-3">
                             <OrderStatusBadge status={order.status} />
                           </td>
                           <td className="border-b border-border px-3 py-3 text-secondary">
-                            {formatDateTime(order.expires_at)}
-                          </td>
-                          <td className="border-b border-border px-3 py-3 text-secondary">
                             {formatDateTime(order.created_at)}
                           </td>
                           <td className="border-b border-border px-3 py-3 text-right">
-                            <button
-                              type="button"
-                              disabled={cancellingOrderId !== null}
-                              onClick={() => handleCancelOrder(order.id)}
-                              className="h-9 rounded-lg border border-sell/40 bg-sell/10 px-3 text-sm font-semibold text-sell transition hover:bg-sell/20 disabled:opacity-40"
-                            >
-                              {cancellingOrderId === order.id
-                                ? "Cancelling..."
-                                : "Cancel"}
-                            </button>
+                            <div className="flex justify-end gap-2">
+                              <Link
+                                href={`/orders/${order.id}`}
+                                className="inline-flex h-9 items-center justify-center rounded-lg border border-accent bg-accent px-3 text-sm font-semibold text-text transition hover:brightness-110"
+                              >
+                                View
+                              </Link>
+                              <button
+                                type="button"
+                                disabled={cancellingOrderId !== null}
+                                onClick={() => handleCancelOrder(order.id)}
+                                className="h-9 rounded-lg border border-sell/40 bg-sell/10 px-3 text-sm font-semibold text-sell transition hover:bg-sell/20 disabled:opacity-40"
+                              >
+                                {cancellingOrderId === order.id
+                                  ? "Cancelling..."
+                                  : "Cancel"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td
-                          colSpan={7}
+                          colSpan={6}
                           className="px-3 py-6 text-center text-secondary"
                         >
                           No orders found for this market.
@@ -658,11 +663,8 @@ function SkeletonMarketOrderRows() {
           <td className="border-b border-border px-3 py-3">
             <div className="h-3 w-24 rounded bg-surface" />
           </td>
-          <td className="border-b border-border px-3 py-3">
-            <div className="h-3 w-24 rounded bg-surface" />
-          </td>
           <td className="border-b border-border px-3 py-3 text-right">
-            <div className="ml-auto h-9 w-16 rounded-lg bg-surface" />
+            <div className="ml-auto h-9 w-32 rounded-lg bg-surface" />
           </td>
         </tr>
       ))}

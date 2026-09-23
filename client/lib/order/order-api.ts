@@ -1,6 +1,6 @@
 import { ORDER_SERVICE_URL } from "@/lib/api/config";
 import { apiFetch } from "@/lib/api/http";
-import type { OrderRequest, Order, OrdersQuery } from "./types";
+import type { OrderRequest, Order, OrderDetail, OrdersQuery } from "./types";
 
 export async function placeOrder(request: OrderRequest): Promise<Order> {
     return apiFetch<Order>("/api/order", {
@@ -48,6 +48,13 @@ export async function getOrders(query: OrdersQuery): Promise<Order[]> {
     const url = `/api/order${queryString ? `?${queryString}` : ""}`;
 
     return apiFetch<Order[]>(url, {
+        baseUrl: ORDER_SERVICE_URL,
+        method: "GET",
+    });
+}
+
+export async function getOrder(orderId: string): Promise<OrderDetail> {
+    return apiFetch<OrderDetail>(`/api/order/${encodeURIComponent(orderId)}`, {
         baseUrl: ORDER_SERVICE_URL,
         method: "GET",
     });

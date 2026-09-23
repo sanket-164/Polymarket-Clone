@@ -47,10 +47,30 @@ export interface Order {
   shares: string;
   remaining_shares: string;
   price: string;
+  average_price: string;
+  quote_amount?: string;
+  remaining_quote?: string;
+  order_type: OrderQueryType;
   status: OrderStatus;
   created_at: string;
   updated_at: string;
   expires_at: string;
+}
+
+export interface OrderTrade {
+  id: string;
+  market_id: string;
+  buy_order_id: string;
+  sell_order_id: string;
+  shares: string;
+  price: string;
+  created_at: string;
+}
+
+export interface OrderDetail extends Order {
+  quote_amount: string;
+  remaining_quote: string;
+  trade: OrderTrade[];
 }
 
 export interface OrderFormData {
