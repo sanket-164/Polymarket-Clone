@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   formatDateTime,
@@ -86,8 +86,6 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
   const [marketOrdersError, setMarketOrdersError] = useState<string | null>(
     null
   );
-  const lastUpdateRef = useRef<number>(0);
-
   // Initialize history when market loads
   useEffect(() => {
     if (market && priceHistory.length === 0) {
@@ -150,14 +148,9 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
     showMarketOrders,
   ]);
 
-  // Update history when currentPrices change (throttled to avoid overwhelming the chart)
+  // Add a graph point whenever the feed publishes a trade value.
   useEffect(() => {
     if (!market || Object.keys(currentPrices).length === 0) return;
-
-    const now = Date.now();
-    // Throttle updates to once per 500ms for smooth performance
-    if (now - lastUpdateRef.current < 500) return;
-    lastUpdateRef.current = now;
 
     const firstPrice = Number(
       currentPrices[market.first_outcome.id] ??
@@ -168,6 +161,7 @@ export function MarketDetailsPage({ marketId }: { marketId: string }) {
         market.second_outcome.current_price
     );
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPriceHistory((prev) => {
       const newPoint = {
         time: new Date().toLocaleTimeString(),

@@ -8,6 +8,7 @@ interface OrderbookUpdate {
     quantity: string;
     price: string;
     timestamp: number; // Ensure this matches the unit of MarketSnapshot.updated_at (e.g., milliseconds)
+    trade: string | number;
 }
 
 export function useOrderbookWebSocket(
@@ -72,13 +73,7 @@ export function useOrderbookWebSocket(
                     for (const update of relevantUpdates) {
                         currentSnapshots = applyUpdate(currentSnapshots, update);
 
-                        // Update current price on trade execution (SELL with negative quantity)
-                        if (update.side === "SELL" && parseFloat(update.quantity) < 0) {
-                            setCurrentPrices((prev) => ({
-                                ...prev,
-                                [update.outcome_id]: update.price,
-                            }));
-                        }
+                        updateCurrentPrice(update, setCurrentPrices);
                     }
 
                     setSnapshots(currentSnapshots);
@@ -109,12 +104,8 @@ export function useOrderbookWebSocket(
                     }
                 }
 
-                // Update current price on trade execution (SELL with negative quantity)
-                if (isSyncedRef.current && isCurrent && data.side === "SELL" && parseFloat(data.quantity) < 0) {
-                    setCurrentPrices((prev) => ({
-                        ...prev,
-                        [data.outcome_id]: data.price,
-                    }));
+                if (isSyncedRef.current && isCurrent) {
+                    updateCurrentPrice(data, setCurrentPrices);
                 }
             } catch (err) {
                 console.error("WebSocket message error:", err);
@@ -138,6 +129,20 @@ export function useOrderbookWebSocket(
     }, [marketId, enabled]);
 
     return { snapshots, currentPrices, isSynced };
+}
+
+function updateCurrentPrice(
+    update: OrderbookUpdate,
+    setCurrentPrices: React.Dispatch<React.SetStateAction<Record<string, string>>>
+) {
+    const tradePrice = Number(update.trade);
+
+    if (!Number.isFinite(tradePrice) || tradePrice <= 0) return;
+
+    setCurrentPrices((prev) => ({
+        ...prev,
+        [update.outcome_id]: String(tradePrice),
+    }));
 }
 
 function applyUpdate(
