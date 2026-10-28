@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{Router, middleware, routing::get};
-use common::constant::{API, HOLDING, PROFILE, ROOT, WALLET};
+use common::constant::{API, HOLDING, PROFILE, ROOT, USER, WALLET};
 
 use crate::{
     AppState,
@@ -37,5 +37,5 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         )
         .with_state(app_state);
 
-    Router::new().nest(API, api_route)
+    Router::new().nest(&format!("{API}{USER}"), api_route)
 }

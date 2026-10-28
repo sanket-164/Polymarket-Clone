@@ -6,6 +6,7 @@ pub const ADMIN: &str = "/admin";
 pub const USER: &str = "/user";
 
 // Auth
+pub const AUTH: &str = "/auth";
 pub const SIGNUP: &str = "/signup";
 pub const SIGNIN: &str = "/signin";
 pub const SEND_OTP: &str = "/send-otp";

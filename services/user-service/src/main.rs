@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::http::{
-    Method,
+    HeaderValue, Method,
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
 };
 use common::{
@@ -31,13 +31,31 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() {
+    let server_config = ServerConfig::init();
+
     let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::mirror_request())
         .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE])
-        .allow_credentials(true)
         .allow_methods([Method::GET, Method::POST, Method::PUT]);
 
-    match ServerConfig::init().environment.as_str() {
+    let cors = match server_config.allow_origins.as_str() {
+        // No origin configured: allow any origin, but credentials must be off
+        "*" => cors.allow_origin(AllowOrigin::any()),
+
+        // Explicit origin(s): credentials are allowed
+        _ => {
+            let origins = server_config.allow_origins.as_str();
+            let list: Vec<HeaderValue> = origins
+                .split(',')
+                .map(|o| o.trim().parse::<HeaderValue>())
+                .collect::<Result<_, _>>()
+                .expect("invalid origin in server_config.allow_origins");
+
+            cors.allow_origin(AllowOrigin::list(list))
+                .allow_credentials(true)
+        }
+    };
+
+    match server_config.environment.as_str() {
         "production" => {
             tracing_subscriber::registry()
                 .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")))
@@ -109,11 +127,13 @@ async fn main() {
 
     let app = create_router(Arc::new(app_state.clone())).layer(cors.clone());
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{USER_PORT}"))
+    let server_port = server_config.port.unwrap_or(USER_PORT.to_string());
+
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{server_port}"))
         .await
         .unwrap();
 
-    println!("User Service is listening at http://localhost:{USER_PORT}");
+    println!("User Service is listening at http://localhost:{server_port}");
 
     axum::serve(listener, app).await.unwrap()
 }
