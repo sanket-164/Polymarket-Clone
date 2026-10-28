@@ -1,5 +1,5 @@
 # ---- Base image ----
-FROM node:20-alpine AS base
+FROM node:22.23.4-alpine3.24 AS base
 
 # ---- Dependencies stage ----
 FROM base AS deps
@@ -18,6 +18,9 @@ COPY . .
 
 # Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
+
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 RUN npm run build
 

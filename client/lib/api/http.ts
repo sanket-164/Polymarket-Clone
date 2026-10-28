@@ -1,4 +1,4 @@
-import { AUTH_SERVICE_URL } from "./config";
+import { BASE_API_URL } from "./config";
 import { clearStoredAccessToken, getStoredAccessToken, storeAccessToken } from "@/lib/auth/token-storage";
 import type { AuthTokenResponse } from "@/lib/auth/types";
 
@@ -24,7 +24,7 @@ export async function apiFetch<TResponse>(
   path: string,
   options: ApiFetchOptions = {},
 ): Promise<TResponse> {
-  const { auth = true, baseUrl = AUTH_SERVICE_URL, retryOnUnauthorized = true, headers, ...requestOptions } = options;
+  const { auth = true, baseUrl = BASE_API_URL, retryOnUnauthorized = true, headers, ...requestOptions } = options;
   const response = await fetch(buildApiUrl(path, baseUrl), {
     ...requestOptions,
     credentials: "include",
@@ -71,7 +71,7 @@ async function refreshAccessToken() {
   }
 }
 
-function buildApiUrl(path: string, baseUrl = AUTH_SERVICE_URL) {
+function buildApiUrl(path: string, baseUrl = BASE_API_URL) {
   return `${baseUrl}${path}`;
 }
 

@@ -1,4 +1,4 @@
-import { USER_SERVICE_URL } from "@/lib/api/config";
+import { BASE_API_URL } from "@/lib/api/config";
 import { apiFetch } from "@/lib/api/http";
 import type { Holding, HoldingsQuery } from "./types";
 
@@ -19,10 +19,10 @@ export async function getHoldings(query: HoldingsQuery = {}): Promise<Holding[]>
     }
 
     const queryString = params.toString();
-    const url = `/api/holding${queryString ? `?${queryString}` : ""}`;
+    const url = `/api/user/holding${queryString ? `?${queryString}` : ""}`;
 
     return apiFetch<Holding[]>(url, {
-        baseUrl: USER_SERVICE_URL,
+        baseUrl: BASE_API_URL,
         method: "GET",
     });
 }

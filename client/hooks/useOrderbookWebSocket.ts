@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import type { OutcomeSnapshot, OrderBookLevel, MarketSnapshot } from "../lib/market/types";
+import { BASE_API_URL } from "@/lib/api/config";
 
 interface OrderbookUpdate {
     market_id: string;
@@ -41,7 +42,7 @@ export function useOrderbookWebSocket(
         setSnapshots([]);
         setCurrentPrices({});
 
-        const ws = new WebSocket(process.env.NEXT_PUBLIC_FEED_SERVICE_URL || "");
+        const ws = new WebSocket(BASE_API_URL + "/api/feed/ws" || "");
         wsRef.current = ws;
 
         ws.onopen = () => {

@@ -10,7 +10,7 @@ import type {
 } from "./types";
 
 export async function signUp(payload: SignUpPayload) {
-  return apiFetch<User>("/api/user/signup", {
+  return apiFetch<User>("/api/auth/user/signup", {
     method: "POST",
     auth: false,
     body: JSON.stringify(payload),
@@ -18,7 +18,7 @@ export async function signUp(payload: SignUpPayload) {
 }
 
 export async function signIn(payload: SignInPayload) {
-  const response = await apiFetch<AuthTokenResponse>("/api/user/signin", {
+  const response = await apiFetch<AuthTokenResponse>("/api/auth/user/signin", {
     method: "POST",
     auth: false,
     body: JSON.stringify(payload),
@@ -30,7 +30,7 @@ export async function signIn(payload: SignInPayload) {
 }
 
 export async function sendOtp(email: string) {
-  return apiFetch<MessageResponse>("/api/user/send-otp", {
+  return apiFetch<MessageResponse>("/api/auth/user/send-otp", {
     method: "POST",
     auth: false,
     body: JSON.stringify({ email }),
@@ -38,7 +38,7 @@ export async function sendOtp(email: string) {
 }
 
 export async function resetPassword(payload: ResetPasswordPayload) {
-  return apiFetch<MessageResponse>("/api/user/reset-password", {
+  return apiFetch<MessageResponse>("/api/auth/user/reset-password", {
     method: "POST",
     auth: false,
     body: JSON.stringify(payload),
@@ -46,7 +46,7 @@ export async function resetPassword(payload: ResetPasswordPayload) {
 }
 
 export async function refreshSession() {
-  return apiFetch<AuthTokenResponse>("/api/user/refresh", {
+  return apiFetch<AuthTokenResponse>("/api/auth/user/refresh", {
     method: "POST",
     auth: false,
   });
@@ -54,7 +54,7 @@ export async function refreshSession() {
 
 export async function logout() {
   try {
-    return await apiFetch<MessageResponse>("/api/user/logout", {
+    return await apiFetch<MessageResponse>("/api/auth/user/logout", {
       method: "POST",
       auth: false,
     });
