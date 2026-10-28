@@ -13,7 +13,7 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
     let api_route = Router::new()
         .route(ROOT, get(health_check))
         .nest(
-            PROFILE,
+            &format!("{ADMIN}{PROFILE}"),
             profile_handler().layer(middleware::from_fn_with_state(
                 app_state.clone(),
                 auth_middleware,
@@ -21,5 +21,5 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         )
         .with_state(app_state);
 
-    Router::new().nest(&format!("{API}{ADMIN}"), api_route)
+    Router::new().nest(API, api_route)
 }

@@ -1,5 +1,15 @@
+# Shared healthcheck for the HTTP app services.
+x-app-healthcheck: &app-healthcheck
+  test: [ "CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/$${SERVICE_PORT}' || exit 1" ]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  start_period: 20s
+
 services:
+  # ───────────────────────── Infrastructure ─────────────────────────
   postgres:
+    container_name: polymarket-postgres
     build:
       context: .
       dockerfile: postgres/Dockerfile
@@ -23,8 +33,15 @@ services:
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U root -d polymarket" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   redpanda:
+    container_name: polymarket-redpanda
     image: redpandadata/redpanda:latest
     command:
       - redpanda
@@ -35,7 +52,7 @@ services:
       - --reserve-memory 0M
       - --node-id 0
       - --check=false
-      # FIX: Define two listeners (Internal for Docker, External for Host)
+      # Two listeners: Internal for Docker network, External for host
       - --kafka-addr INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
       - --advertise-kafka-addr INTERNAL://redpanda:29092,EXTERNAL://localhost:9092
       - --pandaproxy-addr 0.0.0.0:8082
@@ -46,8 +63,15 @@ services:
       - "29092:29092"
       - "8081:8081"
       - "8082:8082"
+    healthcheck:
+      test: [ "CMD-SHELL", "rpk cluster health | grep -qE 'Healthy:\\s+true'" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
 
   redpanda-console:
+    container_name: polymarket-redpanda-console
     image: redpandadata/console:latest
     environment:
       KAFKA_BROKERS: redpanda:29092
@@ -55,9 +79,17 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - redpanda
+      redpanda:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8080/admin/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   kafka-connect:
+    container_name: polymarket-kafka-connect
     image: debezium/connect:2.5
     environment:
       BOOTSTRAP_SERVERS: redpanda:29092
@@ -65,7 +97,7 @@ services:
       CONFIG_STORAGE_TOPIC: debezium_configs
       OFFSET_STORAGE_TOPIC: debezium_offsets
       STATUS_STORAGE_TOPIC: debezium_status
-      # Use JSON converters (no Schema Registry needed)
+      # JSON converters (no Schema Registry needed)
       KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       KEY_CONVERTER_SCHEMAS_ENABLE: "false"
@@ -73,11 +105,21 @@ services:
     ports:
       - "8083:8083"
     depends_on:
-      - redpanda
-      - postgres
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsS http://localhost:8083/connectors || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
 
   nats:
-    image: nats:latest
+    container_name: polymarket-nats
+    # alpine variant is used because the default image is scratch-based (no shell/wget)
+    image: nats:alpine
     command:
       - "--jetstream"
       - "--store_dir=/data"
@@ -89,29 +131,43 @@ services:
       - "8222:8222"
     volumes:
       - nats_data:/data
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8222/healthz || exit 1" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   redis:
+    container_name: polymarket-redis
     image: redis:7-alpine
     command:
       - redis-server
-      - --save 60 1 # persist if ≥1 key changes in 60s
-      - --loglevel warning
-      - --requirepass redispassword
-      - --maxmemory 256mb
-      - --maxmemory-policy allkeys-lru
+      - --save
+      - "60"
+      - "1" # persist if >=1 key changes in 60s
+      - --loglevel
+      - warning
+      - --requirepass
+      - redispassword
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: [ "CMD", "redis-cli", "-a", "redispassword", "ping" ]
+      test: [ "CMD-SHELL", "redis-cli -a redispassword ping 2>/dev/null | grep -q PONG" ]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5s
 
   clickhouse:
+    container_name: polymarket-clickhouse
     image: clickhouse/clickhouse-server:latest
-    container_name: clickhouse
     ports:
       - "8123:8123"
       - "9000:9000"
@@ -122,8 +178,16 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8123/ping || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
+  # ───────────────────────── Application services ─────────────────────────
   auth-service:
+    container_name: polymarket-auth-service
     build:
       context: .
       dockerfile: services/auth-service/Dockerfile
@@ -141,10 +205,14 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - SERVICE_PORT=${SERVICE_PORT}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
 
   user-service:
+    container_name: polymarket-user-service
     build:
       context: .
       dockerfile: services/user-service/Dockerfile
@@ -159,10 +227,14 @@ services:
       - ALLOW_ORIGINS=${ALLOW_ORIGINS}
       - SERVICE_PORT=${SERVICE_PORT}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
 
   order-service:
+    container_name: polymarket-order-service
     build:
       context: .
       dockerfile: services/order-service/Dockerfile
@@ -178,11 +250,16 @@ services:
       - ALLOW_ORIGINS=${ALLOW_ORIGINS}
       - SERVICE_PORT=${SERVICE_PORT}
     depends_on:
-      - postgres
-      - nats
-      - redis
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
 
   feed-service:
+    container_name: polymarket-feed-service
     build:
       context: .
       dockerfile: services/feed-service/Dockerfile
@@ -192,9 +269,12 @@ services:
       - ALLOW_ORIGINS=${ALLOW_ORIGINS}
       - SERVICE_PORT=${SERVICE_PORT}
     depends_on:
-      - nats
+      nats:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
 
   admin-service:
+    container_name: polymarket-admin-service
     build:
       context: .
       dockerfile: services/admin-service/Dockerfile
@@ -208,10 +288,14 @@ services:
       - ALLOW_ORIGINS=${ALLOW_ORIGINS}
       - SERVICE_PORT=${SERVICE_PORT}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
 
   market-service:
+    container_name: polymarket-market-service
     build:
       context: .
       dockerfile: services/market-service/Dockerfile
@@ -227,20 +311,28 @@ services:
       - ALLOW_ORIGINS=${ALLOW_ORIGINS}
       - SERVICE_PORT=${SERVICE_PORT}
     depends_on:
-      - postgres
-      - nats
-      - redis
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck: *app-healthcheck
 
+  # Background workers (no HTTP endpoint) - gated on their dependencies only.
   matching-engine:
+    container_name: polymarket-matching-engine
     build:
       context: .
       dockerfile: services/matching-engine/Dockerfile
     environment:
       - NATS_URL=${NATS_URL}
     depends_on:
-      - nats
+      nats:
+        condition: service_healthy
 
   cdc-service:
+    container_name: polymarket-cdc-service
     build:
       context: .
       dockerfile: services/cdc-service/Dockerfile
@@ -252,19 +344,47 @@ services:
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
       - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
     depends_on:
-      - postgres
-      - redpanda
-      - nats
-      - clickhouse
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
 
+  # ───────────────────────── Edge / Frontend ─────────────────────────
   nginx:
+    container_name: polymarket-nginx
     build:
       context: ./nginx
       dockerfile: Dockerfile
     ports:
       - "8000:80"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      feed-service:
+        condition: service_healthy
+      market-service:
+        condition: service_healthy
+      admin-service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:80/ || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
   client:
+    container_name: polymarket-client
     build:
       context: ./client
       dockerfile: Dockerfile
@@ -273,11 +393,22 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - auth-service
-      - user-service
-      - order-service
-      - feed-service
-      - market-service
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      feed-service:
+        condition: service_healthy
+      market-service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "node -e \"fetch('http://localhost:3000').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))\"" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 volumes:
   nats_data:

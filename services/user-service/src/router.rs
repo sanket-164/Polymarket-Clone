@@ -15,21 +15,21 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
     let api_route = Router::new()
         .route(ROOT, get(health_check))
         .nest(
-            PROFILE,
+            &format!("{USER}{PROFILE}"),
             profile_handler().layer(middleware::from_fn_with_state(
                 app_state.clone(),
                 auth_middleware,
             )),
         )
         .nest(
-            WALLET,
+            &format!("{USER}{WALLET}"),
             wallet_handler().layer(middleware::from_fn_with_state(
                 app_state.clone(),
                 auth_middleware,
             )),
         )
         .nest(
-            HOLDING,
+            &format!("{USER}{HOLDING}"),
             holding_handler().layer(middleware::from_fn_with_state(
                 app_state.clone(),
                 auth_middleware,
@@ -37,5 +37,5 @@ pub fn create_router(app_state: Arc<AppState>) -> Router {
         )
         .with_state(app_state);
 
-    Router::new().nest(&format!("{API}{USER}"), api_route)
+    Router::new().nest(API, api_route)
 }
