@@ -39,6 +39,18 @@ pub struct RegisterUserDTO {
 }
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
+pub struct VerifySignupDTO {
+    #[validate(
+        length(min = 1, message = "Email is required"),
+        email(message = "Provide valid email address")
+    )]
+    pub email: String,
+
+    #[validate(range(min = 100000, max = 999999, message = "OTP must be a 6 digit number"))]
+    pub otp: u32,
+}
+
+#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct LoginUserDTO {
     #[validate(
         length(min = 1, message = "Email is required"),
@@ -50,6 +62,13 @@ pub struct LoginUserDTO {
     pub password: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OtpReason {
+    SIGNUP,
+    PASSWORD,
+}
+
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct SendOtpDTO {
     #[validate(
@@ -57,6 +76,7 @@ pub struct SendOtpDTO {
         email(message = "Provide valid email address")
     )]
     pub email: String,
+    pub reason: OtpReason,
 }
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]

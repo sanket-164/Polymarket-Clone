@@ -9,6 +9,11 @@ import type {
   User,
 } from "./types";
 
+type VerifySignupPayload = {
+  email: string;
+  otp: number;
+};
+
 export async function signUp(payload: SignUpPayload) {
   return apiFetch<User>("/api/auth/user/signup", {
     method: "POST",
@@ -29,11 +34,19 @@ export async function signIn(payload: SignInPayload) {
   return response;
 }
 
-export async function sendOtp(email: string) {
+export async function sendOtp(email: string, reason: string) {
   return apiFetch<MessageResponse>("/api/auth/user/send-otp", {
     method: "POST",
     auth: false,
-    body: JSON.stringify({ email }),
+    body: JSON.stringify(reason ? { email, reason } : { email }),
+  });
+}
+
+export async function verifySignup(payload: VerifySignupPayload) {
+  return apiFetch<MessageResponse>("/api/auth/user/verify-signup", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify(payload),
   });
 }
 

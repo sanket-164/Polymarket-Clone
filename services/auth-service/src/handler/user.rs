@@ -16,7 +16,7 @@ use chrono::Utc;
 use common::{
     constant::{
         LOGOUT, OTP_CACHE_TTL, REFRESH, REFRESH_TOKEN, RESET_PASSWORD, SEND_OTP, SIGNIN, SIGNUP,
-        USER_TOKEN,
+        USER_TOKEN, VERIFY_SIGNUP,
     },
     error::{ErrorMessage, HttpError},
     util::{hash, jwt},
@@ -35,12 +35,16 @@ use sha2::{Digest, Sha256};
 use crate::{
     AppState,
     db::AuthExt,
-    dto::{LoginUserDTO, RegisterUserDTO, ResetPassword, SendOtpDTO, UserResponse},
+    dto::{
+        LoginUserDTO, OtpReason, RegisterUserDTO, ResetPassword, SendOtpDTO, UserResponse,
+        VerifySignupDTO,
+    },
 };
 
 pub fn user_auth_handler() -> Router<Arc<AppState>> {
     Router::new()
         .route(SIGNUP, post(signup))
+        .route(VERIFY_SIGNUP, post(verify_signup))
         .route(SIGNIN, post(signin))
         .route(SEND_OTP, post(send_otp))
         .route(REFRESH, post(refresh))
@@ -48,7 +52,7 @@ pub fn user_auth_handler() -> Router<Arc<AppState>> {
         .route(LOGOUT, post(logout))
 }
 
-fn build_otp_email_html(name: &str, otp: &str) -> String {
+fn build_otp_email_html(otp: &str, reason: &str, expire_min: u64) -> String {
     format!(
         r#"<!DOCTYPE html>
             <html>
@@ -70,7 +74,7 @@ fn build_otp_email_html(name: &str, otp: &str) -> String {
                     <tr>
                         <td style="padding: 0 40px 8px 40px; text-align:center;">
                         <p style="margin:0; font-size:15px; color:#4b5563; line-height:1.5;">
-                            Hi {name}, use the code below to complete your verification. This code will expire in 5 minutes.
+                            Use the code below to complete your {reason}. This code will expire in {expire_min} minutes.
                         </p>
                         </td>
                     </tr>
@@ -99,8 +103,9 @@ fn build_otp_email_html(name: &str, otp: &str) -> String {
             </table>
             </body>
             </html>"#,
-        name = name,
         otp = otp,
+        reason = reason,
+        expire_min = expire_min,
         year = chrono::Utc::now().format("%Y")
     )
 }
@@ -132,6 +137,48 @@ pub async fn signup(
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
     Ok((StatusCode::CREATED, Json(UserResponse::from(new_user))))
+}
+
+pub async fn verify_signup(
+    State(app_state): State<Arc<AppState>>,
+    Json(body): Json<VerifySignupDTO>,
+) -> Result<impl IntoResponse, HttpError> {
+    body.validate()
+        .map_err(|e| HttpError::bad_request(e.to_string()))?;
+
+    let redis_key = format!("otp:signup:{}", body.email);
+
+    let mut redis = app_state
+        .redis_pool
+        .get()
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let stored_otp: Option<String> = redis
+        .get(&redis_key)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    let stored_otp = stored_otp.ok_or(HttpError::unauthorized(
+        "OTP has expired or is invalid".to_string(),
+    ))?;
+
+    if stored_otp != body.otp.to_string() {
+        return Err(HttpError::bad_request("Invalid OTP".to_string()));
+    }
+
+    redis
+        .del::<_, ()>(&redis_key)
+        .await
+        .map_err(|e| HttpError::server_error(e.to_string()))?;
+
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "status": "success",
+            "message": "OTP verified successfully"
+        })),
+    ))
 }
 
 pub async fn signin(
@@ -317,9 +364,13 @@ pub async fn send_otp(
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    let user = existing_user.ok_or(HttpError::unauthorized(
-        ErrorMessage::WrongCredentials.to_string(),
-    ))?;
+    if body.reason == OtpReason::SIGNUP && existing_user.is_some() {
+        Err(HttpError::conflict(ErrorMessage::EmailExist.to_string()))?
+    } else if body.reason == OtpReason::PASSWORD && existing_user.is_none() {
+        Err(HttpError::bad_request(
+            ErrorMessage::WrongCredentials.to_string(),
+        ))?;
+    }
 
     let mut redis = app_state
         .redis_pool
@@ -330,13 +381,27 @@ pub async fn send_otp(
     let otp: u32 = rand::thread_rng().gen_range(100_000..=999_999);
     let otp_str = otp.to_string();
 
-    let redis_key = format!("otp:{}", body.email);
+    let redis_key = format!(
+        "otp:{}:{}",
+        match body.reason {
+            OtpReason::SIGNUP => "signup",
+            OtpReason::PASSWORD => "password",
+        },
+        body.email
+    );
     redis
         .set_ex::<_, _, ()>(&redis_key, &otp_str, OTP_CACHE_TTL)
         .await
         .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-    let html_body = build_otp_email_html(&user.name, &otp_str);
+    let html_body = build_otp_email_html(
+        &otp_str,
+        match body.reason {
+            OtpReason::SIGNUP => "sign up verification",
+            OtpReason::PASSWORD => "password reset verification",
+        },
+        OTP_CACHE_TTL / 60,
+    );
 
     let email = Message::builder()
         .from(
@@ -413,7 +478,7 @@ pub async fn reset_password(
             .await
             .map_err(|e| HttpError::server_error(e.to_string()))?;
 
-        let redis_key = format!("otp:{}", body.email);
+        let redis_key = format!("otp:password:{}", body.email);
 
         let stored_otp: Option<String> = redis
             .get(&redis_key)

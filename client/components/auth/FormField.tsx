@@ -6,6 +6,7 @@ type FormFieldProps = {
   autoComplete?: string;
   required?: boolean;
   minLength?: number;
+  disabled?: boolean;
 };
 
 export function FormField({
@@ -16,6 +17,7 @@ export function FormField({
   autoComplete,
   required = true,
   minLength,
+  disabled = false,
 }: FormFieldProps) {
   return (
     <label htmlFor={id} className="block">
@@ -27,6 +29,7 @@ export function FormField({
         autoComplete={autoComplete}
         required={required}
         minLength={minLength}
+        disabled={disabled}
         className="mt-2 h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-text outline-none transition placeholder:text-secondary focus:border-accent focus:ring-2 focus:ring-accent/25"
       />
     </label>

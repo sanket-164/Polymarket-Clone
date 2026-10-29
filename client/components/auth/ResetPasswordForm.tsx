@@ -28,7 +28,7 @@ export function ResetPasswordForm() {
     const email = String(formData.get("otpEmail"));
 
     try {
-      const response = await sendOtp(email);
+      const response = await sendOtp(email, "password");
       setOtpEmail(email);
       setIsOtpSent(true);
       showSuccess(response.message || "OTP sent to your email.");
