@@ -18,6 +18,21 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Backend API
+
+The browser calls the same-origin `/polymarket/*` route. The Next.js server forwards
+those requests to the backend configured by the server-only `BACKEND_API_URL`
+environment variable.
+
+For local development, create or update `.env` with:
+
+```env
+BACKEND_API_URL=http://localhost:8000
+```
+
+Do not use a `NEXT_PUBLIC_` prefix for this variable; that would expose the
+backend URL in the browser bundle.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
